@@ -1,0 +1,969 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "guild-hydra-war",
+  "description": "Guild/Clan info, Clan Clash, Clan War, Global Championship, Clan Trainings, Clan Inventory",
+  "methodCount": 13,
+  "methods": {
+    "clanClash_claimReward": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611140649._guild_rewardjson.json",
+        "capturedAt": "2026-11-13T23:49:09.310Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "ClashEventId": 1,
+        "ClaimedTypes": [
+          1
+        ]
+      },
+      "response": {}
+    },
+    "clanClash_getBoosters": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:09:58.761Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "ClashEventId": 1
+      },
+      "response": {
+        "clashEvent": {
+          "id": 17,
+          "updateTimestamp": 1794204600,
+          "boosters": {
+            "1216299788": [
+              {
+                "id": 5,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216305475": [
+              {
+                "id": 4,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216394683": [
+              {
+                "id": 4,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216420019": [
+              {
+                "id": 4,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              },
+              {
+                "id": 5,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216438103": [
+              {
+                "id": 2,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ]
+          },
+          "boostersUpdateTime": 1794794400
+        }
+      }
+    },
+    "clanClash_getCurrentState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "ClashEventId": 1
+      },
+      "response": {
+        "clashEvent": {
+          "id": 17,
+          "updateTimestamp": 1793594178,
+          "currentState": {
+            "type": 1,
+            "endTime": 1793829600,
+            "role": 1
+          },
+          "lanes": [
+            {
+              "laneId": 1,
+              "attackPower": 299526,
+              "defensePower": 189306,
+              "players": [
+                {
+                  "info": "[Object(5 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                },
+                {
+                  "info": "[Object(5 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                },
+                {
+                  "info": "[Object(4 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                }
+              ]
+            },
+            {
+              "laneId": 2,
+              "attackPower": 397803,
+              "defensePower": 262597,
+              "players": [
+                {
+                  "info": "[Object(4 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                },
+                {
+                  "info": "[Object(4 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                },
+                {
+                  "info": "[Object(4 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                }
+              ]
+            },
+            {
+              "laneId": 0,
+              "attackPower": 137844,
+              "defensePower": 135822,
+              "players": [
+                {
+                  "info": "[Object(5 keys)]",
+                  "attackers": "[Array(5)]",
+                  "defenders": "[Array(5)]"
+                }
+              ]
+            }
+          ],
+          "players": [],
+          "clans": [],
+          "cycleId": 1,
+          "round": {
+            "currentId": 0
+          },
+          "groupRanking": [],
+          "boosters": {
+            "1216250642": [
+              {
+                "id": 4,
+                "level": 2,
+                "levelByRound": {
+                  "0": 2
+                }
+              }
+            ],
+            "1216363456": [
+              {
+                "id": 4,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216399799": [
+              {
+                "id": 4,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ],
+            "1216420019": [
+              {
+                "id": 5,
+                "level": 1,
+                "levelByRound": {
+                  "0": 1
+                }
+              }
+            ]
+          },
+          "boostersUpdateTime": 1794189600
+        }
+      }
+    },
+    "clanGetActivityStat": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:30:02.913Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "clanActivity": 21944,
+        "dungeonActivity": 702,
+        "stat": {
+          "todayActivity": 1786,
+          "activitySum": 15792,
+          "dungeonActivitySum": 2664,
+          "raidDamage": {
+            "2": 5639421,
+            "3": 5830377,
+            "4": 5946906
+          },
+          "todayItemsActivity": 0,
+          "todayDungeonActivity": 0,
+          "activityForRuneAvailable": false
+        }
+      }
+    },
+    "clanTrainings_createChallenge": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611242016-training.json",
+        "capturedAt": "2026-11-24T13:16:00.938Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroes": [
+          79,
+          72,
+          16,
+          54,
+          60
+        ],
+        "type": "hero",
+        "description": "1st"
+      },
+      "response": {
+        "id": 27755770,
+        "clanId": 305081,
+        "userId": 1216438103,
+        "ctime": 1795526161,
+        "type": "challenge",
+        "battleType": "training_pvp",
+        "data": {
+          "defenders": {
+            "heroes": [
+              {
+                "unitType": "hero",
+                "id": 79,
+                "level": 90,
+                "skills": {
+                  "1": 90,
+                  "2": 90,
+                  "3": 90,
+                  "4": 90
+                },
+                "star": 5,
+                "skin": 489,
+                "skinRank": 0,
+                "skinColorId": 0,
+                "artifacts": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ],
+                "skins": {
+                  "489": "[Object(2 keys)]"
+                },
+                "color": 9,
+                "slots": [
+                  -1,
+                  0,
+                  0,
+                  -1,
+                  -1,
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "_truncatedKeys": 6,
+                "_totalKeys": 18
+              },
+              {
+                "unitType": "hero",
+                "id": 72,
+                "level": 85,
+                "skills": {
+                  "1": 85,
+                  "2": 85,
+                  "3": 85,
+                  "4": 70
+                },
+                "star": 5,
+                "skin": 486,
+                "skinRank": 0,
+                "skinColorId": 0,
+                "artifacts": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ],
+                "skins": {
+                  "435": "[Object(2 keys)]",
+                  "486": "[Object(2 keys)]"
+                },
+                "color": 8,
+                "slots": [
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "_truncatedKeys": 6,
+                "_totalKeys": 18
+              },
+              {
+                "unitType": "hero",
+                "id": 16,
+                "level": 90,
+                "skills": {
+                  "1": 90,
+                  "2": 90,
+                  "3": 90,
+                  "4": 90
+                },
+                "star": 5,
+                "skin": 309,
+                "skinRank": 0,
+                "skinColorId": 0,
+                "artifacts": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ],
+                "skins": {
+                  "16": "[Object(2 keys)]",
+                  "58": "[Object(2 keys)]",
+                  "309": "[Object(2 keys)]"
+                },
+                "color": 12,
+                "slots": [
+                  -1,
+                  0,
+                  -1,
+                  0,
+                  0,
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "_truncatedKeys": 6,
+                "_totalKeys": 18
+              },
+              {
+                "unitType": "hero",
+                "id": 54,
+                "level": 90,
+                "skills": {
+                  "1": 90,
+                  "2": 90,
+                  "3": 90,
+                  "4": 90
+                },
+                "star": 4,
+                "skin": 295,
+                "skinRank": 0,
+                "skinColorId": 0,
+                "artifacts": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ],
+                "skins": {
+                  "242": "[Object(2 keys)]",
+                  "295": "[Object(2 keys)]"
+                },
+                "color": 11,
+                "slots": [
+                  0,
+                  0,
+                  -1,
+                  0,
+                  0,
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "_truncatedKeys": 6,
+                "_totalKeys": 18
+              },
+              {
+                "unitType": "hero",
+                "id": 60,
+                "level": 90,
+                "skills": {
+                  "1": 90,
+                  "2": 90,
+                  "3": 90,
+                  "4": 90
+                },
+                "star": 3,
+                "skin": 303,
+                "skinRank": 0,
+                "skinColorId": 0,
+                "artifacts": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ],
+                "skins": {
+                  "303": "[Object(2 keys)]"
+                },
+                "color": 10,
+                "slots": [
+                  0,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "_truncatedKeys": 6,
+                "_totalKeys": 18
+              }
+            ],
+            "power": 175794
+          },
+          "type": "hero",
+          "manual": false,
+          "description": "1st"
+        }
+      }
+    },
+    "clanTrainings_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611242016-training.json",
+        "capturedAt": "2026-11-24T13:15:40.668Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "onlyMy": false
+      },
+      "response": {
+        "challenges": [],
+        "replays": [
+          {
+            "id": 27731809,
+            "clanId": 305081,
+            "userId": 1216305475,
+            "ctime": 1795444831,
+            "type": "replay",
+            "battleType": "training_pvp",
+            "data": {
+              "challengeId": 27714776,
+              "challengeTime": 1795376763,
+              "attackers": {
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "power": 203372
+              },
+              "defenders": {
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "power": 209212
+              },
+              "defenderId": 1216250642,
+              "battles": [
+                {
+                  "replayId": "1795444831791926169",
+                  "result": true,
+                  "attackersHealth": "[Array(5)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444831794298177",
+                  "result": true,
+                  "attackersHealth": "[Array(5)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444831796504866",
+                  "result": false,
+                  "attackersHealth": "[Array(5)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444831798678139",
+                  "result": true,
+                  "attackersHealth": "[Array(5)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444831801029264",
+                  "result": true,
+                  "attackersHealth": "[Array(5)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "_truncatedArrayItems": 5,
+                  "_totalLength": 10
+                }
+              ],
+              "type": "hero"
+            }
+          },
+          {
+            "id": 27731768,
+            "clanId": 305081,
+            "userId": 1216305475,
+            "ctime": 1795444767,
+            "type": "replay",
+            "battleType": "training_pvp",
+            "data": {
+              "challengeId": 27723038,
+              "challengeTime": 1795427199,
+              "attackers": {
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "power": 151204
+              },
+              "defenders": {
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "power": 148635
+              },
+              "defenderId": 1216409133,
+              "battles": [
+                {
+                  "replayId": "1795444767701878456",
+                  "result": true,
+                  "attackersHealth": "[Array(3)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444767704126683",
+                  "result": true,
+                  "attackersHealth": "[Array(3)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444767706042369",
+                  "result": true,
+                  "attackersHealth": "[Array(3)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444767707917873",
+                  "result": true,
+                  "attackersHealth": "[Array(3)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "replayId": "1795444767709881435",
+                  "result": true,
+                  "attackersHealth": "[Array(3)]",
+                  "defendersHealth": "[Array(5)]"
+                },
+                {
+                  "_truncatedArrayItems": 5,
+                  "_totalLength": 10
+                }
+              ],
+              "type": "hero"
+            }
+          }
+        ]
+      }
+    },
+    "clanWarChampInfo_getBriefInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "seasonStatus": {
+          "current": {
+            "dayTs": 1793577600,
+            "stageType": "REGULAR_STAGE",
+            "startHour": 7,
+            "lockHour": 6,
+            "endHour": 20
+          },
+          "next": {
+            "dayTs": 1793664000,
+            "stageType": "REGULAR_STAGE",
+            "startHour": 7,
+            "lockHour": 6,
+            "endHour": 20
+          }
+        },
+        "tries": 0,
+        "hasActiveWar": false,
+        "arePointsMax": true,
+        "ourPoints": null,
+        "rivalPoints": null,
+        "hasBothTeams": true,
+        "seasonId": 58
+      }
+    },
+    "clanWarGetBriefInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "nextWarTime": 1793602800,
+        "tries": 0,
+        "hasActiveWar": false,
+        "nearestWarEndTime": 1793649600,
+        "arePointsMax": true
+      }
+    },
+    "clanWarGetWarlordInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "response": null
+      }
+    },
+    "clan_getInventory": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "clanBorder": {
+          "8": 2,
+          "9": 2,
+          "10": 1,
+          "11": 1,
+          "12": 1,
+          "412": 1
+        }
+      }
+    },
+    "getUserClanMembersOutposts": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "outposts": [
+          {
+            "outpostId": "00000000-0000-0000-0000-000012837e48",
+            "outpostLevel": 18,
+            "coordinates": {
+              "x": 503,
+              "y": 125
+            },
+            "userId": 1216250642,
+            "username": "LickingToad",
+            "userFlagId": 2,
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+          },
+          {
+            "outpostId": "00000000-0000-0000-0000-000059a27e48",
+            "outpostLevel": 21,
+            "coordinates": {
+              "x": 499,
+              "y": 125
+            },
+            "userId": 1216258649,
+            "username": "jaimy",
+            "userFlagId": 30,
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+          },
+          {
+            "outpostId": "00000000-0000-0000-0000-00000e287f48",
+            "outpostLevel": 20,
+            "coordinates": {
+              "x": 496,
+              "y": 122
+            },
+            "userId": 1216292878,
+            "username": "ShapelessFuss95",
+            "userFlagId": 30,
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+          },
+          {
+            "outpostId": "00000000-0000-0000-0000-00000c437f48",
+            "outpostLevel": 21,
+            "coordinates": {
+              "x": 504,
+              "y": 114
+            },
+            "userId": 1216299788,
+            "username": "Gojind",
+            "userFlagId": 17,
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+          },
+          {
+            "outpostId": "00000000-0000-0000-0000-00003f4d7f48",
+            "outpostLevel": 18,
+            "coordinates": {
+              "x": 509,
+              "y": 122
+            },
+            "userId": 1216302399,
+            "username": "DuhJuh",
+            "userFlagId": 2,
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+          },
+          {
+            "_truncatedArrayItems": 25,
+            "_totalLength": 30
+          }
+        ]
+      }
+    },
+    "getWars": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "wars": [],
+        "clans": []
+      }
+    },
+    "user_getClanInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "clanData": {
+          "clan": {
+            "id": "305081",
+            "ownerId": "1216348128",
+            "level": "1",
+            "title": "4-LEAF CLOVER",
+            "description": null,
+            "icon": {
+              "flagColor1": 1,
+              "flagColor2": 19,
+              "flagShape": 14,
+              "iconColor": 1,
+              "iconShape": 24,
+              "border": 12
+            },
+            "country": "0",
+            "minLevel": "70",
+            "serverId": "1431",
+            "membersCount": "30",
+            "disbanding": false,
+            "topActivity": "406633",
+            "_truncatedKeys": 12,
+            "_totalKeys": 24
+          },
+          "membersStat": [
+            {
+              "userId": "1216250642",
+              "activitySum": 18010,
+              "todayActivity": 1546,
+              "dungeonActivitySum": 1632,
+              "todayDungeonActivity": 516,
+              "raidDamage": {
+                "4": 5946906,
+                "5": 5946906,
+                "7": 22950523,
+                "8": 29189428,
+                "9": 12568301,
+                "10": 23787599,
+                "11": 13286274,
+                "12": 30008168,
+                "13": 2020129,
+                "18": 2136212
+              },
+              "wasChampion": false
+            },
+            {
+              "userId": "1216258649",
+              "activitySum": 19458,
+              "todayActivity": 0,
+              "dungeonActivitySum": 1846,
+              "todayDungeonActivity": 0,
+              "raidDamage": {
+                "9": 8480924,
+                "11": 17501937,
+                "12": 328721,
+                "14": 5559072,
+                "18": 7678881
+              },
+              "wasChampion": false
+            },
+            {
+              "userId": "1216292878",
+              "activitySum": 10914,
+              "todayActivity": 0,
+              "dungeonActivitySum": 1794,
+              "todayDungeonActivity": 0,
+              "raidDamage": {
+                "7": 1807665,
+                "10": 270819,
+                "17": 132841
+              },
+              "wasChampion": false
+            },
+            {
+              "userId": "1216299788",
+              "activitySum": 21098,
+              "todayActivity": 0,
+              "dungeonActivitySum": 2304,
+              "todayDungeonActivity": 0,
+              "raidDamage": {
+                "9": 17260488,
+                "11": 16396604,
+                "12": 17699730,
+                "13": 9091844,
+                "14": 21351869,
+                "18": 45673109
+              },
+              "wasChampion": false
+            },
+            {
+              "userId": "1216302399",
+              "activitySum": 0,
+              "todayActivity": 0,
+              "dungeonActivitySum": 0,
+              "todayDungeonActivity": 0,
+              "raidDamage": {
+                "1": 5946906,
+                "4": 5791453,
+                "6": 5946906,
+                "7": 2751418,
+                "9": 2057360,
+                "11": 7062314,
+                "15": 482142,
+                "18": 4239437
+              },
+              "wasChampion": false
+            },
+            {
+              "_truncatedArrayItems": 25,
+              "_totalLength": 30
+            }
+          ],
+          "stat": {
+            "todayActivity": 296,
+            "activitySum": 15172,
+            "dungeonActivitySum": 2604,
+            "raidDamage": {
+              "2": 3028671,
+              "3": 5322720,
+              "4": 3827929
+            },
+            "todayItemsActivity": 0,
+            "todayDungeonActivity": 0,
+            "activityForRuneAvailable": true
+          },
+          "serverResetTime": 1793671200,
+          "clanWarEndSeasonTime": 1794042000,
+          "freeClanChangeInterval": {
+            "start": 1793440800,
+            "end": 1793613600
+          }
+        },
+        "clanRole": 3
+      }
+    }
+  }
+}

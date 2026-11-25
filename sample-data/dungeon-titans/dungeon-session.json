@@ -1,0 +1,775 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "dungeon-titans",
+  "description": "Titan Dungeon room battles, save progress, and dungeon info",
+  "methodCount": 4,
+  "methods": {
+    "dungeonEndBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021227_titan_dungeon.json",
+        "capturedAt": "2026-11-02T05:26:20.350Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "result": {
+          "win": true,
+          "stars": 3
+        },
+        "progress": [
+          {
+            "defenders": {
+              "heroes": {},
+              "input": []
+            },
+            "attackers": {
+              "heroes": {
+                "4020": {
+                  "isDead": false,
+                  "hp": 796786,
+                  "energy": 900
+                },
+                "4021": {
+                  "isDead": false,
+                  "hp": 682830,
+                  "energy": 400
+                },
+                "4022": {
+                  "isDead": false,
+                  "hp": 753169,
+                  "energy": 200
+                },
+                "4023": {
+                  "isDead": false,
+                  "hp": 787848,
+                  "energy": 700
+                },
+                "4050": {
+                  "isDead": false,
+                  "hp": 128252,
+                  "energy": 1000
+                }
+              },
+              "input": []
+            },
+            "duration": 26.4834488891,
+            "seed": 4230866710
+          }
+        ]
+      },
+      "response": {
+        "reward": {
+          "dungeonActivity": 12,
+          "consumable": {
+            "20": 50
+          },
+          "fragmentTitan": {
+            "4011": 2
+          }
+        },
+        "rewardMultiplier": 2,
+        "dungeon": {
+          "userId": "1216438103",
+          "elements": {
+            "prime": "earth",
+            "nonprime": [
+              "water",
+              "fire"
+            ]
+          },
+          "respawnFloor": "571",
+          "floorNumber": 577,
+          "floorType": "battle",
+          "states": {
+            "titans": {
+              "4000": {
+                "isDead": false,
+                "hp": 856926,
+                "energy": 600,
+                "maxHp": 856926
+              },
+              "4001": {
+                "isDead": false,
+                "hp": 745452,
+                "energy": 700,
+                "maxHp": 745452
+              },
+              "4002": {
+                "isDead": false,
+                "hp": 693989,
+                "energy": 600,
+                "maxHp": 693989
+              },
+              "4004": {
+                "isDead": false,
+                "hp": 375509,
+                "energy": 500,
+                "maxHp": 375509
+              },
+              "4020": {
+                "isDead": false,
+                "hp": 796786,
+                "energy": 900,
+                "maxHp": 933184
+              },
+              "4021": {
+                "isDead": false,
+                "hp": 682830,
+                "energy": 400,
+                "maxHp": 682830
+              },
+              "4022": {
+                "isDead": false,
+                "hp": 753169,
+                "energy": 200,
+                "maxHp": 753169
+              },
+              "4023": {
+                "isDead": false,
+                "hp": 787848,
+                "energy": 700,
+                "maxHp": 787848
+              },
+              "4050": {
+                "isDead": false,
+                "hp": 128252,
+                "energy": 1000,
+                "maxHp": 795326
+              },
+              "4052": {
+                "isDead": false,
+                "hp": 323782,
+                "energy": 400,
+                "maxHp": 323782
+              }
+            }
+          },
+          "floor": {
+            "userData": [
+              {
+                "defenderType": "earth",
+                "chance": 50,
+                "team": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "userId": -3002520,
+                "power": 10861,
+                "attackerType": "fire"
+              },
+              {
+                "defenderType": "neutral",
+                "chance": 50,
+                "team": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]"
+                ],
+                "userId": -4000159,
+                "power": 47586,
+                "attackerType": "neutral"
+              }
+            ],
+            "defenders": [],
+            "state": 1
+          },
+          "reward": [],
+          "maxFloorReached": 577,
+          "maxFloorPassed": "576"
+        },
+        "states": {
+          "titans": {
+            "4000": {
+              "isDead": false,
+              "hp": 856926,
+              "energy": 600,
+              "maxHp": 856926
+            },
+            "4001": {
+              "isDead": false,
+              "hp": 745452,
+              "energy": 700,
+              "maxHp": 745452
+            },
+            "4002": {
+              "isDead": false,
+              "hp": 693989,
+              "energy": 600,
+              "maxHp": 693989
+            },
+            "4004": {
+              "isDead": false,
+              "hp": 375509,
+              "energy": 500,
+              "maxHp": 375509
+            },
+            "4020": {
+              "isDead": false,
+              "hp": 796786,
+              "energy": 900,
+              "maxHp": 933184
+            },
+            "4021": {
+              "isDead": false,
+              "hp": 682830,
+              "energy": 400,
+              "maxHp": 682830
+            },
+            "4022": {
+              "isDead": false,
+              "hp": 753169,
+              "energy": 200,
+              "maxHp": 753169
+            },
+            "4023": {
+              "isDead": false,
+              "hp": 787848,
+              "energy": 700,
+              "maxHp": 787848
+            },
+            "4050": {
+              "isDead": false,
+              "hp": 128252,
+              "energy": 1000,
+              "maxHp": 795326
+            },
+            "4052": {
+              "isDead": false,
+              "hp": 323782,
+              "energy": 400,
+              "maxHp": 323782
+            }
+          }
+        },
+        "dungeonActivity": 738
+      }
+    },
+    "dungeonGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611100940_dungeon.json",
+        "capturedAt": "2026-11-10T02:36:10.189Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "userId": "1216438103",
+        "elements": {
+          "prime": "earth",
+          "nonprime": [
+            "water",
+            "fire"
+          ]
+        },
+        "respawnFloor": "851",
+        "floorNumber": "851",
+        "floorType": "battle",
+        "states": {
+          "titans": []
+        },
+        "floor": {
+          "userData": [
+            {
+              "defenderType": "neutral",
+              "chance": 25,
+              "team": [
+                {
+                  "id": 4012,
+                  "level": 55,
+                  "star": 5
+                },
+                {
+                  "id": 4021,
+                  "level": 55,
+                  "star": 5
+                },
+                {
+                  "id": 4024,
+                  "level": 62,
+                  "star": 5
+                },
+                {
+                  "id": 4003,
+                  "level": 55,
+                  "star": 5
+                },
+                {
+                  "id": 4001,
+                  "level": 54,
+                  "star": 5
+                }
+              ],
+              "userId": -4002916,
+              "power": 69378,
+              "attackerType": "neutral"
+            }
+          ],
+          "defenders": [],
+          "state": 1
+        },
+        "reward": [],
+        "maxFloorReached": "855",
+        "maxFloorPassed": "855"
+      }
+    },
+    "dungeonSaveProgress": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021227_titan_dungeon.json",
+        "capturedAt": "2026-11-02T05:26:51.128Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "reward": {
+          "gold": 49600
+        },
+        "dungeon": {
+          "userId": "1216438103",
+          "elements": {
+            "prime": "earth",
+            "nonprime": [
+              "water",
+              "fire"
+            ]
+          },
+          "respawnFloor": "576",
+          "floorNumber": 581,
+          "floorType": "battle",
+          "states": {
+            "titans": {
+              "4000": {
+                "isDead": false,
+                "hp": 856926,
+                "energy": 400,
+                "maxHp": 856926
+              },
+              "4001": {
+                "isDead": false,
+                "hp": 745452,
+                "energy": 800,
+                "maxHp": 745452
+              },
+              "4002": {
+                "isDead": false,
+                "hp": 693989,
+                "energy": 200,
+                "maxHp": 693989
+              },
+              "4004": {
+                "isDead": false,
+                "hp": 375509,
+                "energy": 800,
+                "maxHp": 375509
+              },
+              "4010": {
+                "isDead": false,
+                "hp": 541209,
+                "energy": 500,
+                "maxHp": 732048
+              },
+              "4011": {
+                "isDead": false,
+                "hp": 440633,
+                "energy": 200,
+                "maxHp": 440633
+              },
+              "4012": {
+                "isDead": false,
+                "hp": 424535,
+                "energy": 800,
+                "maxHp": 424535
+              },
+              "4013": {
+                "isDead": false,
+                "hp": 535817,
+                "energy": 200,
+                "maxHp": 535817
+              },
+              "4020": {
+                "isDead": false,
+                "hp": 796786,
+                "energy": 900,
+                "maxHp": 933184
+              },
+              "4021": {
+                "isDead": false,
+                "hp": 682830,
+                "energy": 400,
+                "maxHp": 682830
+              },
+              "4022": {
+                "isDead": false,
+                "hp": 753169,
+                "energy": 200,
+                "maxHp": 753169
+              },
+              "4023": {
+                "isDead": false,
+                "hp": 787848,
+                "energy": 700,
+                "maxHp": 787848
+              },
+              "_truncatedKeys": 3,
+              "_totalKeys": 15
+            }
+          },
+          "floor": {
+            "userData": [
+              {
+                "defenderType": "water",
+                "chance": 75,
+                "team": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "userId": -1000076,
+                "power": 15230,
+                "attackerType": "earth"
+              }
+            ],
+            "defenders": [],
+            "state": 1
+          },
+          "reward": [],
+          "maxFloorReached": 581,
+          "maxFloorPassed": "580"
+        }
+      }
+    },
+    "dungeonStartBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021227_titan_dungeon.json",
+        "capturedAt": "2026-11-02T05:26:18.753Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroes": [
+          4050,
+          4020,
+          4022,
+          4023,
+          4021
+        ],
+        "teamNum": 0
+      },
+      "response": {
+        "userId": "1216438103",
+        "typeId": -1000044,
+        "attackers": {
+          "4020": {
+            "id": 4020,
+            "xp": 18060,
+            "level": 45,
+            "star": 3,
+            "skills": {
+              "4019": 45
+            },
+            "power": 6797,
+            "artifacts": [
+              {
+                "level": 10,
+                "star": 2
+              },
+              {
+                "level": 10,
+                "star": 1
+              },
+              {
+                "level": 16,
+                "star": 1
+              }
+            ],
+            "skins": {
+              "10009": 10
+            },
+            "currentSkin": 10009,
+            "skinsInfo": [],
+            "currentSkinRank": 0,
+            "physicalAttack": 28782.96,
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          },
+          "4021": {
+            "id": 4021,
+            "xp": 18060,
+            "level": 45,
+            "star": 3,
+            "skills": {
+              "4021": 45
+            },
+            "power": 6575,
+            "artifacts": [
+              {
+                "level": 1,
+                "star": 1
+              },
+              {
+                "level": 1,
+                "star": 1
+              },
+              {
+                "level": 1,
+                "star": 1
+              }
+            ],
+            "skins": {
+              "10010": 8
+            },
+            "currentSkin": 10010,
+            "skinsInfo": [],
+            "currentSkinRank": 0,
+            "physicalAttack": 45271.34,
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          },
+          "4022": {
+            "id": 4022,
+            "xp": 18060,
+            "level": 45,
+            "star": 3,
+            "skills": {
+              "4023": 45
+            },
+            "power": 6930,
+            "artifacts": [
+              {
+                "level": 20,
+                "star": 3
+              },
+              {
+                "level": 5,
+                "star": 1
+              },
+              {
+                "level": 15,
+                "star": 1
+              }
+            ],
+            "skins": {
+              "10011": 13
+            },
+            "currentSkin": 10011,
+            "skinsInfo": [],
+            "currentSkinRank": 0,
+            "physicalAttack": 43890.3,
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          },
+          "4023": {
+            "id": 4023,
+            "xp": 18060,
+            "level": 45,
+            "star": 3,
+            "skills": {
+              "4025": 45,
+              "4026": 45
+            },
+            "power": 7110,
+            "artifacts": [
+              {
+                "level": 20,
+                "star": 3
+              },
+              {
+                "level": 15,
+                "star": 1
+              },
+              {
+                "level": 20,
+                "star": 1
+              }
+            ],
+            "skins": {
+              "10012": 16
+            },
+            "currentSkin": 10012,
+            "skinsInfo": [],
+            "currentSkinRank": 0,
+            "physicalAttack": 43797.22,
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          },
+          "4050": {
+            "id": 4050,
+            "xp": 18060,
+            "level": 45,
+            "star": 3,
+            "skills": {
+              "4065": 45
+            },
+            "power": 6606,
+            "artifacts": [
+              {
+                "level": 1,
+                "star": 0
+              },
+              {
+                "level": 8,
+                "star": 3
+              },
+              {
+                "level": 1,
+                "star": 0
+              }
+            ],
+            "skins": {
+              "10062": 10
+            },
+            "currentSkin": 10062,
+            "skinsInfo": [],
+            "currentSkinRank": 0,
+            "physicalAttack": 36907.43,
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          }
+        },
+        "defenders": [
+          {
+            "1": {
+              "id": 4002,
+              "xp": 21630,
+              "level": 48,
+              "star": 2,
+              "skills": {
+                "4005": 48
+              },
+              "power": 5123,
+              "artifacts": [
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                }
+              ],
+              "skins": [],
+              "currentSkin": 0,
+              "skinsInfo": [],
+              "currentSkinRank": 0,
+              "physicalAttack": 37665.91,
+              "_truncatedKeys": 8,
+              "_totalKeys": 20
+            },
+            "2": {
+              "id": 4000,
+              "xp": 21630,
+              "level": 48,
+              "star": 2,
+              "skills": {
+                "4001": 48
+              },
+              "power": 5122,
+              "artifacts": [
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                }
+              ],
+              "skins": [],
+              "currentSkin": 0,
+              "skinsInfo": [],
+              "currentSkinRank": 0,
+              "anticrit": 1,
+              "_truncatedKeys": 8,
+              "_totalKeys": 20
+            },
+            "3": {
+              "id": 4001,
+              "xp": 20390,
+              "level": 47,
+              "star": 2,
+              "skills": {
+                "4003": 47
+              },
+              "power": 4967,
+              "artifacts": [
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                },
+                {
+                  "level": 1,
+                  "star": 0
+                }
+              ],
+              "skins": [],
+              "currentSkin": 0,
+              "skinsInfo": [],
+              "currentSkinRank": 0,
+              "physicalAttack": 40182.11,
+              "_truncatedKeys": 8,
+              "_totalKeys": 20
+            }
+          }
+        ],
+        "effects": [],
+        "reward": {
+          "dungeonActivity": 12,
+          "consumable": {
+            "20": 50
+          },
+          "fragmentTitan": {
+            "4011": 2
+          }
+        },
+        "startTime": 1793597180,
+        "seed": 4230866710,
+        "type": "dungeon_titan",
+        "battleFeatures": [
+          "battleFeature_202",
+          "battleFeature_204",
+          "battleFeature_207"
+        ],
+        "battleEffects": {
+          "LightTitanShield": 1,
+          "Buff_Duplicate": 71,
+          "StatUp": 5,
+          "AntimagePassive": 7,
+          "EnergyWarlockDamageRetarget": 9,
+          "Levitation": 251,
+          "Curse": 11,
+          "Hero500MUlt": 441,
+          "Hero500MArmorDebuff": 13,
+          "AstarothResurrect": 35,
+          "RufusResurrect": 36,
+          "MorriganResurrect": 37,
+          "_truncatedKeys": 431,
+          "_totalKeys": 443
+        },
+        "rewardMultiplier": 2
+      }
+    }
+  }
+}

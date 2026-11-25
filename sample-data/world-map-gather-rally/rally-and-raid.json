@@ -1,0 +1,1244 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "world-map-gather-rally",
+  "description": "World Map rally creation, joining, rally details, defenders, fortresses, and solo attacks",
+  "methodCount": 11,
+  "methods": {
+    "createRally": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061038_start_raid_rally.json",
+        "capturedAt": "2026-11-06T03:37:46.975Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mobId": "8fe5678e-feee-428c-98ab-14f4b9af3a05",
+        "squad": {
+          "heroes": [
+            {
+              "heroId": 16
+            },
+            {
+              "heroId": 2
+            },
+            {
+              "heroId": 79
+            },
+            {
+              "heroId": 70
+            },
+            {
+              "heroId": 60
+            }
+          ],
+          "units": [
+            {
+              "unitId": 7,
+              "count": 1618
+            },
+            {
+              "unitId": 17,
+              "count": 1617
+            },
+            {
+              "unitId": 27,
+              "count": 1617
+            }
+          ]
+        },
+        "startDelay": 300000
+      },
+      "response": {
+        "squadId": "6e139b6d-b983-490e-b8ed-093af619d510",
+        "rally": {
+          "rallyId": "7782bff6-4310-4c38-94c4-3ea66aafc574",
+          "plannedStartTime": 1793936568130,
+          "membersLimit": 5,
+          "unitsLimit": 400000
+        }
+      }
+    },
+    "getAllFortresses": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+      },
+      "response": {
+        "fortresses": [
+          {
+            "fortressId": "aa4197ca-56c1-4c41-b3c9-f6116ee91adc",
+            "mapFortressConfigId": 93,
+            "stateType": "available",
+            "stateData": {
+              "stateType": "available",
+              "owner": 304684,
+              "captureTimestamp": 1793208210,
+              "guardsLeft": 30,
+              "totalWarsCount": 0,
+              "warInProgressCount": 0,
+              "garrisonCount": 4,
+              "garrisonPlayers": [
+                1216295022,
+                1216296176,
+                1216296657,
+                1216282705
+              ]
+            }
+          },
+          {
+            "fortressId": "185e2ca1-7d43-4387-9bf3-0884cf92a9f6",
+            "mapFortressConfigId": 64,
+            "stateType": "available",
+            "stateData": {
+              "stateType": "available",
+              "owner": 304788,
+              "captureTimestamp": 1793134806,
+              "guardsLeft": 30,
+              "totalWarsCount": 0,
+              "warInProgressCount": 0,
+              "garrisonCount": 2,
+              "garrisonPlayers": [
+                1216381101,
+                1216337718
+              ]
+            }
+          },
+          {
+            "fortressId": "2faec32e-c56e-45a1-b663-a572f6899b8c",
+            "mapFortressConfigId": 44,
+            "stateType": "available",
+            "stateData": {
+              "stateType": "available",
+              "owner": 305364,
+              "captureTimestamp": 1793539637,
+              "guardsLeft": 50,
+              "totalWarsCount": 0,
+              "warInProgressCount": 0,
+              "garrisonCount": 1,
+              "garrisonPlayers": [
+                1216265710
+              ]
+            }
+          },
+          {
+            "fortressId": "a301a9a4-5f4a-4284-939a-dc9a270700c0",
+            "mapFortressConfigId": 41,
+            "stateType": "available",
+            "stateData": {
+              "stateType": "available",
+              "owner": 305364,
+              "captureTimestamp": 1793132684,
+              "guardsLeft": 30,
+              "totalWarsCount": 0,
+              "warInProgressCount": 0,
+              "garrisonCount": 0,
+              "garrisonPlayers": []
+            }
+          },
+          {
+            "fortressId": "62c210f3-cfda-45de-b228-e27e808565c0",
+            "mapFortressConfigId": 40,
+            "stateType": "available",
+            "stateData": {
+              "stateType": "available",
+              "owner": 304509,
+              "captureTimestamp": 1793517774,
+              "guardsLeft": 30,
+              "totalWarsCount": 0,
+              "warInProgressCount": 0,
+              "garrisonCount": 0,
+              "garrisonPlayers": []
+            }
+          },
+          {
+            "_truncatedArrayItems": 82,
+            "_totalLength": 87
+          }
+        ],
+        "clans": [
+          {
+            "clanId": 304684,
+            "title": "Tui@Pim",
+            "serverId": 1431,
+            "icon": {
+              "iconShape": 8,
+              "iconColor": 19,
+              "flagShape": 15,
+              "flagColor1": 1,
+              "flagColor2": 4
+            }
+          },
+          {
+            "clanId": 304788,
+            "title": "Doooooooom",
+            "serverId": 1431,
+            "icon": {
+              "iconShape": 81,
+              "iconColor": 0,
+              "flagShape": 5,
+              "flagColor1": 7,
+              "flagColor2": 10,
+              "border": 412
+            }
+          },
+          {
+            "clanId": 305364,
+            "title": "-=УКРАЇНА=-",
+            "serverId": 1431,
+            "icon": {
+              "iconShape": 46,
+              "iconColor": 0,
+              "flagShape": 2,
+              "flagColor1": 16,
+              "flagColor2": 3
+            }
+          },
+          {
+            "clanId": 304509,
+            "title": "【★】 Continental  【★】",
+            "serverId": 1431,
+            "icon": {
+              "iconShape": 56,
+              "iconColor": 18,
+              "flagShape": 7,
+              "flagColor1": 9,
+              "flagColor2": 7,
+              "border": 412
+            }
+          },
+          {
+            "clanId": 305081,
+            "title": "4-LEAF CLOVER",
+            "serverId": 1431,
+            "icon": {
+              "iconShape": 24,
+              "iconColor": 1,
+              "flagShape": 14,
+              "flagColor1": 1,
+              "flagColor2": 19,
+              "border": 12
+            }
+          },
+          {
+            "_truncatedArrayItems": 6,
+            "_totalLength": 11
+          }
+        ],
+        "state": {
+          "clanWarsDeclaredToday": 0
+        },
+        "serverTime": 1793594182
+      }
+    },
+    "getCampSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:21:18.147Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "campsSummary": {
+          "nextRespawnDt": 1795268489242,
+          "camps": [
+            {
+              "id": "7887f2ce-6941-4231-bb8c-a9147f339c7c",
+              "campConfigId": 2,
+              "defendersPack": [
+                {
+                  "unitType": "hero",
+                  "id": 7,
+                  "level": 66,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 31,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 7,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 64,
+                  "level": 71,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 325,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 8,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 12,
+                  "level": 67,
+                  "skills": "[Object(4 keys)]",
+                  "star": 5,
+                  "skin": 37,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 8,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 36,
+                  "level": 66,
+                  "skills": "[Object(4 keys)]",
+                  "star": 5,
+                  "skin": 84,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 7,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 24,
+                  "level": 67,
+                  "skills": "[Object(4 keys)]",
+                  "star": 6,
+                  "skin": 75,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 8,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                }
+              ]
+            },
+            {
+              "id": "a0b2d72e-8fad-4691-86c4-ba39c5f8afd4",
+              "campConfigId": 1,
+              "defendersPack": [
+                {
+                  "unitType": "hero",
+                  "id": 2,
+                  "level": 45,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 307,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 1,
+                  "level": 45,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 216,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 15,
+                  "level": 45,
+                  "skills": "[Object(3 keys)]",
+                  "star": 2,
+                  "skin": 345,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 64,
+                  "level": 45,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 325,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 7,
+                  "level": 45,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 194,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                }
+              ]
+            },
+            {
+              "id": "a68f464e-3721-40aa-bba2-33eb73d5d8f6",
+              "campConfigId": 1,
+              "defendersPack": [
+                {
+                  "unitType": "hero",
+                  "id": 2,
+                  "level": 53,
+                  "skills": "[Object(3 keys)]",
+                  "star": 2,
+                  "skin": 2,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 5,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 1,
+                  "level": 53,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 1,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 7,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 15,
+                  "level": 53,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 15,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 64,
+                  "level": 53,
+                  "skills": "[Object(4 keys)]",
+                  "star": 4,
+                  "skin": 325,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 7,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 7,
+                  "level": 53,
+                  "skills": "[Object(3 keys)]",
+                  "star": 2,
+                  "skin": 7,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 5,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                }
+              ]
+            },
+            {
+              "id": "722c25fc-734b-473c-9103-793d3d7a9c75",
+              "campConfigId": 1,
+              "defendersPack": [
+                {
+                  "unitType": "hero",
+                  "id": 2,
+                  "level": 46,
+                  "skills": "[Object(3 keys)]",
+                  "star": 3,
+                  "skin": 2,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 1,
+                  "level": 46,
+                  "skills": "[Object(3 keys)]",
+                  "star": 4,
+                  "skin": 1,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 15,
+                  "level": 46,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 15,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 7,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 64,
+                  "level": 46,
+                  "skills": "[Object(3 keys)]",
+                  "star": 6,
+                  "skin": 325,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 6,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 6,
+                  "level": 45,
+                  "skills": "[Object(2 keys)]",
+                  "star": 2,
+                  "skin": 0,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Array(0)]",
+                  "color": 3,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                }
+              ]
+            },
+            {
+              "id": "fcfcd2eb-d13c-4263-baf4-a7c823f4026e",
+              "campConfigId": 2,
+              "defendersPack": [
+                {
+                  "unitType": "hero",
+                  "id": 7,
+                  "level": 74,
+                  "skills": "[Object(4 keys)]",
+                  "star": 2,
+                  "skin": 7,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 9,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 8,
+                  "level": 74,
+                  "skills": "[Object(4 keys)]",
+                  "star": 2,
+                  "skin": 8,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 9,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 17,
+                  "level": 74,
+                  "skills": "[Object(4 keys)]",
+                  "star": 2,
+                  "skin": 17,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 10,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 2,
+                  "level": 74,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 2,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 10,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                },
+                {
+                  "unitType": "hero",
+                  "id": 4,
+                  "level": 74,
+                  "skills": "[Object(4 keys)]",
+                  "star": 3,
+                  "skin": 4,
+                  "skinRank": 0,
+                  "skinColorId": 0,
+                  "artifacts": "[Array(3)]",
+                  "skins": "[Object(1 keys)]",
+                  "color": 10,
+                  "slots": "[Array(6)]",
+                  "_truncatedKeys": 6,
+                  "_totalKeys": 18
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "getGarrisonWallSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.314Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "garrisonWall": {
+          "health": 10000,
+          "state": "healthy",
+          "updatedAt": 1793092367032,
+          "version": 1
+        },
+        "garrisonSquad": {
+          "heroes": [
+            1,
+            4,
+            5,
+            30,
+            503
+          ],
+          "isReserved": true
+        }
+      }
+    },
+    "getRallyAttackDefenders": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061038_start_raid_rally.json",
+        "capturedAt": "2026-11-06T03:37:42.515Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "PredefinedSquadId": 84
+      },
+      "response": {
+        "defenders": [
+          {
+            "id": 10031,
+            "level": 1,
+            "color": 1,
+            "star": 1,
+            "power": 4444999,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          }
+        ]
+      }
+    },
+    "getRallyById": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611031237_tower_session.json",
+        "capturedAt": "2026-11-03T05:32:54.981Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "rallyId": "773f560b-84bb-445e-a56e-6d81fcc97eda"
+      },
+      "response": {
+        "rally": {
+          "rallyId": "773f560b-84bb-445e-a56e-6d81fcc97eda",
+          "rallyVersion": 13,
+          "clanId": 305081,
+          "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+          "mapType": "multiplayer",
+          "leader": {
+            "userId": 1216305475,
+            "user": {
+              "id": 1216305475,
+              "avatarId": 2229,
+              "avatarBorderId": 1,
+              "level": 82,
+              "name": "Rin",
+              "serverId": 1431,
+              "flagId": 16
+            },
+            "squad": {
+              "squadId": "c2b1af1c-ff9c-4a8b-b8fb-f3262ef94b2a",
+              "heroes": [
+                {
+                  "heroId": 37,
+                  "level": 82,
+                  "color": 11,
+                  "star": 3
+                },
+                {
+                  "heroId": 39,
+                  "level": 82,
+                  "color": 10,
+                  "star": 4
+                },
+                {
+                  "heroId": 67,
+                  "level": 82,
+                  "color": 10,
+                  "star": 5
+                },
+                {
+                  "heroId": 72,
+                  "level": 82,
+                  "color": 10,
+                  "star": 5
+                },
+                {
+                  "heroId": 79,
+                  "level": 82,
+                  "color": 10,
+                  "star": 5
+                }
+              ],
+              "units": [
+                {
+                  "unitId": 7,
+                  "count": 1640,
+                  "amount": 0,
+                  "getCount": 1640
+                },
+                {
+                  "unitId": 17,
+                  "count": 1640,
+                  "amount": 0,
+                  "getCount": 1640
+                },
+                {
+                  "unitId": 27,
+                  "count": 1639,
+                  "amount": 0,
+                  "getCount": 1639
+                }
+              ]
+            }
+          },
+          "members": [
+            {
+              "userId": 1216359313,
+              "joinedAt": 1793683954014,
+              "user": {
+                "id": 1216359313,
+                "avatarId": 24,
+                "level": 76,
+                "name": "NeedlessCoast85",
+                "serverId": 1431,
+                "flagId": 78
+              },
+              "squad": {
+                "squadId": "e2afd58b-c05b-4135-b810-d97721911e74",
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "units": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "eta": 1775001600000
+            },
+            {
+              "userId": 1216302399,
+              "joinedAt": 1793683964121,
+              "user": {
+                "id": 1216302399,
+                "avatarId": 30,
+                "level": 78,
+                "name": "DuhJuh",
+                "serverId": 1431,
+                "flagId": 2
+              },
+              "squad": {
+                "squadId": "ad6829e8-8bba-4e3f-baeb-67c3ca96037d",
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "units": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "eta": 1775001600000
+            },
+            {
+              "userId": 1216409133,
+              "joinedAt": 1793683964121,
+              "user": {
+                "id": 1216409133,
+                "avatarId": 30,
+                "level": 72,
+                "name": "10PR0",
+                "serverId": 1431,
+                "flagId": 13
+              },
+              "squad": {
+                "squadId": "0a12e55f-8589-49cf-aeeb-587db4212101",
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "units": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "eta": 1775001600000
+            },
+            {
+              "userId": 1216417802,
+              "joinedAt": 1793683964121,
+              "user": {
+                "id": 1216417802,
+                "avatarId": 23,
+                "avatarBorderId": 1,
+                "level": 68,
+                "name": "Shadow976521358",
+                "serverId": 1431,
+                "flagId": 19
+              },
+              "squad": {
+                "squadId": "51aabfb3-1aa7-4cc6-a462-1f0cb218d723",
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "units": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "eta": 1775001600000
+            },
+            {
+              "userId": 1216349140,
+              "joinedAt": 1793683964121,
+              "user": {
+                "id": 1216349140,
+                "avatarId": 2211,
+                "avatarBorderId": 1,
+                "level": 80,
+                "name": "Ray53Anno70",
+                "serverId": 1431,
+                "flagId": 5
+              },
+              "squad": {
+                "squadId": "20c2c5e3-eec4-4763-a43e-afe4c3e0beb5",
+                "heroes": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "units": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "eta": 1775001600000
+            }
+          ],
+          "membersCapacityLeft": 0,
+          "unitsCapacityLeft": 400000,
+          "mob": {
+            "mobId": "39deb070-6b0e-4fbc-8614-b9aa1266f07c",
+            "mobConfigId": 78,
+            "mobType": "rally",
+            "coordinates": {
+              "x": 470,
+              "y": 116
+            }
+          },
+          "target": {
+            "objectId": "39deb070-6b0e-4fbc-8614-b9aa1266f07c",
+            "objectType": "mob",
+            "objectConfigId": 78,
+            "coordinates": {
+              "x": 470,
+              "y": 116
+            }
+          },
+          "leaderCoordinates": {
+            "x": 509,
+            "y": 125
+          },
+          "_truncatedKeys": 3,
+          "_totalKeys": 15
+        }
+      }
+    },
+    "getRallySummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "rallies": [],
+        "autoJoinSettings": {
+          "maxMarchesCount": 1,
+          "expiresAt": 1793621908620,
+          "queuePosition": 10
+        }
+      }
+    },
+    "getShieldSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:25.246Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {}
+    },
+    "getSoloAttackDefenders": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611051201_attack_monster.json",
+        "capturedAt": "2026-11-05T05:00:05.484Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "PredefinedSquadId": 109,
+        "EnemyLevel": 15,
+        "EnemyId": "d500baf7-0aca-4e63-bc2e-be3ae60e00a7"
+      },
+      "response": {
+        "defenders": [
+          {
+            "id": 1002,
+            "level": 120,
+            "color": 15,
+            "star": 6,
+            "power": 18495,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          },
+          {
+            "id": 1001,
+            "level": 120,
+            "color": 15,
+            "star": 6,
+            "power": 19209,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          },
+          {
+            "id": 1000,
+            "level": 120,
+            "color": 15,
+            "star": 6,
+            "power": 18182,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          },
+          {
+            "id": 1004,
+            "level": 120,
+            "color": 15,
+            "star": 6,
+            "power": 18590,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          },
+          {
+            "id": 1003,
+            "level": 120,
+            "color": 15,
+            "star": 6,
+            "power": 18330,
+            "skinData": {
+              "id": 0,
+              "rank": 0,
+              "color": 0
+            }
+          }
+        ]
+      }
+    },
+    "joinRally": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:04:01.938Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "rallyId": "a6c33757-3569-4f14-9647-6514a8c3d98d",
+        "squad": {
+          "heroes": [
+            {
+              "heroId": 35
+            },
+            {
+              "heroId": 38
+            },
+            {
+              "heroId": 33
+            },
+            {
+              "heroId": 34
+            },
+            {
+              "heroId": 75
+            }
+          ],
+          "units": [
+            {
+              "unitId": 7,
+              "count": 1361
+            },
+            {
+              "unitId": 17,
+              "count": 1360
+            },
+            {
+              "unitId": 27,
+              "count": 1360
+            }
+          ]
+        },
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc"
+      },
+      "response": {
+        "squadId": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+        "route": {
+          "routeId": "5b5fdb94-a0d5-4dd5-a682-20c62ee47096",
+          "from": {
+            "coordinates": {
+              "x": 606,
+              "y": 376
+            },
+            "objectSizeId": 6,
+            "object": {
+              "objectId": "00000000-0000-0000-0000-0000575f8148",
+              "objectType": "outpost",
+              "objectSizeId": 6
+            }
+          },
+          "to": {
+            "coordinates": {
+              "x": 620,
+              "y": 370
+            },
+            "objectSizeId": 6,
+            "object": {
+              "objectId": "00000000-0000-0000-0000-0000912b8048",
+              "objectType": "outpost",
+              "objectSizeId": 6
+            }
+          },
+          "startedAt": 1794161041839,
+          "duration": 8881,
+          "durationMs": 8881
+        }
+      }
+    },
+    "winCampBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611131602_brigand.json",
+        "capturedAt": "2026-11-13T09:02:02.924Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "campId": "2eb37df6-e1f1-4d1d-8cf2-36822ec986e6",
+        "userHeroesIds": [
+          79,
+          72,
+          16,
+          54,
+          60
+        ]
+      },
+      "response": {
+        "reward": [
+          {
+            "type": "lootboxChanced",
+            "id": 27,
+            "amount": 1
+          },
+          {
+            "type": "coin",
+            "id": 40077,
+            "amount": 135
+          },
+          {
+            "type": "gold",
+            "id": 0,
+            "amount": 15000
+          },
+          {
+            "type": "experience",
+            "id": 0,
+            "amount": 6
+          }
+        ]
+      }
+    }
+  }
+}

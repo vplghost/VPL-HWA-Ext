@@ -1,0 +1,1322 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "events-rewards-mail",
+  "description": "Quests, daily bonuses, mail claims, battlepass rewards, zeppelin gift, cinema/video rewards, subscriptions",
+  "methodCount": 28,
+  "methods": {
+    "attentionBonus_collectReward": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611180923_claim_free_chest.json",
+        "capturedAt": "2026-11-18T02:23:15.460Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "id": 4
+      },
+      "response": {
+        "response": null,
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1795053600,
+            "collected": true
+          }
+        ]
+      }
+    },
+    "battlePass_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 186,
+          "type": "draft",
+          "battlePassExp": 7235,
+          "goldenPassPurchaseDate": 0,
+          "farmedRewards": {
+            "normal": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              {
+                "_truncatedArrayItems": 4,
+                "_totalLength": 9
+              }
+            ],
+            "gold": []
+          },
+          "goldenPassType": null,
+          "nextDayTime": 1793671200,
+          "endTime": 1795399200,
+          "energyBoost": 1,
+          "energyBoostStartTime": 0
+        },
+        {
+          "id": 188,
+          "type": "regular",
+          "battlePassExp": 0,
+          "goldenPassPurchaseDate": 0,
+          "farmedRewards": {
+            "normal": [],
+            "gold": []
+          },
+          "goldenPassType": null,
+          "nextDayTime": 1793671200,
+          "endTime": 1795399200,
+          "energyBoost": 1,
+          "energyBoostStartTime": 0
+        }
+      ]
+    },
+    "cinemaGetCounters": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "viewed": 0,
+        "available": 8,
+        "placementViewed": 5,
+        "placementAvailable": 0,
+        "placementRewards": [
+          {
+            "reward": {
+              "gold": 18076
+            },
+            "boxNum": 4
+          },
+          {
+            "reward": {
+              "stamina": 16
+            },
+            "boxNum": 3
+          },
+          {
+            "reward": {
+              "consumable": {
+                "9": 4,
+                "10": 4,
+                "11": 1
+              }
+            },
+            "boxNum": 0
+          },
+          {
+            "reward": {
+              "coin": {
+                "1": 23
+              }
+            },
+            "boxNum": 1
+          },
+          {
+            "reward": {
+              "fragmentHero": {
+                "500": 1
+              }
+            },
+            "boxNum": 2
+          }
+        ],
+        "resetTime": 1793656800,
+        "consolationPrize": false,
+        "boxyResetTime": 1793613600
+      }
+    },
+    "cinemaGiveReward": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151702_video_free_boxes.json",
+        "capturedAt": "2026-11-15T10:02:39.022Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "firstPlacement",
+        "boxNum": 4
+      },
+      "response": {
+        "coin": {
+          "3": 24
+        }
+      }
+    },
+    "claimBattlepassRewardAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171407_claim_rewards.json",
+        "capturedAt": "2026-11-17T07:05:45.336Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "battlepassId": 1037,
+        "levelIdAndTrackIdToClaim": [
+          [
+            975,
+            107
+          ],
+          [
+            976,
+            107
+          ]
+        ],
+        "claimedAt": "2026-11-17T07:05:42.0000000Z"
+      },
+      "response": {}
+    },
+    "completeQuest": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:15:24.380Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "questId": 11298
+      },
+      "response": {}
+    },
+    "dailyBonusFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "status": 200,
+        "hasResponse": false,
+        "hasError": true,
+        "truncated": false
+      },
+      "args": {
+        "vip": 1
+      },
+      "response": null
+    },
+    "dailyBonusGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "year": "2026",
+        "month": 11,
+        "currentDay": "2",
+        "availableToday": false,
+        "availableVip": false,
+        "daysInMonth": 30,
+        "heroId": 51
+      }
+    },
+    "deleteAllRead": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171407_claim_rewards.json",
+        "capturedAt": "2026-11-17T07:06:34.141Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "types": [
+          "soloMobAttackResult",
+          "rallyMobAttackResult",
+          "rallyCancelled",
+          "mineGatheringResult",
+          "outpostScoutResult",
+          "outpostAttackResult",
+          {
+            "_truncatedArrayItems": 7,
+            "_totalLength": 13
+          }
+        ]
+      },
+      "response": {
+        "deletedReports": [
+          "fbdce456-66c3-4ca7-80bc-5686ce45760a",
+          "21ee1f7b-ad00-4988-8127-b4ddade7df7a",
+          "59c269b2-166a-4271-9133-03806b936d54",
+          "c74796d5-c6b5-49e0-9da0-0cb2f4521141",
+          "ec2be71d-288f-43a3-8fcf-1bd5e15a2fb8",
+          {
+            "_truncatedArrayItems": 99,
+            "_totalLength": 104
+          }
+        ]
+      }
+    },
+    "getBattlepassState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "battlepasses": [
+          {
+            "battlepassId": 1033,
+            "points": 55,
+            "endlessClaimedCount": 0,
+            "startedAt": "2026-11-02T02:00:00Z",
+            "expiresAt": "2026-11-08T02:00:00Z",
+            "activatedTrackIds": [
+              91
+            ],
+            "refundedTrackIds": [],
+            "claimedRewards": [
+              {
+                "levelId": 891,
+                "trackId": 91
+              }
+            ]
+          },
+          {
+            "battlepassId": 1034,
+            "points": 50,
+            "endlessClaimedCount": 0,
+            "startedAt": "2026-11-02T02:00:00Z",
+            "expiresAt": "2026-11-09T02:00:00Z",
+            "activatedTrackIds": [
+              94
+            ],
+            "refundedTrackIds": [],
+            "claimedRewards": [
+              {
+                "levelId": 911,
+                "trackId": 94
+              }
+            ]
+          },
+          {
+            "battlepassId": 1017,
+            "points": 7100,
+            "endlessClaimedCount": 0,
+            "startedAt": "2026-10-26T02:00:00Z",
+            "expiresAt": "2026-11-23T02:00:00Z",
+            "activatedTrackIds": [
+              48
+            ],
+            "refundedTrackIds": [],
+            "claimedRewards": [
+              {
+                "levelId": 421,
+                "trackId": 48
+              },
+              {
+                "levelId": 422,
+                "trackId": 48
+              },
+              {
+                "levelId": 423,
+                "trackId": 48
+              },
+              {
+                "levelId": 424,
+                "trackId": 48
+              },
+              {
+                "levelId": 425,
+                "trackId": 48
+              },
+              {
+                "_truncatedArrayItems": 16,
+                "_totalLength": 21
+              }
+            ]
+          },
+          {
+            "battlepassId": 1016,
+            "points": 1015,
+            "endlessClaimedCount": 0,
+            "startedAt": "2026-10-26T02:00:00Z",
+            "expiresAt": "2026-11-23T02:00:00Z",
+            "activatedTrackIds": [
+              46
+            ],
+            "refundedTrackIds": [],
+            "claimedRewards": [
+              {
+                "levelId": 366,
+                "trackId": 46
+              },
+              {
+                "levelId": 367,
+                "trackId": 46
+              },
+              {
+                "levelId": 368,
+                "trackId": 46
+              },
+              {
+                "levelId": 369,
+                "trackId": 46
+              },
+              {
+                "levelId": 370,
+                "trackId": 46
+              },
+              {
+                "_truncatedArrayItems": 6,
+                "_totalLength": 11
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "getDailyQuests": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "quests": [
+          {
+            "id": 346,
+            "state": "completed",
+            "progress": 1,
+            "completionCount": 1
+          },
+          {
+            "id": 348,
+            "state": "completed",
+            "progress": 109,
+            "completionCount": 1
+          },
+          {
+            "id": 349,
+            "state": "inProgress",
+            "progress": 0,
+            "completionCount": 0
+          },
+          {
+            "id": 350,
+            "state": "inProgress",
+            "progress": 0,
+            "completionCount": 0
+          },
+          {
+            "id": 351,
+            "state": "completed",
+            "progress": 109,
+            "completionCount": 1
+          },
+          {
+            "_truncatedArrayItems": 12,
+            "_totalLength": 17
+          }
+        ]
+      }
+    },
+    "getGrowthQuests": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "quests": [
+          {
+            "id": 131,
+            "state": "completed",
+            "progress": 5,
+            "completionCount": 1
+          },
+          {
+            "id": 132,
+            "state": "completed",
+            "progress": 6,
+            "completionCount": 1
+          },
+          {
+            "id": 133,
+            "state": "completed",
+            "progress": 6,
+            "completionCount": 1
+          },
+          {
+            "id": 134,
+            "state": "completed",
+            "progress": 6,
+            "completionCount": 1
+          },
+          {
+            "id": 135,
+            "state": "completed",
+            "progress": 6,
+            "completionCount": 1
+          },
+          {
+            "_truncatedArrayItems": 218,
+            "_totalLength": 223
+          }
+        ]
+      }
+    },
+    "getRewardList": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:29.389Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "qualifyingClanRank": -1,
+        "seasonClanRank": 1,
+        "userRoundPoints": 123700,
+        "userBattlePoints": 123700,
+        "userSeasonPoints": 15345899,
+        "userClanRank": 14
+      }
+    },
+    "getSpecialQuestState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "events": [
+          {
+            "id": 100273,
+            "start": 1793584800000,
+            "end": 1794103200000,
+            "groups": [
+              {
+                "id": 1070,
+                "repeatType": "daily",
+                "localeKey": "LIB_SPECIAL_QUEST_EVENT_NAME_9",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1071,
+                "repeatType": "single",
+                "localeKey": "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_48",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 6,
+                    "_totalLength": 11
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1072,
+                "repeatType": "single",
+                "localeKey": "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_763",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 3,
+                    "_totalLength": 8
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1073,
+                "repeatType": "single",
+                "localeKey": "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 5,
+                    "_totalLength": 10
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              }
+            ],
+            "viewId": 65
+          },
+          {
+            "id": 100292,
+            "start": 1792980000000,
+            "end": 1795399200000,
+            "groups": [
+              {
+                "id": 1115,
+                "repeatType": "single",
+                "localeKey": "QUEST_TAB_NAME_ARTLEVEL",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 15,
+                    "_totalLength": 20
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1116,
+                "repeatType": "single",
+                "localeKey": "UI_DIALOG_HERO_ARTIFACTS_ARTIFACT_EVOLUTION",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 13,
+                    "_totalLength": 18
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1117,
+                "repeatType": "single",
+                "localeKey": "QUEST_TAB_NAME_HERO_RANK",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 9,
+                    "_totalLength": 14
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1118,
+                "repeatType": "single",
+                "localeKey": "QUEST_TAB_HERO_LEVEL",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 7,
+                    "_totalLength": 12
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1119,
+                "repeatType": "single",
+                "localeKey": "RECOMMENDATION_RUNES_NEW",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 15,
+                    "_totalLength": 20
+                  }
+                ],
+                "hide": false,
+                "inactiveQuestIds": []
+              },
+              {
+                "_truncatedArrayItems": 2,
+                "_totalLength": 7
+              }
+            ],
+            "viewId": 94
+          },
+          {
+            "id": 100309,
+            "start": 1792980000000,
+            "end": 1795399200000,
+            "groups": [
+              {
+                "id": 1151,
+                "repeatType": "daily",
+                "localeKey": "LIB_TEST_BP_DAILY_QUESTS",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "hide": true,
+                "inactiveQuestIds": [],
+                "availableFromDay": 8,
+                "availableUntilDay": 8
+              }
+            ],
+            "viewId": 99
+          },
+          {
+            "id": 100356,
+            "start": 1793584800000,
+            "end": 1794189600000,
+            "groups": [
+              {
+                "id": 1250,
+                "repeatType": "daily",
+                "localeKey": "LIB_TEST_BP_DAILY_QUESTS",
+                "quests": [
+                  "[Object(5 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 4,
+                    "_totalLength": 9
+                  }
+                ],
+                "hide": true,
+                "inactiveQuestIds": []
+              },
+              {
+                "id": 1251,
+                "repeatType": "single",
+                "localeKey": "LIB_TEST_BP_SINGLE_QUESTS",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 2,
+                    "_totalLength": 7
+                  }
+                ],
+                "hide": true,
+                "inactiveQuestIds": []
+              }
+            ],
+            "viewId": 129
+          },
+          {
+            "id": 100293,
+            "start": 1792980000000,
+            "end": 1794189600000,
+            "groups": [
+              {
+                "id": 1122,
+                "repeatType": "single",
+                "localeKey": "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TEST_WENDYGIFT",
+                "quests": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  {
+                    "_truncatedArrayItems": 9,
+                    "_totalLength": 14
+                  }
+                ],
+                "inactiveQuestIds": []
+              }
+            ],
+            "viewId": 29
+          },
+          {
+            "_truncatedArrayItems": 4,
+            "_totalLength": 9
+          }
+        ]
+      }
+    },
+    "mailFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171407_claim_rewards.json",
+        "capturedAt": "2026-11-17T07:06:24.804Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "letterIds": [
+          3439106120,
+          3439098134,
+          3438997311,
+          3438946498,
+          3438946007,
+          3438944387,
+          {
+            "_truncatedArrayItems": 1,
+            "_totalLength": 7
+          }
+        ]
+      },
+      "response": {
+        "3438937865": {
+          "coin": {
+            "18": 80
+          }
+        },
+        "3438944387": {
+          "coin": {
+            "18": 70
+          }
+        },
+        "3438946007": {
+          "coin": {
+            "18": 100
+          },
+          "consumable": {
+            "46": 1
+          }
+        },
+        "3438946498": {
+          "coin": {
+            "18": 130
+          },
+          "consumable": {
+            "46": 2
+          }
+        },
+        "3438997311": {
+          "coin": {
+            "13": "1"
+          }
+        },
+        "3439098134": {
+          "coin": {
+            "13": "2"
+          }
+        },
+        "3439106120": {
+          "coin": {
+            "40077": 1000
+          }
+        }
+      }
+    },
+    "mailGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "letters": [
+          {
+            "id": "3412470429",
+            "type": "common",
+            "senderId": "-3",
+            "message": "",
+            "params": {
+              "clanTitle": "4-LEAF CLOVER",
+              "headId": 3,
+              "deadHeads": 4,
+              "titleIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TITLE",
+              "textIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TEXT",
+              "textParams": [
+                "UI_CLAN_BOSS_SELECT_DIFFICULTY1_COLORED",
+                "LIB_MAIL_TYPE_CLANBOSS_HEAD_ORDER_4"
+              ]
+            },
+            "reward": {
+              "coin": {
+                "18": 50
+              }
+            },
+            "read": "0",
+            "ctime": "1793593321",
+            "availableUntil": "1793852521"
+          },
+          {
+            "id": "3412471626",
+            "type": "common",
+            "senderId": "-3",
+            "message": "",
+            "params": {
+              "clanTitle": "4-LEAF CLOVER",
+              "headId": 2,
+              "deadHeads": 5,
+              "titleIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TITLE",
+              "textIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TEXT",
+              "textParams": [
+                "UI_CLAN_BOSS_SELECT_DIFFICULTY1_COLORED",
+                "LIB_MAIL_TYPE_CLANBOSS_HEAD_ORDER_5"
+              ]
+            },
+            "reward": {
+              "coin": {
+                "18": 65
+              }
+            },
+            "read": "0",
+            "ctime": "1793593363",
+            "availableUntil": "1793852563"
+          },
+          {
+            "id": "3412472929",
+            "type": "common",
+            "senderId": "-3",
+            "message": "",
+            "params": {
+              "clanTitle": "4-LEAF CLOVER",
+              "headId": 4,
+              "deadHeads": 6,
+              "titleIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TITLE",
+              "textIdent": "LIB_MAIL_TYPE_CLANBOSS_GRATZ_TEXT",
+              "textParams": [
+                "UI_CLAN_BOSS_SELECT_DIFFICULTY1_COLORED",
+                "LIB_MAIL_TYPE_CLANBOSS_HEAD_ORDER_6"
+              ]
+            },
+            "reward": {
+              "coin": {
+                "18": 80
+              },
+              "consumable": {
+                "46": 1
+              }
+            },
+            "read": "0",
+            "ctime": "1793593419",
+            "availableUntil": "1793852619"
+          }
+        ],
+        "users": {
+          "-3": {
+            "id": -3,
+            "name": "Disposer",
+            "avatarId": 30,
+            "experience": 81070,
+            "level": 80
+          }
+        }
+      }
+    },
+    "questFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:08:43.199Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "questId": 357
+      },
+      "response": {
+        "coin": {
+          "13": 2
+        }
+      }
+    },
+    "questGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 249,
+          "state": 1,
+          "progress": 0,
+          "multiplier": 0,
+          "reward": {
+            "consumable": {
+              "100": 1
+            },
+            "gold": 1000
+          }
+        },
+        {
+          "id": 76135,
+          "state": 1,
+          "progress": 0,
+          "multiplier": 0,
+          "reward": {
+            "gold": 10000
+          }
+        },
+        {
+          "id": 76136,
+          "state": 1,
+          "progress": 0,
+          "multiplier": 0,
+          "reward": {
+            "drafts_chip": 5
+          }
+        },
+        {
+          "id": 76137,
+          "state": 1,
+          "progress": 0,
+          "multiplier": 0,
+          "reward": {
+            "coin": {
+              "40077": 200
+            }
+          }
+        },
+        {
+          "id": 76138,
+          "state": 1,
+          "progress": 0,
+          "multiplier": 0,
+          "reward": {
+            "consumable": {
+              "51": 10
+            }
+          }
+        },
+        {
+          "_truncatedArrayItems": 50,
+          "_totalLength": 55
+        }
+      ]
+    },
+    "questGetEvents": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 90249,
+          "sortOrder": 1,
+          "name_localeKey": "ADVENTURE_HERO62_TITLE_EVENT_UPGRADE",
+          "desc_localeKey": "ADVENTURE_HERO62_TITLE_EVENT_UPGRADE",
+          "localeKey": "ADVENTURE_HERO62_TITLE_EVENT_UPGRADE",
+          "eventLoopData": null,
+          "tab_icon": {
+            "imagePath": "button_adventure_s1_soleil_24.png"
+          },
+          "back_image": {
+            "imagePath": "background_calendar_temp.png"
+          },
+          "exchangeRule": null,
+          "clientData": {
+            "hideInSpecialQuestPopup": 1
+          },
+          "assets": null,
+          "startTime": 1722823200,
+          "_truncatedKeys": 1,
+          "_totalKeys": 13
+        },
+        {
+          "id": 97682,
+          "sortOrder": 100,
+          "name_localeKey": "DAEMONSKIN22_UI_TITLE",
+          "desc_localeKey": "DAEMONSKIN22_UI_TITLE",
+          "localeKey": "DAEMONSKIN22_UI_TITLE",
+          "eventLoopData": null,
+          "tab_icon": {
+            "imagePath": "superskin_october2022_button.png"
+          },
+          "back_image": null,
+          "exchangeRule": null,
+          "clientData": {
+            "hideInSpecialQuestPopup": 1
+          },
+          "assets": null,
+          "startTime": 1793584800,
+          "_truncatedKeys": 1,
+          "_totalKeys": 13
+        }
+      ]
+    },
+    "questGetPaymentDependent": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "quest_multiFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091231_legend_draft_2.json",
+        "capturedAt": "2026-11-09T05:31:30.096Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "questIds": [
+          76135
+        ]
+      },
+      "response": {
+        "gold": 10000
+      }
+    },
+    "readAndClaimAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171407_claim_rewards.json",
+        "capturedAt": "2026-11-17T07:06:29.101Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "types": [
+          "soloMobAttackResult",
+          "rallyMobAttackResult",
+          "rallyCancelled",
+          "mineGatheringResult",
+          "outpostScoutResult",
+          "outpostAttackResult",
+          {
+            "_truncatedArrayItems": 7,
+            "_totalLength": 13
+          }
+        ]
+      },
+      "response": {
+        "readReports": [
+          "fbdce456-66c3-4ca7-80bc-5686ce45760a",
+          "21ee1f7b-ad00-4988-8127-b4ddade7df7a",
+          "59c269b2-166a-4271-9133-03806b936d54",
+          "c74796d5-c6b5-49e0-9da0-0cb2f4521141",
+          "ec2be71d-288f-43a3-8fcf-1bd5e15a2fb8",
+          {
+            "_truncatedArrayItems": 21,
+            "_totalLength": 26
+          }
+        ],
+        "claimedRewards": [
+          {
+            "type": "lootboxChanced",
+            "id": 26,
+            "amount": 1
+          },
+          {
+            "type": "material",
+            "id": 5,
+            "amount": 82000
+          },
+          {
+            "type": "material",
+            "id": 4,
+            "amount": 82000
+          },
+          {
+            "type": "material",
+            "id": 3,
+            "amount": 13250
+          },
+          {
+            "type": "material",
+            "id": 2,
+            "amount": 6700
+          },
+          {
+            "_truncatedArrayItems": 68,
+            "_totalLength": 73
+          }
+        ]
+      }
+    },
+    "resourceSubscription_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "error": "Mechanic is not available now!",
+        "errorCode": 4
+      }
+    },
+    "startQuest": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171407_claim_rewards.json",
+        "capturedAt": "2026-11-17T07:06:40.096Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "questId": 359
+      },
+      "response": {}
+    },
+    "subscriptionFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:49.379Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "reward": null
+      }
+    },
+    "subscriptionGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "subscription": null,
+        "dailyReward": {
+          "availableFarm": false,
+          "dailyReward": {
+            "coin": {
+              "14": "445"
+            }
+          },
+          "notFarmedDays": 0,
+          "currentReward": null
+        }
+      }
+    },
+    "zeppelinGiftFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:49.379Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "reward": {
+          "consumable": {
+            "45": 1
+          }
+        }
+      }
+    },
+    "zeppelinGiftGet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "available": false,
+        "reward": {
+          "consumable": {
+            "45": 1
+          }
+        }
+      }
+    }
+  }
+}

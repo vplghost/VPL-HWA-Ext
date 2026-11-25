@@ -1,0 +1,832 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "snapshots",
+  "domain": "roster-inventory",
+  "description": "Compact previews & schemas of exported hero, titan, inventory, resource, and full-data snapshots",
+  "snapshotCount": 6,
+  "snapshots": {
+    "hwa-full-data-2026-11-17": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-full-data-2026-11-17.json",
+        "format": "hwa-helper-full-data",
+        "version": 1,
+        "exportedAt": "2026-11-17T17:20:20.950Z",
+        "topKeys": [
+          "autoFreeSpinEnabled",
+          "autoFreeSpinState",
+          "autoGatherSettings",
+          "buildingQueue",
+          "buildingQueueLogs",
+          "cachedGameVersion",
+          "campaignRaidSequential",
+          "campaignRecentMissions:1216438103",
+          "captureSettings",
+          "cityQueueGameRefresh",
+          "customTeams",
+          "dialogTeam:1216438103:autoGatherSettings",
+          "dialogTeam:1216438103:brigand",
+          "dialogTeam:1216438103:monsterPreferences",
+          "dialogTeam:1216438103:tower",
+          "dispatchMode",
+          "dynamicEventCatalog",
+          "favoriteHeroes",
+          "favoriteTitans",
+          "gameEngineStatus",
+          "guildChatLastReadTime",
+          "lastRefreshRpcResult",
+          "legendDraftHookTelemetry",
+          "legendDraftLoggingEnabled",
+          "legendDraftSessionLog",
+          "mailClaimState",
+          "monsterPreferences",
+          "monsterQueue",
+          "mqttCaptureEnabled",
+          "popupRpcEnabled",
+          "priorityAutoJoin",
+          "raidEnergyAuto",
+          "raidEnergyAutoStatus",
+          "raidPreferences",
+          "raidQueue",
+          "researchQueue",
+          "researchQueueLogs",
+          "resourceSelection",
+          "rpcCache",
+          "rpcMqttTriggerStatus",
+          "rpcQueueStatus",
+          "smartGatherState",
+          "socketRefreshMode",
+          "tabConfig",
+          "theme",
+          "towerAutomationSettings",
+          "towerRun",
+          "worldReadState"
+        ]
+      },
+      "dataPreview": {
+        "autoFreeSpinEnabled": true,
+        "autoFreeSpinState": {
+          "accountId": 1216438103,
+          "attemptedCycle": "1216438103:1794866400000:1794924004000:1794924003269",
+          "lastResult": "Free spin confirmed",
+          "pending": null,
+          "status": "Waiting for free spin cooldown",
+          "tabId": 179497666,
+          "wakeAt": 1794952800000
+        },
+        "autoGatherSettings": {
+          "defenseInfirmaryThreshold": 50,
+          "defenseRecallEnabled": true,
+          "enabled": true,
+          "interceptTeamId": "custom:c317f3ac-254e-420a-ab0b-f0b0f9af5611",
+          "lastAutoMineType": "stone",
+          "maxMarches": 3,
+          "mineLevel": 8,
+          "mineType": "rotate",
+          "_truncatedKeys": 1,
+          "_totalKeys": 9
+        },
+        "buildingQueue": {
+          "enabled": true,
+          "items": [
+            {
+              "addedAt": 1794676176990,
+              "buildingId": 20,
+              "currentLevel": 21,
+              "durationMs": 335089200,
+              "nextLevel": 22,
+              "queueItemId": "1794676176990-955z56q143"
+            },
+            {
+              "addedAt": 1794676212652,
+              "buildingId": 41,
+              "currentLevel": 21,
+              "durationMs": 50251200,
+              "nextLevel": 22,
+              "queueItemId": "1794676212652-bpmr70339bt"
+            },
+            {
+              "_truncatedArrayItems": 10,
+              "_totalLength": 12
+            }
+          ],
+          "lastBlocked": null,
+          "lastConfirmedStartAt": 1794914250103,
+          "lastStarted": {
+            "addedAt": 1794676174520,
+            "buildingId": 41,
+            "currentLevel": 20,
+            "durationMs": 33495000,
+            "nextLevel": 21,
+            "queueItemId": "1794676174520-mmfyu2dc88q"
+          },
+          "lastVerifiedAt": 1794935978292,
+          "pendingRequest": null,
+          "stalledRefresh": null,
+          "_truncatedKeys": 3,
+          "_totalKeys": 11
+        },
+        "buildingQueueLogs": [
+          {
+            "action": "verify",
+            "id": "1794935978324-bdyad",
+            "message": "Cached occupancy is missing, stale, or estimated. Requested current server summary.",
+            "status": "info",
+            "time": "2026-11-17T17:19:38.324Z",
+            "timestamp": 1794935978324,
+            "type": "building"
+          },
+          {
+            "action": "verify",
+            "id": "1794935848790-4nrau",
+            "message": "Cached occupancy is missing, stale, or estimated. Requested current server summary.",
+            "status": "info",
+            "time": "2026-11-17T17:17:28.790Z",
+            "timestamp": 1794935848790,
+            "type": "building"
+          },
+          {
+            "_truncatedArrayItems": 98,
+            "_totalLength": 100
+          }
+        ],
+        "cachedGameVersion": "1.293.1010",
+        "campaignRaidSequential": true,
+        "campaignRecentMissions:1216438103": [
+          107,
+          104,
+          {
+            "_truncatedArrayItems": 3,
+            "_totalLength": 5
+          }
+        ],
+        "_truncatedKeys": 40,
+        "_totalKeys": 48
+      }
+    },
+    "hwa-full-data-2026-11-19": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-full-data-2026-11-19.json",
+        "format": "hwa-helper-full-data",
+        "version": 1,
+        "exportedAt": "2026-11-19T12:00:39.801Z",
+        "topKeys": [
+          "autoClaimSettings",
+          "autoFreeSpinEnabled",
+          "autoFreeSpinState",
+          "autoGatherSettings",
+          "buildingQueue",
+          "buildingQueueLogs",
+          "cachedGameVersion",
+          "campaignRaidSequential",
+          "campaignRecentMissions:1216438103",
+          "captureSettings",
+          "cityQueueGameRefresh",
+          "customTeams",
+          "dailyActivityHistory",
+          "dialogTeam:1216438103:autoGatherSettings",
+          "dialogTeam:1216438103:brigand",
+          "dialogTeam:1216438103:monsterPreferences",
+          "dialogTeam:1216438103:tower",
+          "dispatchMode",
+          "dynamicEventCatalog",
+          "favoriteHeroes",
+          "favoriteTitans",
+          "gameEngineStatus",
+          "guildChatLastReadTime",
+          "lastRefreshRpcResult",
+          "legendDraftHookTelemetry",
+          "legendDraftLoggingEnabled",
+          "legendDraftSessionLog",
+          "mailClaimState",
+          "monsterPreferences",
+          "monsterQueue",
+          "mqttCaptureEnabled",
+          "popupRpcEnabled",
+          "priorityAutoJoin",
+          "raidEnergyAuto",
+          "raidEnergyAutoStatus",
+          "raidPreferences",
+          "raidQueue",
+          "researchQueue",
+          "researchQueueLogs",
+          "resourceSelection",
+          "rpcCache",
+          "rpcMqttTriggerStatus",
+          "rpcQueueStatus",
+          "smartGatherState",
+          "socketRefreshMode",
+          "tabConfig",
+          "theme",
+          "towerAutomationSettings",
+          "towerRun",
+          "worldReadState"
+        ]
+      },
+      "dataPreview": {
+        "autoClaimSettings": {
+          "airshipGift": true,
+          "alchemySpin": true,
+          "attentionBonuses": true,
+          "dailyBonus": true,
+          "freeOffers": true,
+          "mail": true,
+          "onOpen": false,
+          "quests": true,
+          "_truncatedKeys": 2,
+          "_totalKeys": 10
+        },
+        "autoFreeSpinEnabled": true,
+        "autoFreeSpinState": {
+          "accountId": 1216438103,
+          "attemptedCycle": "1216438103:1795039200000:1795068003000:1795068001504",
+          "lastResult": "Free spin confirmed",
+          "pending": null,
+          "status": "Waiting for free spin cooldown",
+          "tabId": 179498772,
+          "wakeAt": 1795096804000
+        },
+        "autoGatherSettings": {
+          "accountId": 1216438103,
+          "defenseInfirmaryThreshold": 50,
+          "defenseRecallEnabled": true,
+          "enabled": true,
+          "interceptTeamId": "custom:d67c9d1b-d694-4bf4-ab9d-db4a58d4f91c",
+          "lastAutoMineType": null,
+          "maxMarches": 3,
+          "mineLevel": 8,
+          "_truncatedKeys": 4,
+          "_totalKeys": 12
+        },
+        "buildingQueue": {
+          "enabled": true,
+          "items": [
+            {
+              "addedAt": 1794676212652,
+              "buildingId": 41,
+              "currentLevel": 21,
+              "durationMs": 50251200,
+              "nextLevel": 22,
+              "queueItemId": "1794676212652-bpmr70339bt"
+            },
+            {
+              "addedAt": 1794676217249,
+              "buildingId": 40,
+              "currentLevel": 20,
+              "durationMs": 33495000,
+              "nextLevel": 21,
+              "queueItemId": "1794676217249-en62jeyzbzj"
+            },
+            {
+              "_truncatedArrayItems": 9,
+              "_totalLength": 11
+            }
+          ],
+          "lastBlocked": null,
+          "lastConfirmedStartAt": 1794947746610,
+          "lastStarted": {
+            "addedAt": 1794676176990,
+            "buildingId": 20,
+            "currentLevel": 21,
+            "durationMs": 335089200,
+            "nextLevel": 22,
+            "queueItemId": "1794676176990-955z56q143"
+          },
+          "lastVerifiedAt": 1795089621536,
+          "pendingRequest": null,
+          "stalledRefresh": null,
+          "_truncatedKeys": 3,
+          "_totalKeys": 11
+        },
+        "buildingQueueLogs": [
+          {
+            "action": "verify",
+            "id": "1795089621572-cd6up",
+            "message": "Cached occupancy is missing, stale, or estimated. Requested current server summary.",
+            "status": "info",
+            "time": "2026-11-19T12:00:21.572Z",
+            "timestamp": 1795089621572,
+            "type": "building"
+          },
+          {
+            "action": "verify",
+            "id": "1795089560363-oe1ms",
+            "message": "Cached occupancy is missing, stale, or estimated. Requested current server summary.",
+            "status": "info",
+            "time": "2026-11-19T11:59:20.363Z",
+            "timestamp": 1795089560363,
+            "type": "building"
+          },
+          {
+            "_truncatedArrayItems": 98,
+            "_totalLength": 100
+          }
+        ],
+        "cachedGameVersion": "1.293.1010",
+        "campaignRaidSequential": true,
+        "_truncatedKeys": 42,
+        "_totalKeys": 50
+      }
+    },
+    "hwa-heroes-202611071231": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-heroes-202611071231.json",
+        "totalEntries": 61,
+        "itemKeys": [
+          "id",
+          "name",
+          "level",
+          "star",
+          "power",
+          "role",
+          "class",
+          "faction",
+          "soulStones",
+          "sparksOfPower",
+          "skills",
+          "skins",
+          "glyphs",
+          "artifacts"
+        ]
+      },
+      "sampleItems": [
+        {
+          "id": 1,
+          "name": "Aurora",
+          "level": 70,
+          "star": 3,
+          "power": 14984,
+          "role": "Front",
+          "class": "Tank",
+          "faction": "Way of Nature",
+          "soulStones": {
+            "current": 83,
+            "needed": 100
+          },
+          "sparksOfPower": {
+            "level": 5,
+            "max": 30
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 2,
+              "level": 30
+            },
+            {
+              "slot": 2,
+              "skillId": 3,
+              "level": 30
+            },
+            {
+              "slot": 3,
+              "skillId": 4,
+              "level": 35
+            },
+            {
+              "_truncatedArrayItems": 1,
+              "_totalLength": 4
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 1,
+              "stat": "Int",
+              "level": 11,
+              "isCurrent": true
+            }
+          ],
+          "glyphs": [
+            {
+              "slot": 1,
+              "stat": "MA",
+              "level": 10
+            },
+            {
+              "slot": 2,
+              "stat": "HP",
+              "level": 10
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "id": null,
+              "star": 1,
+              "level": 5
+            },
+            {
+              "slot": 2,
+              "id": null,
+              "star": 1,
+              "level": 5
+            },
+            {
+              "slot": 3,
+              "id": null,
+              "star": 1,
+              "level": 5
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Galahad",
+          "level": 70,
+          "star": 5,
+          "power": 29677,
+          "role": "Front",
+          "class": "Warrior",
+          "faction": "Way of Honor",
+          "soulStones": {
+            "current": 294,
+            "needed": 300
+          },
+          "sparksOfPower": {
+            "level": 22,
+            "max": 30
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 270,
+              "level": 40
+            },
+            {
+              "slot": 2,
+              "skillId": 271,
+              "level": 40
+            },
+            {
+              "slot": 3,
+              "skillId": 272,
+              "level": 50
+            },
+            {
+              "_truncatedArrayItems": 1,
+              "_totalLength": 4
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 2,
+              "stat": "Str",
+              "level": 54,
+              "isCurrent": false
+            },
+            {
+              "skinId": 307,
+              "stat": "PA",
+              "level": 20,
+              "isCurrent": true
+            }
+          ],
+          "glyphs": [
+            {
+              "slot": 1,
+              "stat": "PA",
+              "level": 40
+            },
+            {
+              "slot": 2,
+              "stat": "Arm",
+              "level": 20
+            },
+            {
+              "slot": 3,
+              "stat": "HP",
+              "level": 20
+            },
+            {
+              "_truncatedArrayItems": 2,
+              "_totalLength": 5
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "id": null,
+              "star": 3,
+              "level": 40
+            },
+            {
+              "slot": 2,
+              "id": null,
+              "star": 2,
+              "level": 24
+            },
+            {
+              "slot": 3,
+              "id": null,
+              "star": 2,
+              "level": 23
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Keira",
+          "level": 60,
+          "star": 3,
+          "power": 12302,
+          "role": "Middle",
+          "class": "Marksman",
+          "faction": "Way of Eternity",
+          "soulStones": {
+            "current": 76,
+            "needed": 100
+          },
+          "sparksOfPower": {
+            "level": 5,
+            "max": 30
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 260,
+              "level": 20
+            },
+            {
+              "slot": 2,
+              "skillId": 261,
+              "level": 20
+            },
+            {
+              "slot": 3,
+              "skillId": 262,
+              "level": 30
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 3,
+              "stat": "Agi",
+              "level": 12,
+              "isCurrent": true
+            }
+          ],
+          "glyphs": [
+            {
+              "slot": 1,
+              "stat": "PA",
+              "level": 6
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "id": null,
+              "star": 1,
+              "level": 5
+            },
+            {
+              "slot": 2,
+              "id": null,
+              "star": 1,
+              "level": 5
+            },
+            {
+              "slot": 3,
+              "id": null,
+              "star": 1,
+              "level": 7
+            }
+          ]
+        }
+      ]
+    },
+    "hwa-inventory": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-inventory.json",
+        "totalEntries": 418,
+        "itemKeys": [
+          "group",
+          "id",
+          "name",
+          "amount"
+        ]
+      },
+      "sampleItems": [
+        {
+          "group": "border",
+          "id": 1,
+          "name": "—",
+          "amount": 1
+        },
+        {
+          "group": "border",
+          "id": 127493,
+          "name": "—",
+          "amount": 1
+        },
+        {
+          "group": "coin",
+          "id": 1,
+          "name": "Arena coin",
+          "amount": 473
+        }
+      ]
+    },
+    "hwa-resources": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-resources.json",
+        "totalEntries": 150,
+        "itemKeys": [
+          "key",
+          "name",
+          "amount"
+        ]
+      },
+      "sampleItems": [
+        {
+          "key": "resource:coin:100008",
+          "name": "Holiday Particle",
+          "amount": 0
+        },
+        {
+          "key": "resource:coin:1031",
+          "name": "Horn of Summoning",
+          "amount": 0
+        },
+        {
+          "key": "resource:consumable:105",
+          "name": "Silver Casket",
+          "amount": 0
+        }
+      ]
+    },
+    "hwa-titans-202611051321": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-titans-202611051321.json",
+        "totalEntries": 20,
+        "itemKeys": [
+          "id",
+          "name",
+          "level",
+          "star",
+          "power",
+          "role",
+          "element",
+          "soulStones",
+          "skills",
+          "artifacts",
+          "skins"
+        ]
+      },
+      "sampleItems": [
+        {
+          "id": 4000,
+          "name": "Sigurd",
+          "level": 50,
+          "star": 4,
+          "power": 10894,
+          "role": "Tank",
+          "element": "Water",
+          "soulStones": {
+            "current": 55,
+            "needed": 900
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 4001,
+              "level": 50
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "type": "weapon",
+              "star": 3,
+              "level": 22,
+              "isUpgradable": false
+            },
+            {
+              "slot": 2,
+              "type": "crown",
+              "star": 1,
+              "level": 15,
+              "isUpgradable": false
+            },
+            {
+              "slot": 3,
+              "type": "seal",
+              "star": 2,
+              "level": 20,
+              "isUpgradable": false
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 10001,
+              "stat": "Arm",
+              "level": 21,
+              "isCurrent": true
+            }
+          ]
+        },
+        {
+          "id": 4001,
+          "name": "Nova",
+          "level": 45,
+          "star": 4,
+          "power": 8874,
+          "role": "Marksman",
+          "element": "Water",
+          "soulStones": {
+            "current": 213,
+            "needed": 900
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 4003,
+              "level": 45
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "type": "weapon",
+              "star": 1,
+              "level": 10,
+              "isUpgradable": false
+            },
+            {
+              "slot": 2,
+              "type": "crown",
+              "star": 1,
+              "level": 5,
+              "isUpgradable": false
+            },
+            {
+              "slot": 3,
+              "type": "seal",
+              "star": 1,
+              "level": 10,
+              "isUpgradable": false
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 10002,
+              "stat": "PA",
+              "level": 12,
+              "isCurrent": true
+            }
+          ]
+        },
+        {
+          "id": 4002,
+          "name": "Mairi",
+          "level": 45,
+          "star": 4,
+          "power": 8740,
+          "role": "Support",
+          "element": "Water",
+          "soulStones": {
+            "current": 183,
+            "needed": 900
+          },
+          "skills": [
+            {
+              "slot": 1,
+              "skillId": 4005,
+              "level": 45
+            }
+          ],
+          "artifacts": [
+            {
+              "slot": 1,
+              "type": "weapon",
+              "star": 1,
+              "level": 5,
+              "isUpgradable": false
+            },
+            {
+              "slot": 2,
+              "type": "crown",
+              "star": 1,
+              "level": 2,
+              "isUpgradable": false
+            },
+            {
+              "slot": 3,
+              "type": "seal",
+              "star": 1,
+              "level": 4,
+              "isUpgradable": true
+            }
+          ],
+          "skins": [
+            {
+              "skinId": 10003,
+              "stat": "PA",
+              "level": 10,
+              "isCurrent": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1223 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "draft-verified",
+  "domain": "legends-draft",
+  "description": "Verified Legends Draft Stage 0..7 decrypted raw-order hero IDs (pre-JSON.parse order) + in-game round notes",
+  "stages": {
+    "stage_0": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "stageId": 0,
+        "matchId": null,
+        "draftBase64Len": 36,
+        "draftEnemyBase64Len": 8
+      },
+      "responseSummary": {
+        "matchId": null,
+        "rating": {
+          "userRating": null,
+          "enemyRating": null,
+          "userDifRating": null
+        },
+        "stageId": 0,
+        "stageFinishTs": null,
+        "enemyUser": null,
+        "draft": "<base64 len=36>",
+        "draftEnemy": "<base64 len=8>",
+        "journal": [
+          {
+            "matchId": 358213004,
+            "rating": {
+              "userRating": 1075,
+              "enemyRating": 1060,
+              "userDifRating": 40
+            },
+            "enemyUser": {
+              "id": "1219313103",
+              "accountId": "101000000000000215613640",
+              "name": "lagrol64",
+              "lastLoginTime": "1793573151",
+              "serverId": "1461",
+              "level": "99",
+              "clanId": "374920",
+              "clanRole": "4",
+              "avatarId": "30",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": null,
+              "battleIsAllowed": true,
+              "flagId": 9,
+              "clanTitle": "Argento",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 0,
+            "resultDetails": 0,
+            "ts": 1793553314
+          },
+          {
+            "matchId": 358200026,
+            "rating": {
+              "userRating": 1035,
+              "enemyRating": 1130,
+              "userDifRating": 40
+            },
+            "enemyUser": {
+              "id": "1216843033",
+              "accountId": "102000000000000213583606",
+              "name": "Ieon1973",
+              "lastLoginTime": "1793556007",
+              "serverId": "1438",
+              "level": "72",
+              "clanId": "432477",
+              "clanRole": "3",
+              "avatarId": "30",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": null,
+              "battleIsAllowed": true,
+              "flagId": 6,
+              "clanTitle": "пиздец ",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 0,
+            "resultDetails": 0,
+            "ts": 1793550426
+          },
+          {
+            "matchId": 358155805,
+            "rating": {
+              "userRating": 1045,
+              "enemyRating": 1330,
+              "userDifRating": -10
+            },
+            "enemyUser": {
+              "id": "618772039",
+              "accountId": "102000000000000045407579",
+              "name": "☆NoMaD☆",
+              "lastLoginTime": "1793590298",
+              "serverId": "1272",
+              "level": "120",
+              "clanId": "67204140",
+              "clanRole": "4",
+              "avatarId": "1846",
+              "borderId": 140,
+              "isChatModerator": false,
+              "frameId": 2,
+              "battleIsAllowed": true,
+              "flagId": 6,
+              "clanTitle": "● DARKNESS ●",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 1,
+            "resultDetails": 1,
+            "ts": 1793540968
+          },
+          {
+            "matchId": 358056784,
+            "rating": {
+              "userRating": 1005,
+              "enemyRating": 830,
+              "userDifRating": 40
+            },
+            "enemyUser": {
+              "id": "664087459",
+              "accountId": "102000000000000194037812",
+              "name": "всадник света",
+              "lastLoginTime": "1793589810",
+              "serverId": "1258",
+              "level": "120",
+              "clanId": "117497032",
+              "clanRole": "255",
+              "avatarId": "30",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": null,
+              "battleIsAllowed": true,
+              "flagId": 6,
+              "clanTitle": "вссв",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 0,
+            "resultDetails": 0,
+            "ts": 1793517685
+          }
+        ],
+        "gameTimeTs": 1793594177,
+        "winstreak": {
+          "winStreakCount": 0,
+          "defenceCount": 1,
+          "isDefenceBroken": false,
+          "resetTime": 1793671200,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": []
+    },
+    "stage_1": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:03:23.110Z",
+        "stageId": 1,
+        "matchId": null,
+        "draftBase64Len": 36,
+        "draftEnemyBase64Len": 8
+      },
+      "responseSummary": {
+        "matchId": null,
+        "rating": {
+          "userRating": null,
+          "enemyRating": null,
+          "userDifRating": null
+        },
+        "stageId": 1,
+        "stageFinishTs": null,
+        "enemyUser": null,
+        "draft": "<base64 len=36>",
+        "draftEnemy": "<base64 len=8>",
+        "journal": [
+          {
+            "matchId": 360290093,
+            "rating": {
+              "userRating": 1605,
+              "enemyRating": 1600,
+              "userDifRating": -5
+            },
+            "enemyUser": {
+              "id": "660178141",
+              "accountId": "102000000000000175974786",
+              "name": "KVCharlie",
+              "lastLoginTime": "1794158062",
+              "serverId": "1204",
+              "level": "120",
+              "clanId": "117479112",
+              "clanRole": "3",
+              "avatarId": "11237",
+              "borderId": 40024,
+              "isChatModerator": false,
+              "frameId": 3,
+              "battleIsAllowed": true,
+              "flagId": 31,
+              "clanTitle": "Horizon",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 1,
+            "resultDetails": 1,
+            "ts": 1794159796
+          },
+          {
+            "matchId": 360289659,
+            "rating": {
+              "userRating": 1565,
+              "enemyRating": 1550,
+              "userDifRating": 40
+            },
+            "enemyUser": {
+              "id": "1215741856",
+              "accountId": "101000000000000212703013",
+              "name": "Рома1307",
+              "lastLoginTime": "1794157259",
+              "serverId": "1424",
+              "level": "67",
+              "clanId": "100753399",
+              "clanRole": "2",
+              "avatarId": "417",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": 1,
+              "battleIsAllowed": true,
+              "flagId": 66,
+              "clanTitle": "les français ",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 0,
+            "resultDetails": 2,
+            "ts": 1794159696
+          },
+          {
+            "matchId": 360191737,
+            "rating": {
+              "userRating": 1575,
+              "enemyRating": 1530,
+              "userDifRating": -10
+            },
+            "enemyUser": {
+              "id": "1214186599",
+              "accountId": "102000000000000156249554",
+              "name": "Aragon Fist",
+              "lastLoginTime": "1794157411",
+              "serverId": "1400",
+              "level": "117",
+              "clanId": "67202746",
+              "clanRole": "3",
+              "avatarId": "118",
+              "borderId": 1,
+              "isChatModerator": false,
+              "frameId": 2,
+              "battleIsAllowed": true,
+              "flagId": 113,
+              "clanTitle": "Trial Error",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 1,
+            "resultDetails": 1,
+            "ts": 1794137966
+          },
+          {
+            "matchId": 360191163,
+            "rating": {
+              "userRating": 1585,
+              "enemyRating": 1480,
+              "userDifRating": -10
+            },
+            "enemyUser": {
+              "id": "554273537",
+              "accountId": "102000000000000104637776",
+              "name": "おかか2557",
+              "lastLoginTime": "1794134313",
+              "serverId": "34",
+              "level": "120",
+              "clanId": "194530",
+              "clanRole": "3",
+              "avatarId": "1474",
+              "borderId": 159,
+              "isChatModerator": false,
+              "frameId": 1,
+              "battleIsAllowed": true,
+              "flagId": 8,
+              "clanTitle": "Have Fun:ALL-144",
+              "_truncatedKeys": 1,
+              "_totalKeys": 16
+            },
+            "result": 1,
+            "resultDetails": 1,
+            "ts": 1794137804
+          }
+        ],
+        "gameTimeTs": 1794161003,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": []
+    },
+    "stage_2": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:03:25.617Z",
+        "stageId": 2,
+        "matchId": 360295686,
+        "draftBase64Len": 3120,
+        "draftEnemyBase64Len": 2244
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 2,
+        "stageFinishTs": 1794161095,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=3120>",
+        "draftEnemy": "<base64 len=2244>",
+        "journal": null,
+        "gameTimeTs": 1794161005,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": [
+        11,
+        57,
+        76,
+        18,
+        30,
+        58,
+        67,
+        22,
+        38,
+        42,
+        3,
+        500,
+        54,
+        70,
+        24
+      ],
+      "decryptedRawOrderSwapHeroIds": [
+        55,
+        6,
+        5,
+        2,
+        10,
+        45
+      ],
+      "decryptedRawOrderEnemyHeroIds": [
+        78,
+        25,
+        33,
+        65,
+        47,
+        9,
+        32,
+        61,
+        56,
+        41,
+        46,
+        16,
+        23,
+        52,
+        504
+      ]
+    },
+    "stage_3": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:03:47.500Z",
+        "stageId": 3,
+        "matchId": 360295686,
+        "draftBase64Len": 780,
+        "draftEnemyBase64Len": 2244
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 3,
+        "stageFinishTs": 1794161095,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=780>",
+        "draftEnemy": "<base64 len=2244>",
+        "journal": null,
+        "gameTimeTs": 1794161027,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": [
+        11,
+        58,
+        67,
+        500,
+        54
+      ],
+      "decryptedRawOrderEnemyHeroIds": [
+        501,
+        21,
+        55,
+        10,
+        52,
+        22,
+        30,
+        29,
+        35,
+        72,
+        41,
+        7,
+        57,
+        56,
+        20
+      ]
+    },
+    "stage_4": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:05:07.145Z",
+        "stageId": 4,
+        "matchId": 360295686,
+        "draftBase64Len": 2272,
+        "draftEnemyBase64Len": 748
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 4,
+        "stageFinishTs": 1794161196,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=2272>",
+        "draftEnemy": "<base64 len=748>",
+        "journal": null,
+        "gameTimeTs": 1794161107,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": [
+        501,
+        21,
+        55,
+        10,
+        52,
+        22,
+        30,
+        29,
+        35,
+        72,
+        41,
+        7,
+        57,
+        56,
+        20
+      ],
+      "decryptedRawOrderEnemyHeroIds": [
+        5,
+        40,
+        2,
+        15,
+        503
+      ]
+    },
+    "stage_5": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:05:33.889Z",
+        "stageId": 5,
+        "matchId": 360295686,
+        "draftBase64Len": 36,
+        "draftEnemyBase64Len": 8
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 5,
+        "stageFinishTs": null,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=36>",
+        "draftEnemy": "<base64 len=8>",
+        "journal": null,
+        "gameTimeTs": 1794161133,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": []
+    },
+    "stage_6": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:05:35.915Z",
+        "stageId": 6,
+        "matchId": 360295686,
+        "draftBase64Len": 36,
+        "draftEnemyBase64Len": 8
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 6,
+        "stageFinishTs": 1794161208,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=36>",
+        "draftEnemy": "<base64 len=8>",
+        "journal": null,
+        "gameTimeTs": 1794161134,
+        "winstreak": {
+          "winStreakCount": 1,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": []
+    },
+    "stage_7": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:06:20.457Z",
+        "stageId": 7,
+        "matchId": 360295686,
+        "draftBase64Len": 36,
+        "draftEnemyBase64Len": 8
+      },
+      "responseSummary": {
+        "matchId": 360295686,
+        "rating": {
+          "userRating": 1600,
+          "enemyRating": 1730,
+          "userDifRating": null
+        },
+        "stageId": 7,
+        "stageFinishTs": null,
+        "enemyUser": {
+          "id": "659404194",
+          "accountId": "102000000000000174822635",
+          "name": "ShallowWorkmans",
+          "lastLoginTime": "1794159860",
+          "serverId": "1203",
+          "level": "120",
+          "clanId": "117480605",
+          "clanRole": "2",
+          "avatarId": "2245",
+          "borderId": 1,
+          "isChatModerator": false,
+          "frameId": 1,
+          "battleIsAllowed": true,
+          "flagId": 42,
+          "clanTitle": "Apex Assassins",
+          "_truncatedKeys": 1,
+          "_totalKeys": 16
+        },
+        "draft": "<base64 len=36>",
+        "draftEnemy": "<base64 len=8>",
+        "journal": null,
+        "gameTimeTs": 1794161180,
+        "winstreak": {
+          "winStreakCount": 2,
+          "defenceCount": 0,
+          "isDefenceBroken": false,
+          "resetTime": 1794189600,
+          "availableRestoreWinstreakCount": 3
+        }
+      },
+      "decryptedRawOrderBaseHeroIds": []
+    }
+  },
+  "inGameNotes": {
+    "hwa-game-record-202611091943_draft_ingame.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091943_draft_ingame.md",
+        "kind": "in-game-draft-log"
+      },
+      "content": "# Defense\n## step 1\nChabba\nGalahad\nPhobos\n## step 2\nPeech\nIris\nKrista\n## step 3\nOya\nEva\nPeppy\n## step 4\nJulius\nCascade\nMaya\n## step 5\nDaredevil\nAurora\nWodryn\n# Attack\n## step 1\nMushy and Shroom\nGinger\nAmira\n## step 2\nXe'sha\nMaya\nDaredevil\n## step 3\nKai\nCorvus\nAndvari\n## step 4\nDante\nAlvanor\nFolio\n## step 5\nByrna\nCleaver\nYasmine"
+    },
+    "hwa-game-record-202611171800._draft_3json.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171800._draft_3json.md",
+        "kind": "in-game-draft-log"
+      },
+      "content": "# defense\r\nMushy and Shroom, Galahad, Cascade\r\nLars, Eva, Mojo\r\nSolei, Folio, Ginger\r\nYasmine, Lilith, Peech\r\nCeleste, Sebastian, Heidi\r\n\r\n# Attack\r\nWodryn, Miu, Corvus\r\nQing Mao, Drayne, Aurora\r\nLars, Lian, Crow\r\nmissing\r\nCornelius, Aidan, Kai"
+    },
+    "hwa-game-record-202611171841_draft_4.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.md",
+        "kind": "in-game-draft-log"
+      },
+      "content": "# Def\r\nRufus, Dante, Guus\r\nTristan, Fox, Yashmine\r\nGinger, Iris, Oya\r\nPeppy, Somna, Isaac\r\nHelios, Alvanor, Galahad\r\n\r\n# Atk\r\nWodryn, Mushy and Shroom, Aidan\r\nFolio, Krista, Jet\r\nDaredevil, Ziri, Judge\r\nLian, Satori, Thea\r\nArachne, Isaac, Kai"
+    },
+    "hwa-game-record-202611171910_draft_5.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171910_draft_5.md",
+        "kind": "in-game-draft-log"
+      },
+      "content": "# def\r\nMushy and Shroom, Elmir, Rufus\r\nMaya, Keira, Jet\r\nKrista, Andvari, Faceless\r\nDaredevil, Xe'Sha, Aidan\r\nOrion, Soleil, Morrigan\r\n\r\n# atk\r\nChabba, Byrna, Martha\r\nOya, Crow, Kayla\r\nLilith, Iris, Soleil\r\nJhu, Nebula, Jorgen\r\nPeech, Thea, Morrigan"
+    }
+  },
+  "sessionSnapshot": {
+    "_meta": {
+      "sourceFile": "temp/tracking-data/archived/hwa-legend-draft-5-session-2026-11-17T12-10-28-533Z.json",
+      "format": "hwa-legend-draft-session-log"
+    },
+    "sample": {
+      "_format": "hwa-legend-draft-session-log",
+      "_version": 2,
+      "_exportedAt": "2026-11-17T12:10:28.533Z",
+      "matchId": 362841385,
+      "candidates": [
+        16,
+        17,
+        20,
+        24,
+        25,
+        {
+          "_truncatedArrayItems": 10,
+          "_totalLength": 15
+        }
+      ],
+      "lastTelemetry": {
+        "capturedStringsCount": 0,
+        "cipherOffsets": [
+          929808496,
+          929861104,
+          984854784
+        ],
+        "detectedCandidatePools": [
+          {
+            "count": 15,
+            "heroIds": [
+              16,
+              17,
+              20,
+              24,
+              25,
+              {
+                "_truncatedArrayItems": 10,
+                "_totalLength": 15
+              }
+            ],
+            "ptr": 11531296
+          },
+          {
+            "count": 25,
+            "heroIds": [
+              26,
+              27,
+              28,
+              29,
+              30,
+              {
+                "_truncatedArrayItems": 20,
+                "_totalLength": 25
+              }
+            ],
+            "ptr": 11531316
+          },
+          {
+            "count": 15,
+            "heroIds": [
+              16,
+              17,
+              18,
+              19,
+              20,
+              {
+                "_truncatedArrayItems": 10,
+                "_totalLength": 15
+              }
+            ],
+            "ptr": 11650780
+          },
+          {
+            "count": 15,
+            "heroIds": [
+              16,
+              17,
+              18,
+              19,
+              20,
+              {
+                "_truncatedArrayItems": 10,
+                "_totalLength": 15
+              }
+            ],
+            "ptr": 11650844
+          },
+          {
+            "count": 25,
+            "heroIds": [
+              26,
+              28,
+              32,
+              36,
+              40,
+              {
+                "_truncatedArrayItems": 20,
+                "_totalLength": 25
+              }
+            ],
+            "ptr": 11815452
+          },
+          {
+            "_truncatedArrayItems": 3,
+            "_totalLength": 8
+          }
+        ],
+        "detectedPoolsCount": 8,
+        "draftBase64": "TyFgZiZSRw9wZA4kJAxtc3ZpejkFeFRuEg==",
+        "heapU32Extraction": {
+          "detectedPoolsCount": 8,
+          "pools": [
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11531296,
+              "rawDwordsHex": "[Array(16)]"
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11531316,
+              "rawDwordsHex": "[Array(26)]"
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650780,
+              "rawDwordsHex": "[Array(16)]"
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650844,
+              "rawDwordsHex": "[Array(16)]"
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11815452,
+              "rawDwordsHex": "[Array(26)]"
+            },
+            {
+              "_truncatedArrayItems": 3,
+              "_totalLength": 8
+            }
+          ]
+        },
+        "heapU8Extraction": {
+          "cipherMatches": 3,
+          "slices": [
+            {
+              "asciiDump": "..5.............O!`f&RG.pd.$$.msviz9.xTn..r......2'......",
+              "cipherOffset": 929808496,
+              "hexDump": "b0 e4 35 02 00 00 00 00 00 00 00 00 19 00 00 00 4f 21 60 66 26 52 47 0f 70 64 0e 24 24 0c 6d 73 76 69 7a 39 05 78 54 6e 12 00 72 00 00 00 00 00 f8 32 27 02 00 00 00 00 0f",
+              "sliceEnd": 929808537,
+              "sliceStart": 929808480,
+              "targetLength": 25
+            },
+            {
+              "asciiDump": "..5.............O!`f&RG.pd.$$.msviz9.xTn.........2'......",
+              "cipherOffset": 929861104,
+              "hexDump": "b0 e4 35 02 00 00 00 00 00 00 00 00 19 00 00 00 4f 21 60 66 26 52 47 0f 70 64 0e 24 24 0c 6d 73 76 69 7a 39 05 78 54 6e 12 00 00 00 00 00 00 00 f8 32 27 02 00 00 00 00 0f",
+              "sliceEnd": 929861145,
+              "sliceStart": 929861088,
+              "targetLength": 25
+            },
+            {
+              "asciiDump": "..5.............O!`f&RG.pd.$$.msviz9.xTn.........2'......",
+              "cipherOffset": 984854784,
+              "hexDump": "b0 e4 35 02 00 00 00 00 00 00 00 00 19 00 00 00 4f 21 60 66 26 52 47 0f 70 64 0e 24 24 0c 6d 73 76 69 7a 39 05 78 54 6e 12 00 00 00 00 00 00 00 f8 32 27 02 00 00 00 00 0d",
+              "sliceEnd": 984854825,
+              "sliceStart": 984854768,
+              "targetLength": 25
+            }
+          ],
+          "targetLength": 25
+        },
+        "ok": true,
+        "stageId": 7,
+        "timestamp": "2026-11-17T12:09:44.110Z",
+        "topCandidateIds": [
+          16,
+          17,
+          20,
+          24,
+          25,
+          {
+            "_truncatedArrayItems": 10,
+            "_totalLength": 15
+          }
+        ]
+      },
+      "entriesCount": 21,
+      "logs": [
+        {
+          "action": "randomDraft_getInfo",
+          "id": "draft-log-1794917225617-mhkfx",
+          "ident": "d252ce2525b54afca96112209a2522b4",
+          "in": {
+            "args": {},
+            "matchId": null
+          },
+          "isoTime": "2026-11-17T12:07:05.617Z",
+          "out": {
+            "battleReplay": null,
+            "battleResult": null,
+            "draftEnemy": "WnZuaw==",
+            "error": null,
+            "hasDraftCipher": true,
+            "matchId": null,
+            "ok": true,
+            "rating": {
+              "enemyRating": null,
+              "userDifRating": null,
+              "userRating": null
+            },
+            "rawResponse": {
+              "draft": "TyFgZiZSRw9wZA4kJAxtc3ZpejkFeFRuEg==",
+              "draftEnemy": "WnZuaw==",
+              "enemyUser": null,
+              "gameTimeTs": 1794917225,
+              "journal": "[Array(4)]",
+              "matchId": null,
+              "rating": "[Object(3 keys)]",
+              "stageFinishTs": null,
+              "stageId": 0,
+              "winstreak": "[Object(5 keys)]"
+            },
+            "stageId": 0
+          },
+          "step": "getInfo",
+          "timestamp": 1794917225617,
+          "type": "draft-step"
+        },
+        {
+          "capturedStringsCount": 0,
+          "cipherOffsets": [
+            926441488,
+            957247696
+          ],
+          "detectedCandidatePools": [
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11531296
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11531316
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650780
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650844
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11815452
+            },
+            {
+              "_truncatedArrayItems": 3,
+              "_totalLength": 8
+            }
+          ],
+          "detectedPoolsCount": 8,
+          "heapU32Extraction": {
+            "detectedPoolsCount": 8,
+            "pools": [
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          },
+          "heapU8Extraction": {
+            "cipherMatches": 2,
+            "slices": [
+              "[Object(6 keys)]",
+              "[Object(6 keys)]"
+            ],
+            "targetLength": 25
+          },
+          "id": "draft-log-1794917228604-rznve",
+          "isoTime": "2026-11-17T12:07:08.604Z",
+          "sampleCapturedStrings": [],
+          "stageId": 0,
+          "timestamp": 1794917228604,
+          "topCandidateIds": [
+            16,
+            17,
+            20,
+            24,
+            25,
+            {
+              "_truncatedArrayItems": 10,
+              "_totalLength": 15
+            }
+          ],
+          "_truncatedKeys": 1,
+          "_totalKeys": 13
+        },
+        {
+          "action": "randomDraft_getInfo",
+          "id": "draft-log-1794917230816-44vpk",
+          "ident": "c59a1b70087b44bf8208d8383019ccd8",
+          "in": {
+            "args": {},
+            "matchId": null
+          },
+          "isoTime": "2026-11-17T12:07:10.816Z",
+          "out": {
+            "battleReplay": null,
+            "battleResult": null,
+            "draftEnemy": "WnZuaw==",
+            "error": null,
+            "hasDraftCipher": true,
+            "matchId": null,
+            "ok": true,
+            "rating": {
+              "enemyRating": null,
+              "userDifRating": null,
+              "userRating": null
+            },
+            "rawResponse": {
+              "draft": "TyFgZiZSRw9wZA4kJAxtc3ZpejkFeFRuEg==",
+              "draftEnemy": "WnZuaw==",
+              "enemyUser": null,
+              "gameTimeTs": 1794917230,
+              "journal": "[Array(4)]",
+              "matchId": null,
+              "rating": "[Object(3 keys)]",
+              "stageFinishTs": null,
+              "stageId": 1,
+              "winstreak": "[Object(5 keys)]"
+            },
+            "stageId": 1
+          },
+          "step": "getInfo",
+          "timestamp": 1794917230816,
+          "type": "draft-step"
+        },
+        {
+          "capturedStringsCount": 0,
+          "cipherOffsets": [
+            926441488,
+            953818656,
+            957247696
+          ],
+          "detectedCandidatePools": [
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11531296
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11531316
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650780
+            },
+            {
+              "count": 15,
+              "heroIds": "[Array(15)]",
+              "ptr": 11650844
+            },
+            {
+              "count": 25,
+              "heroIds": "[Array(25)]",
+              "ptr": 11815452
+            },
+            {
+              "_truncatedArrayItems": 3,
+              "_totalLength": 8
+            }
+          ],
+          "detectedPoolsCount": 8,
+          "heapU32Extraction": {
+            "detectedPoolsCount": 8,
+            "pools": [
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              "[Object(4 keys)]",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          },
+          "heapU8Extraction": {
+            "cipherMatches": 3,
+            "slices": [
+              "[Object(6 keys)]",
+              "[Object(6 keys)]",
+              "[Object(6 keys)]"
+            ],
+            "targetLength": 25
+          },
+          "id": "draft-log-1794917235379-9o9c4",
+          "isoTime": "2026-11-17T12:07:15.379Z",
+          "sampleCapturedStrings": [],
+          "stageId": 1,
+          "timestamp": 1794917235379,
+          "topCandidateIds": [
+            16,
+            17,
+            20,
+            24,
+            25,
+            {
+              "_truncatedArrayItems": 10,
+              "_totalLength": 15
+            }
+          ],
+          "_truncatedKeys": 1,
+          "_totalKeys": 13
+        },
+        {
+          "action": "randomDraft_getInfo",
+          "id": "draft-log-1794917235812-vin3g",
+          "ident": "017d45ec19354dd2baf8780dc720a14e",
+          "in": {
+            "args": {},
+            "matchId": null
+          },
+          "isoTime": "2026-11-17T12:07:15.812Z",
+          "out": {
+            "battleReplay": null,
+            "battleResult": null,
+            "draftEnemy": "WnZuaw==",
+            "error": null,
+            "hasDraftCipher": true,
+            "matchId": null,
+            "ok": true,
+            "rating": {
+              "enemyRating": null,
+              "userDifRating": null,
+              "userRating": null
+            },
+            "rawResponse": {
+              "draft": "TyFgZiZSRw9wZA4kJAxtc3ZpejkFeFRuEg==",
+              "draftEnemy": "WnZuaw==",
+              "enemyUser": null,
+              "gameTimeTs": 1794917235,
+              "journal": "[Array(4)]",
+              "matchId": null,
+              "rating": "[Object(3 keys)]",
+              "stageFinishTs": null,
+              "stageId": 1,
+              "winstreak": "[Object(5 keys)]"
+            },
+            "stageId": 1
+          },
+          "step": "getInfo",
+          "timestamp": 1794917235812,
+          "type": "draft-step"
+        },
+        {
+          "_truncatedArrayItems": 16,
+          "_totalLength": 21
+        }
+      ]
+    }
+  }
+}

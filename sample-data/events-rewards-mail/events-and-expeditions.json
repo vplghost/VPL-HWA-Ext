@@ -1,0 +1,1268 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "events-rewards-mail",
+  "description": "Expeditions, special events, offers, monthly hero, liveOps, billing & webshop",
+  "methodCount": 15,
+  "methods": {
+    "Webshop_getWebshopTransaction": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.314Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "billingGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "currency": "VND"
+      },
+      "response": {
+        "bundle": [
+          {
+            "id": 24742,
+            "available": true,
+            "bought": 0,
+            "endTime": 1794189600,
+            "offerId": 1000016837
+          },
+          {
+            "id": 24743,
+            "available": true,
+            "bought": 0,
+            "endTime": 1794189600,
+            "offerId": 1000016837
+          },
+          {
+            "id": 24744,
+            "available": true,
+            "bought": 0,
+            "endTime": 1794189600,
+            "offerId": 1000016837
+          },
+          {
+            "id": 24745,
+            "available": true,
+            "bought": 0,
+            "endTime": 1794189600,
+            "offerId": 1000016837
+          },
+          {
+            "id": 24746,
+            "available": true,
+            "bought": 0,
+            "endTime": 1794189600,
+            "offerId": 1000016837
+          },
+          {
+            "_truncatedArrayItems": 15,
+            "_totalLength": 20
+          }
+        ],
+        "billings": [
+          {
+            "id": 11196
+          },
+          {
+            "id": 11198
+          },
+          {
+            "id": 11200
+          },
+          {
+            "id": 20866
+          },
+          {
+            "id": 21197
+          },
+          {
+            "_truncatedArrayItems": 2759,
+            "_totalLength": 2764
+          }
+        ],
+        "priceVersion": "2"
+      }
+    },
+    "billingGetLast": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "lastUpdateDate": 1792414632
+      }
+    },
+    "billing_customStoreGetNotGiven": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "common_getCustomStoresDirect": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "region": "VN",
+        "stores": []
+      }
+    },
+    "eventPicker_info": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "385": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "2": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "387": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "3": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "393": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "4": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "401": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "5": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "405": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "6": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "407": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "7": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "413": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "8": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "416": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "9": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "420": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "10": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "423": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "11": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "426": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "12": {
+          "current_round": 0,
+          "rewards": [],
+          "status": "finished",
+          "final_reward": {
+            "fragmentSkin": {
+              "490": 1
+            }
+          },
+          "restart_count": 0,
+          "freeRun": false
+        },
+        "_truncatedKeys": 9,
+        "_totalKeys": 21
+      }
+    },
+    "expeditionFarm": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:59.352Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "expeditionId": 4
+      },
+      "response": {
+        "reward": {
+          "consumable": {
+            "29": 23,
+            "40": 13
+          }
+        },
+        "newExpedition": null
+      }
+    },
+    "expeditionGet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 0,
+          "slotId": 1,
+          "status": 3,
+          "heroes": [],
+          "endTime": 0,
+          "duration": 360,
+          "day": "20261102",
+          "reward": {
+            "consumable": {
+              "41": 8
+            }
+          },
+          "power": 94300,
+          "rarity": 2,
+          "storyId": 3,
+          "attemptsLeft": 0
+        },
+        {
+          "id": 1,
+          "slotId": 2,
+          "status": 3,
+          "heroes": [],
+          "endTime": 0,
+          "duration": 480,
+          "day": "20261102",
+          "reward": {
+            "consumable": {
+              "34": 4,
+              "35": 5,
+              "36": 2
+            }
+          },
+          "power": 94300,
+          "rarity": 1,
+          "storyId": 8,
+          "attemptsLeft": 0
+        },
+        {
+          "id": 2,
+          "slotId": 3,
+          "status": 2,
+          "heroes": [
+            26,
+            75,
+            23,
+            33,
+            13
+          ],
+          "endTime": 1793611438,
+          "duration": 21600,
+          "day": "20261102",
+          "reward": {
+            "consumable": {
+              "30": 12,
+              "34": 11
+            }
+          },
+          "power": 23600,
+          "rarity": 1,
+          "storyId": 13,
+          "attemptsLeft": 0
+        },
+        {
+          "id": 3,
+          "slotId": 4,
+          "status": 3,
+          "heroes": [],
+          "endTime": 0,
+          "duration": 2100,
+          "day": "20261102",
+          "reward": {
+            "consumable": {
+              "34": 28,
+              "35": 18
+            }
+          },
+          "power": 44200,
+          "rarity": 1,
+          "storyId": 19,
+          "attemptsLeft": 0
+        },
+        {
+          "id": 4,
+          "slotId": 5,
+          "status": 3,
+          "heroes": [],
+          "endTime": 0,
+          "duration": 480,
+          "day": "20261102",
+          "reward": {
+            "consumable": {
+              "34": 19,
+              "35": 12
+            }
+          },
+          "power": 94300,
+          "rarity": 1,
+          "storyId": 25,
+          "attemptsLeft": 0
+        },
+        {
+          "_truncatedArrayItems": 3,
+          "_totalLength": 8
+        }
+      ]
+    },
+    "getEventInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:21.005Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "id": 12,
+        "startDate": 1793005200,
+        "endDate": 1797732000
+      }
+    },
+    "liveOpsInit": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "availableMechanics": [
+          "specialQuest",
+          "battlepass"
+        ]
+      }
+    },
+    "liveOps_refresh": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "response": null,
+        "liveOps_UPDATE_BANK_OFFER": [
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "slots": [
+              {
+                "id": 7,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 8,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 9,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 10,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 11,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_PERIODIC_HERO_OFFER": [
+          {
+            "id": 24,
+            "endTime": 0,
+            "refreshTime": 1793671200,
+            "heroId": 76,
+            "slots": [
+              {
+                "id": 1,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 2,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 3,
+                "bought": false,
+                "heroId": 76
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_OFFER": [
+          {
+            "id": 117,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 123,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 1018,
+            "endTime": 1794189540,
+            "refreshTime": 1793594177,
+            "boughtCount": 0
+          }
+        ],
+        "liveOps_UPDATE_LADDER_OFFER": [
+          {
+            "id": 1088,
+            "endTime": 2071015200,
+            "slots": [
+              {
+                "slotId": 1031,
+                "itemId": 1134,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1030,
+                "itemId": 1130,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1029,
+                "itemId": 1126,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1028,
+                "itemId": 1122,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1027,
+                "itemId": 1118,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "_truncatedArrayItems": 27,
+                "_totalLength": 32
+              }
+            ]
+          },
+          {
+            "id": 1090,
+            "endTime": 0,
+            "slots": [
+              {
+                "slotId": 1032,
+                "itemId": 1138,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 120,
+                "itemId": 484,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 121,
+                "itemId": 489,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 122,
+                "itemId": 494,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 123,
+                "itemId": 499,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "_truncatedArrayItems": 12,
+                "_totalLength": 17
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_LADDER_OFFER": [
+          {
+            "id": 1024,
+            "endTime": 1793757599,
+            "slots": [
+              {
+                "slotId": 16,
+                "itemId": 52,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              }
+            ]
+          },
+          {
+            "id": 1080,
+            "endTime": 1793671140,
+            "slots": [
+              {
+                "slotId": 1021,
+                "itemId": 1088,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_RETENTION_OFFER": [
+          {
+            "id": 2,
+            "isAcquired": false,
+            "endTime": 2071954800,
+            "rewards": [
+              {
+                "id": 8,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 9,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 10,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 11,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 12,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "_truncatedArrayItems": 25,
+                "_totalLength": 30
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SUBSCRIPTION": [
+          {
+            "id": 6,
+            "refreshDate": 1793678400,
+            "subscriptions": [
+              {
+                "id": 30,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "refreshDate": 1793678400,
+            "subscriptions": [
+              {
+                "id": 31,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 32,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 33,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 34,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 35,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_OLD_BANK_OFFER": [
+          {
+            "id": 3,
+            "endTime": 2071954800
+          }
+        ],
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 1,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          },
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          },
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "refreshTime": 1793671201,
+            "collected": true
+          },
+          {
+            "id": 15,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          }
+        ],
+        "liveOps_refresh": [
+          {
+            "refreshTime": 1793671200
+          }
+        ]
+      }
+    },
+    "monthlyHero_getServerDatetimeData": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "monthNumber": 11,
+        "nextMonthStartTS": 1796090400
+      }
+    },
+    "offerFarmReward": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611181003_freebies_2.json",
+        "capturedAt": "2026-11-18T03:02:40.741Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "offerId": 1000016955
+      },
+      "response": {
+        "consumable": {
+          "51": 1
+        },
+        "gold": 15000
+      }
+    },
+    "offerGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 2387,
+          "type": "addBilling",
+          "offerType": "refillableBundle",
+          "offerData": {
+            "addBillingIds": [
+              51594,
+              51595,
+              51596,
+              51597
+            ]
+          },
+          "clientData": {
+            "panelData": {
+              "assetBundleName": "skillPointsRefillWithBundlesPopup.unity3d",
+              "prefabName": "refillable_bundle_regular",
+              "valuePercent": "+250%",
+              "refillableIcon": {
+                "assetBundleName": "skillPointsRefillWithBundlesPopup.unity3d",
+                "ident": "skillpoints_big"
+              },
+              "showVipPointsReward": false,
+              "refillablePseudoItemId": 13
+            }
+          },
+          "endTime": 2524615200,
+          "billings": [
+            {
+              "id": 51596,
+              "priceVersion": [
+                2
+              ],
+              "name": "skill_points_bundle_1_cheap",
+              "productName": "hwm_4.99",
+              "productId": "hwm_4.99",
+              "vipPoints": 400,
+              "cost": 200,
+              "reward": {
+                "skill_point": 100,
+                "gold": 250000,
+                "refillableUpgrade": {
+                  "1": 1
+                },
+                "vipPoints": 400
+              },
+              "requirement": null,
+              "bundleId": null,
+              "type": "specialOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            },
+            {
+              "id": 51597,
+              "priceVersion": [
+                2
+              ],
+              "name": "skill_points_bundle_1_cheap",
+              "productName": "hwm_4.99",
+              "productId": "hwm_4.99",
+              "vipPoints": 400,
+              "cost": 200,
+              "reward": {
+                "skill_point": 100,
+                "gold": 250000,
+                "refillableUpgrade": {
+                  "1": 1
+                },
+                "vipPoints": 400
+              },
+              "requirement": null,
+              "bundleId": null,
+              "type": "specialOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            }
+          ],
+          "notAvailableBillings": [],
+          "isActive": true
+        },
+        {
+          "id": 2388,
+          "type": "addBilling",
+          "offerType": "refillableBundle",
+          "offerData": {
+            "addBillingIds": [
+              51598,
+              51599,
+              51600,
+              51601
+            ]
+          },
+          "clientData": {
+            "panelData": {
+              "assetBundleName": "skillPointsRefillWithBundlesPopup.unity3d",
+              "prefabName": "refillable_bundle_top",
+              "valuePercent": "+300%",
+              "refillableIcon": {
+                "assetBundleName": "skillPointsRefillWithBundlesPopup.unity3d",
+                "ident": "skillpoints_big"
+              },
+              "showVipPointsReward": false,
+              "refillablePseudoItemId": 13
+            }
+          },
+          "endTime": 2524615200,
+          "billings": [
+            {
+              "id": 51600,
+              "priceVersion": [
+                2
+              ],
+              "name": "skill_points_bundle_2_cheap",
+              "productName": "hwm_9.99",
+              "productId": "hwm_9.99",
+              "vipPoints": 800,
+              "cost": 200,
+              "reward": {
+                "skill_point": 250,
+                "gold": 500000,
+                "refillableUpgrade": {
+                  "2": 1
+                },
+                "vipPoints": 800
+              },
+              "requirement": null,
+              "bundleId": null,
+              "type": "specialOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            },
+            {
+              "id": 51601,
+              "priceVersion": [
+                2
+              ],
+              "name": "skill_points_bundle_2_cheap",
+              "productName": "hwm_9.99",
+              "productId": "hwm_9.99",
+              "vipPoints": 800,
+              "cost": 200,
+              "reward": {
+                "skill_point": 250,
+                "gold": 500000,
+                "refillableUpgrade": {
+                  "2": 1
+                },
+                "vipPoints": 800
+              },
+              "requirement": null,
+              "bundleId": null,
+              "type": "specialOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            }
+          ],
+          "notAvailableBillings": [],
+          "isActive": true
+        },
+        {
+          "id": 2407,
+          "type": "addBilling",
+          "offerType": "vipshopBundle",
+          "offerData": {
+            "addBillingIds": [
+              954,
+              955,
+              10953,
+              20954
+            ],
+            "vipBundle": {
+              "count": 1,
+              "remain": 1,
+              "resetTime": 1793656800
+            }
+          },
+          "clientData": {
+            "locale": {
+              "title": "UI_POPUP_BUNDLE_2_NAME",
+              "description": "UI_SPECIALOFFER_SUBSCRIPTION_BUNDLE_DESCRIPTION"
+            },
+            "discountPercent": 80,
+            "redirectWindow": "bundle",
+            "requirement": {
+              "vipLevel": 5
+            }
+          },
+          "endTime": 1920852000,
+          "billings": [
+            {
+              "id": 10953,
+              "priceVersion": [
+                2
+              ],
+              "name": "an_vipshop_bundle_ab",
+              "productName": "vipshop_bundle_ab",
+              "productId": "an_vipshop_bundle_ab",
+              "vipPoints": 800,
+              "cost": 900,
+              "reward": {
+                "starmoney": 2000,
+                "stamina": 1000,
+                "consumable": {
+                  "12": 20,
+                  "27": 12,
+                  "45": 10
+                },
+                "coin": {
+                  "8": 150,
+                  "9": 150,
+                  "10": 150,
+                  "40077": 3600
+                },
+                "vipPoints": 800
+              },
+              "requirement": {
+                "vipLevel": 1,
+                "teamLevel": 11
+              },
+              "bundleId": null,
+              "type": "repeatableOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            },
+            {
+              "id": 20954,
+              "priceVersion": [
+                2
+              ],
+              "name": "ios_vipshop_bundle_ab",
+              "productName": "vipshop_bundle_ab",
+              "productId": "an_vipshop_bundle_ab",
+              "vipPoints": 800,
+              "cost": 900,
+              "reward": {
+                "starmoney": 2000,
+                "stamina": 1000,
+                "consumable": {
+                  "12": 20,
+                  "27": 12,
+                  "45": 10
+                },
+                "coin": {
+                  "8": 150,
+                  "9": 150,
+                  "10": 150,
+                  "40077": 3600
+                },
+                "vipPoints": 800
+              },
+              "requirement": {
+                "vipLevel": 1,
+                "teamLevel": 11
+              },
+              "bundleId": null,
+              "type": "repeatableOffer",
+              "slot": 0,
+              "_truncatedKeys": 5,
+              "_totalKeys": 17
+            }
+          ],
+          "notAvailableBillings": [],
+          "isActive": true
+        },
+        {
+          "id": 1000006257,
+          "type": "addBilling",
+          "offerType": "multislotOffer",
+          "offerData": {
+            "multiSlotOffer": {
+              "cards": [
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105076,
+                  "type": "DEFAULT",
+                  "discount": "70%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(3 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105077,
+                  "type": "DEFAULT",
+                  "discount": "70%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105078,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(3 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105079,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105080,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                }
+              ]
+            }
+          },
+          "clientData": [],
+          "endTime": 1993255200,
+          "isActive": true
+        },
+        {
+          "id": 1000006258,
+          "type": "addBilling",
+          "offerType": "multislotOffer",
+          "offerData": {
+            "multiSlotOffer": {
+              "cards": [
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105113,
+                  "type": "DEFAULT",
+                  "discount": "70%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(3 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105114,
+                  "type": "DEFAULT",
+                  "discount": "70%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105115,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(3 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105116,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                },
+                {
+                  "limit": 1,
+                  "showLimit": false,
+                  "billing": 105117,
+                  "type": "DEFAULT",
+                  "discount": "65%",
+                  "purchasedCount": 0,
+                  "reward": "[Object(4 keys)]"
+                }
+              ]
+            }
+          },
+          "clientData": [],
+          "endTime": 1993255200,
+          "isActive": true
+        },
+        {
+          "_truncatedArrayItems": 70,
+          "_totalLength": 75
+        }
+      ]
+    },
+    "upsaleHeroBundle_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    }
+  }
+}

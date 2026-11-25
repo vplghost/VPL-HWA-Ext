@@ -1,0 +1,376 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "arena-grand-arena",
+  "description": "Grand Arena 3-team matchmaking and ranking RPCs",
+  "methodCount": 1,
+  "methods": {
+    "grandFindEnemies": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611242002_grand_arena.json",
+        "capturedAt": "2026-11-24T13:02:19.633Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "enemies": [
+          {
+            "userId": "1216251207",
+            "place": "28",
+            "heroes": [
+              [
+                {
+                  "id": 51,
+                  "level": 120,
+                  "color": 10,
+                  "star": 6,
+                  "power": 41443,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 76,
+                  "level": 120,
+                  "color": 9,
+                  "star": 5,
+                  "power": 29880,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 49,
+                  "level": 120,
+                  "color": 9,
+                  "star": 6,
+                  "power": 35243,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 79,
+                  "level": 120,
+                  "color": 9,
+                  "star": 6,
+                  "power": 34345,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 71,
+                  "level": 120,
+                  "color": 8,
+                  "star": 6,
+                  "power": 31560,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                }
+              ],
+              [
+                {
+                  "id": 58,
+                  "level": 120,
+                  "color": 10,
+                  "star": 3,
+                  "power": 32225,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 75,
+                  "level": 120,
+                  "color": 13,
+                  "star": 4,
+                  "power": 72567,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 5
+                },
+                {
+                  "id": 29,
+                  "level": 120,
+                  "color": 10,
+                  "star": 6,
+                  "power": 59567,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 5
+                },
+                {
+                  "id": 72,
+                  "level": 120,
+                  "color": 16,
+                  "star": 6,
+                  "power": 111425,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 8
+                },
+                {
+                  "id": 24,
+                  "level": 120,
+                  "color": 12,
+                  "star": 6,
+                  "power": 57154,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                }
+              ]
+            ],
+            "power": "647574",
+            "user": {
+              "id": "1216251207",
+              "accountId": "101000000000000207898251",
+              "name": "༺ Community ༻",
+              "lastLoginTime": "1795525313",
+              "serverId": "1431",
+              "level": "120",
+              "clanId": "304509",
+              "clanRole": "255",
+              "avatarId": "2245",
+              "borderId": 1,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            }
+          },
+          {
+            "userId": "1216258829",
+            "place": "47",
+            "heroes": [
+              [
+                {
+                  "id": 60,
+                  "level": 97,
+                  "color": 10,
+                  "star": 5,
+                  "power": 34478,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 54,
+                  "level": 103,
+                  "color": 11,
+                  "star": 5,
+                  "power": 57287,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 3
+                },
+                {
+                  "id": 35,
+                  "level": 94,
+                  "color": 10,
+                  "star": 5,
+                  "power": 29150,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 43,
+                  "level": 99,
+                  "color": 10,
+                  "star": 4,
+                  "power": 31200,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 16,
+                  "level": 99,
+                  "color": 11,
+                  "star": 5,
+                  "power": 49370,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 5
+                }
+              ],
+              [
+                {
+                  "id": 53,
+                  "level": 91,
+                  "color": 9,
+                  "star": 5,
+                  "power": 26644,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 20,
+                  "level": 91,
+                  "color": 9,
+                  "star": 5,
+                  "power": 28103,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 62,
+                  "level": 91,
+                  "color": 9,
+                  "star": 5,
+                  "power": 27548,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 504,
+                  "level": 94,
+                  "color": 9,
+                  "star": 5,
+                  "power": 29010,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 27,
+                  "level": 94,
+                  "color": 9,
+                  "star": 5,
+                  "power": 35232,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 2
+                }
+              ]
+            ],
+            "power": "476776",
+            "user": {
+              "id": "1216258829",
+              "accountId": "101000000000000213119008",
+              "name": "tmt 14",
+              "lastLoginTime": "1795523945",
+              "serverId": "1431",
+              "level": "103",
+              "clanId": "304491",
+              "clanRole": "255",
+              "avatarId": "11271",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": 1,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            }
+          },
+          {
+            "userId": "1216379031",
+            "place": "55",
+            "heroes": [
+              [
+                {
+                  "id": 77,
+                  "level": 96,
+                  "color": 8,
+                  "star": 3,
+                  "power": 16194,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 6,
+                  "level": 106,
+                  "color": 11,
+                  "star": 3,
+                  "power": 30921,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 73,
+                  "level": 106,
+                  "color": 11,
+                  "star": 5,
+                  "power": 42857,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 21,
+                  "level": 106,
+                  "color": 11,
+                  "star": 3,
+                  "power": 27682,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 78,
+                  "level": 106,
+                  "color": 11,
+                  "star": 6,
+                  "power": 71799,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 6
+                }
+              ],
+              [
+                {
+                  "id": 7,
+                  "level": 106,
+                  "color": 9,
+                  "star": 5,
+                  "power": 26877,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 64,
+                  "level": 106,
+                  "color": 8,
+                  "star": 6,
+                  "power": 30021,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 2,
+                  "level": 106,
+                  "color": 9,
+                  "star": 6,
+                  "power": 32123,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 4,
+                  "level": 106,
+                  "color": 10,
+                  "star": 3,
+                  "power": 29508,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 1,
+                  "level": 106,
+                  "color": 9,
+                  "star": 5,
+                  "power": 27206,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                }
+              ]
+            ],
+            "power": "444368",
+            "user": {
+              "id": "1216379031",
+              "accountId": "102000000000000213210919",
+              "name": "HiddenSearch124",
+              "lastLoginTime": "1795472692",
+              "serverId": "1431",
+              "level": "106",
+              "clanId": "305305",
+              "clanRole": "255",
+              "avatarId": "30",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": null,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            }
+          }
+        ],
+        "useCustomArenaMode": true
+      }
+    }
+  }
+}

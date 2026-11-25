@@ -1,0 +1,344 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "city-buildings-research",
+  "description": "Troop unit summary, training queue, hospital healing queue, and speedups",
+  "methodCount": 8,
+  "methods": {
+    "completeHealing": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611131344_sync_healed.json",
+        "capturedAt": "2026-11-13T06:44:00.882Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "completeDate": 1794552240233
+      },
+      "response": {}
+    },
+    "completeTraining": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090117_building.json",
+        "capturedAt": "2026-11-08T18:17:15.614Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "unitId": 7
+      },
+      "response": {}
+    },
+    "getHealing": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:21.005Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "injuredUnits": [
+          {
+            "unitConfigId": 1,
+            "unitId": 1,
+            "count": 0
+          },
+          {
+            "unitConfigId": 2,
+            "unitId": 2,
+            "count": 0
+          },
+          {
+            "unitConfigId": 3,
+            "unitId": 3,
+            "count": 0
+          },
+          {
+            "unitConfigId": 4,
+            "unitId": 4,
+            "count": 0
+          },
+          {
+            "unitConfigId": 5,
+            "unitId": 5,
+            "count": 0
+          },
+          {
+            "_truncatedArrayItems": 16,
+            "_totalLength": 21
+          }
+        ],
+        "healing": {
+          "startDate": 1793533157163,
+          "duration": 49810000,
+          "units": [
+            {
+              "unitConfigId": 7,
+              "unitId": 7,
+              "count": 2075
+            },
+            {
+              "unitConfigId": 16,
+              "unitId": 16,
+              "count": 35
+            },
+            {
+              "unitConfigId": 17,
+              "unitId": 17,
+              "count": 2044
+            },
+            {
+              "unitConfigId": 27,
+              "unitId": 27,
+              "count": 2081
+            }
+          ]
+        }
+      }
+    },
+    "getTrainings": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "trainingQueues": [
+          {
+            "unitId": 7,
+            "unitCount": 300,
+            "startDate": 1793592948283,
+            "duration": 14716200
+          },
+          {
+            "unitId": 17,
+            "unitCount": 405,
+            "startDate": 1793576248496,
+            "duration": 19866870
+          },
+          {
+            "unitId": 27,
+            "unitCount": 405,
+            "startDate": 1793576251882,
+            "duration": 19866870
+          }
+        ],
+        "upgradeQueues": []
+      }
+    },
+    "getUnitSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "squads": [
+          {
+            "id": "18ac4091-ff6b-4aa9-a797-a2d66ff5f200",
+            "version": 1,
+            "heroes": [
+              {
+                "id": 49
+              },
+              {
+                "id": 32
+              },
+              {
+                "id": 62
+              }
+            ],
+            "units": [
+              {
+                "id": 7,
+                "state": {
+                  "survived": 906,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              },
+              {
+                "id": 17,
+                "state": {
+                  "survived": 905,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              },
+              {
+                "id": 27,
+                "state": {
+                  "survived": 905,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "76bdc966-4ebb-4023-ad12-14303ffbd895",
+            "version": 1,
+            "heroes": [
+              {
+                "id": 10
+              },
+              {
+                "id": 25
+              },
+              {
+                "id": 28
+              }
+            ],
+            "units": [
+              {
+                "id": 7,
+                "state": {
+                  "survived": 909,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              },
+              {
+                "id": 17,
+                "state": {
+                  "survived": 908,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              },
+              {
+                "id": 27,
+                "state": {
+                  "survived": 908,
+                  "lightlyInjured": 0,
+                  "injured": 0,
+                  "lost": 0
+                }
+              }
+            ]
+          }
+        ],
+        "available": [
+          {
+            "unitConfigId": 1,
+            "unitId": 1,
+            "count": 0
+          },
+          {
+            "unitConfigId": 2,
+            "unitId": 2,
+            "count": 0
+          },
+          {
+            "unitConfigId": 3,
+            "unitId": 3,
+            "count": 0
+          },
+          {
+            "unitConfigId": 4,
+            "unitId": 4,
+            "count": 0
+          },
+          {
+            "unitConfigId": 5,
+            "unitId": 5,
+            "count": 0
+          },
+          {
+            "_truncatedArrayItems": 16,
+            "_totalLength": 21
+          }
+        ],
+        "reserved": []
+      }
+    },
+    "speedUpHealingWithResources": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151039_user_speedup.json",
+        "capturedAt": "2026-11-15T03:38:51.911Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "speedUpDuration": 600000,
+        "resourcesToSpend": [
+          {
+            "type": "speedUpUnitHealing",
+            "id": 2,
+            "amount": 2
+          }
+        ],
+        "resourcesToReward": []
+      },
+      "response": {}
+    },
+    "startHealing": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611102036_train_heal.json",
+        "capturedAt": "2026-11-10T13:36:27.415Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "startDate": 1794317786274,
+        "duration": 288000,
+        "units": [
+          {
+            "unitId": 27,
+            "count": 12
+          },
+          {
+            "unitId": 17,
+            "count": 12
+          },
+          {
+            "unitId": 7,
+            "count": 12
+          }
+        ]
+      },
+      "response": {}
+    },
+    "startTraining": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611102036_train_heal.json",
+        "capturedAt": "2026-11-10T13:36:18.873Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "unitId": 27,
+        "count": 26,
+        "startDate": 1794317777664,
+        "duration": 1204892
+      },
+      "response": {}
+    }
+  }
+}

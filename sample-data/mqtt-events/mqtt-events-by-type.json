@@ -1,0 +1,1447 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "mqtt-events",
+  "domain": "mqtt-events",
+  "description": "Deduplicated sanitized MQTT event payloads grouped by eventType",
+  "eventTypeCount": 38,
+  "eventsByType": {
+    "arenaPlaceChanged": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:30.338Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "arenaPlaceChanged",
+          "body": {
+            "type": "grand",
+            "place": "108",
+            "enemy": "1216257557",
+            "pushId": "2c9155b2-1fde-4678-b418-d2546777adee",
+            "pushTs": 1795234487,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 32209,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "bundleCarousel": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:34.593Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "pushUserId": 1216438103,
+            "bundleCarousels": []
+          },
+          "type": "bundleCarousel"
+        },
+        "method": "msg"
+      }
+    },
+    "chatMessage": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:12:15.528Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "chatMessage",
+          "body": {
+            "data": {
+              "text": "If yall are going to hang out online place a strong team on wall when not shielded",
+              "ids": [],
+              "clanRole": "4"
+            },
+            "id": 51581356,
+            "userId": "1216250642",
+            "chatType": "clan",
+            "messageType": "text",
+            "ctime": 1795234336,
+            "user": {
+              "id": "1216250642",
+              "accountId": "101000000000000213112657",
+              "name": "LickingToad",
+              "lastLoginTime": "1795232508",
+              "serverId": "1431",
+              "level": "94",
+              "clanId": "305081",
+              "clanRole": "4",
+              "avatarId": "188",
+              "borderId": 0,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "pushId": "ccc644e6-5ebe-44af-bf5a-fa3afa2e2fcb",
+            "pushTs": 1795234336,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 32203,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanBossUpdate": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:07:08.286Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanBossUpdate",
+          "body": {
+            "heads": [
+              {
+                "bossHeadId": 1,
+                "heroId": 8013,
+                "attackerId": null,
+                "state": {
+                  "isDead": true,
+                  "hp": 0,
+                  "energy": 0,
+                  "maxHp": 5946906
+                }
+              },
+              {
+                "bossHeadId": 2,
+                "heroId": 8011,
+                "attackerId": null,
+                "state": {
+                  "isDead": true,
+                  "hp": 0,
+                  "energy": 0,
+                  "maxHp": 5946906
+                }
+              },
+              {
+                "bossHeadId": 3,
+                "heroId": 8012,
+                "attackerId": null,
+                "state": {
+                  "isDead": true,
+                  "hp": 0,
+                  "energy": 0,
+                  "maxHp": 5946906
+                }
+              },
+              {
+                "bossHeadId": 4,
+                "heroId": 8014,
+                "attackerId": null,
+                "state": {
+                  "isDead": true,
+                  "hp": 0,
+                  "energy": 0,
+                  "maxHp": 5946906
+                }
+              },
+              {
+                "bossHeadId": 5,
+                "heroId": 8015,
+                "attackerId": null,
+                "state": {
+                  "isDead": true,
+                  "hp": 0,
+                  "energy": 0,
+                  "maxHp": 5946906
+                }
+              },
+              {
+                "_truncatedArrayItems": 13,
+                "_totalLength": 18
+              }
+            ],
+            "pushId": "109e0620-8089-407f-8d3f-72db0c4574f3",
+            "pushTs": 1794204429,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 24532,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanClash": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:05:37.404Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanClash",
+          "body": {
+            "eventId": 17,
+            "status": 6,
+            "pushId": "ac75c55a-539f-49fe-9462-4782520fde67",
+            "pushTs": 1794204338,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 24530,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanWarAttack": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.json",
+        "capturedAt": "2026-11-17T11:38:28.426Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanWarAttack",
+          "body": {
+            "slot": 31,
+            "attackClanId": "304902",
+            "attackerId": "1216254854",
+            "defenceClanId": "305081",
+            "pushId": "c4c78593-6d0d-4a7f-9db9-5feb6529613a",
+            "pushTs": 1794915508,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 29952,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanWarChampAttack": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.json",
+        "capturedAt": "2026-11-17T11:38:04.629Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanWarChampAttack",
+          "body": {
+            "slot": 25,
+            "attackClanId": "305081",
+            "attackerId": "1216393583",
+            "defenceClanId": "424532",
+            "attackerTries": 1,
+            "pushId": "1c0ef372-0b1d-45e4-8c6d-2bcf1ff201c4",
+            "pushTs": 1794915479,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 29950,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanWarChampEndBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.json",
+        "capturedAt": "2026-11-17T11:39:26.490Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanWarChampEndBattle",
+          "body": {
+            "arePointsMax": false,
+            "slot": 25,
+            "attackClanId": "305081",
+            "attackerId": "1216393583",
+            "defenceClanId": "424532",
+            "win": true,
+            "state": {
+              "team": [
+                {
+                  "2": "[Object(7 keys)]",
+                  "3": "[Object(7 keys)]",
+                  "4": "[Object(7 keys)]",
+                  "15": "[Object(7 keys)]",
+                  "79": "[Object(7 keys)]"
+                },
+                {
+                  "1": "[Object(34 keys)]",
+                  "7": "[Object(33 keys)]",
+                  "37": "[Object(35 keys)]",
+                  "64": "[Object(34 keys)]",
+                  "68": "[Object(35 keys)]"
+                },
+                {
+                  "6": "[Object(33 keys)]",
+                  "36": "[Object(33 keys)]",
+                  "56": "[Object(33 keys)]",
+                  "62": "[Object(34 keys)]",
+                  "502": "[Object(33 keys)]"
+                }
+              ],
+              "attackerId": 0,
+              "status": "defeated",
+              "user": {
+                "id": "1213998025",
+                "accountId": "102000000000000169337265",
+                "name": "★maxito★",
+                "lastLoginTime": "1794880749",
+                "serverId": "1397",
+                "level": "60",
+                "clanId": "424532",
+                "clanRole": "2",
+                "avatarId": "2481",
+                "borderId": null,
+                "isChatModerator": false,
+                "frameId": 2,
+                "_truncatedKeys": 4,
+                "_totalKeys": 16
+              },
+              "pointsFarmed": 60,
+              "slotId": 25,
+              "totalPoints": 60
+            },
+            "points": 1974,
+            "attackerTries": 1,
+            "pushId": "c0d6b495-f957-41ec-a510-707c7648452a",
+            "pushTs": 1794915566,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "_truncatedKeys": 2,
+            "_totalKeys": 14
+          }
+        },
+        "error": null
+      }
+    },
+    "clanWarChampOrders": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.json",
+        "capturedAt": "2026-11-17T11:39:26.500Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanWarChampOrders",
+          "body": {
+            "orders": [],
+            "pushId": "6fdfb811-185e-4f2a-90e6-e6dac63270ac",
+            "pushTs": 1794915566,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 29956,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "clanWarEndBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171841_draft_4.json",
+        "capturedAt": "2026-11-17T11:38:42.506Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "clanWarEndBattle",
+          "body": {
+            "arePointsMax": false,
+            "slot": "31",
+            "attackClanId": "304902",
+            "attackerId": "1216254854",
+            "defenceClanId": "305081",
+            "win": true,
+            "state": {
+              "team": [
+                {
+                  "19": "[Object(7 keys)]",
+                  "36": "[Object(7 keys)]",
+                  "49": "[Object(7 keys)]",
+                  "56": "[Object(7 keys)]",
+                  "79": "[Object(7 keys)]"
+                }
+              ],
+              "attackerId": 0,
+              "status": "defeated",
+              "user": {
+                "id": "1216413254",
+                "accountId": "105000000000000213236647",
+                "name": "Molkus",
+                "lastLoginTime": "1794853938",
+                "serverId": "1431",
+                "level": "91",
+                "clanId": "305081",
+                "clanRole": "3",
+                "avatarId": "11271",
+                "borderId": 127493,
+                "isChatModerator": false,
+                "frameId": 3,
+                "_truncatedKeys": 4,
+                "_totalKeys": 16
+              },
+              "pointsFarmed": 20,
+              "slotId": "31",
+              "totalPoints": 20
+            },
+            "points": 60,
+            "attackerTries": 1,
+            "pushId": "b081d661-2d80-4a2f-a27c-d81af41db7a5",
+            "pushTs": 1794915522,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "_truncatedKeys": 2,
+            "_totalKeys": 14
+          }
+        },
+        "error": null
+      }
+    },
+    "fortressStateChanged": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:29.810Z",
+        "topic": "hwm/pub/global-map/<REDACTED_MAP_UUID>/fortress",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "fortressId": "f200f405-67a2-40ed-9bc9-0c13b3088347"
+          },
+          "type": "fortressStateChanged"
+        },
+        "method": "msg"
+      }
+    },
+    "gatheringMineCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141920_firstattack.json",
+        "capturedAt": "2026-11-14T12:19:55.844Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "mineId": "1bd88fce-8abf-41d7-82ae-18096bcb344d",
+            "mineConfigId": 76,
+            "squadId": "708cf95e-5e9c-4dc3-89df-dbc4c0efc50b",
+            "remainingResourceAmount": 1266267,
+            "routeToOutpost": {
+              "routeId": "3203c94f-4f13-4122-9205-590476a03727",
+              "from": {
+                "coordinates": {
+                  "x": 589,
+                  "y": 396
+                },
+                "objectSizeId": 4,
+                "object": {
+                  "objectId": "1bd88fce-8abf-41d7-82ae-18096bcb344d",
+                  "objectType": "mine",
+                  "objectSizeId": 4
+                }
+              },
+              "to": {
+                "coordinates": {
+                  "x": 606,
+                  "y": 376
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000575f8148",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "startedAt": 1794658795961,
+              "duration": 18898,
+              "durationMs": 18898
+            },
+            "battleResult": {
+              "battleResult": "lose",
+              "battleId": "50fbf30d-974f-4d1c-8937-6bb62bce16ab",
+              "unitLosses": {
+                "lost": [],
+                "injured": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "enemyLosses": {
+                "lost": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "injured": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ]
+              },
+              "squad": {
+                "id": "708cf95e-5e9c-4dc3-89df-dbc4c0efc50b",
+                "version": 2,
+                "heroes": [
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]"
+                ],
+                "units": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ]
+              }
+            },
+            "pushUserId": 1216438103
+          },
+          "type": "gatheringMineCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "mapChunksUpdated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061038_start_raid_rally.json",
+        "capturedAt": "2026-11-06T03:37:49.665Z",
+        "topic": "hwm/pub/global-map/<REDACTED_MAP_UUID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "chunks": [
+              {
+                "x": 71,
+                "y": 30,
+                "updatedAt": 1793936270883
+              }
+            ]
+          },
+          "type": "mapChunksUpdated"
+        },
+        "method": "msg"
+      }
+    },
+    "marchAttackDetected": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141923_under_attack2.json",
+        "capturedAt": "2026-11-14T12:21:02.061Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+            "target": {
+              "objectId": "1bd88fce-8abf-41d7-82ae-18096bcb344d",
+              "objectType": "mine",
+              "objectConfigId": 76,
+              "coordinates": {
+                "x": 589,
+                "y": 396
+              }
+            },
+            "route": {
+              "routeId": "83fbcf4f-6806-4bc6-95f4-272b309434da",
+              "type": "toTargetPvp",
+              "version": 1,
+              "leader": {
+                "userId": 1216271427,
+                "name": "Loko777 ",
+                "avatarId": 2067,
+                "avatarBorderId": 127493,
+                "clanId": 304509
+              },
+              "strongestHeroId": 79,
+              "members": [],
+              "from": {
+                "coordinates": {
+                  "x": 484,
+                  "y": 450
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-000043d47e48",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "to": {
+                "coordinates": {
+                  "x": 589,
+                  "y": 396
+                },
+                "objectSizeId": 4,
+                "object": {
+                  "objectId": "1bd88fce-8abf-41d7-82ae-18096bcb344d",
+                  "objectType": "mine",
+                  "objectSizeId": 4
+                }
+              },
+              "startedAt": 1794658862070,
+              "duration": 58543,
+              "durationMs": 58543
+            },
+            "leaderUserInfo": {
+              "id": 1216271427,
+              "avatarId": 2067,
+              "avatarBorderId": 127493,
+              "level": 116,
+              "name": "Loko777 ",
+              "serverId": 1431,
+              "flagId": 17
+            },
+            "totalPower": 422307,
+            "squads": [
+              {
+                "userInfo": {
+                  "id": 1216271427,
+                  "avatarId": 2067,
+                  "avatarBorderId": 127493,
+                  "level": 116,
+                  "name": "Loko777 ",
+                  "serverId": 1431,
+                  "flagId": 17
+                },
+                "squad": {
+                  "squadId": "92359ac8-4b4a-44d7-9975-f00972a0e34c",
+                  "power": 422307,
+                  "heroes": "[Array(5)]",
+                  "units": "[Array(3)]",
+                  "bonuses": "[Object(3 keys)]"
+                }
+              }
+            ],
+            "clans": [
+              {
+                "clanId": 304509,
+                "tag": "xxx",
+                "icon": {
+                  "flagColor1": 9,
+                  "flagColor2": 7,
+                  "flagShape": 7,
+                  "iconColor": 18,
+                  "iconShape": 56,
+                  "border": 412
+                },
+                "name": "【★】 Continental  【★】"
+              }
+            ],
+            "pushUserId": 1216438103
+          },
+          "type": "marchAttackDetected"
+        },
+        "method": "msg"
+      }
+    },
+    "marchAttackEnded": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141920_firstattack.json",
+        "capturedAt": "2026-11-14T12:19:55.915Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "543b82f4-6164-42be-b309-26831ffd27ed",
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+            "pushUserId": 1216438103
+          },
+          "type": "marchAttackEnded"
+        },
+        "method": "msg"
+      }
+    },
+    "mobRallyAttackResult": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:05:18.325Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "a6c33757-3569-4f14-9647-6514a8c3d98d",
+            "mobId": "7e80f7c9-4f8c-48cc-adce-d92f8b1a6ad9",
+            "mobConfigId": 77,
+            "squadId": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+            "userRole": "member",
+            "routeToOutpost": {
+              "routeId": "c19e6056-c883-433b-ac7e-b779543629e7",
+              "from": {
+                "coordinates": {
+                  "x": 593,
+                  "y": 306
+                },
+                "objectSizeId": 4,
+                "object": {
+                  "objectId": "7e80f7c9-4f8c-48cc-adce-d92f8b1a6ad9",
+                  "objectType": "rallyMob",
+                  "objectSizeId": 4
+                }
+              },
+              "to": {
+                "coordinates": {
+                  "x": 606,
+                  "y": 376
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000575f8148",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "startedAt": 1794161118226,
+              "duration": 48274,
+              "durationMs": 48274
+            },
+            "battleResult": {
+              "battleResult": "win",
+              "battleId": "cae997f6-ad39-4c5f-85be-d67909912b65",
+              "unitLosses": {
+                "lost": [],
+                "injured": []
+              },
+              "enemyLosses": {
+                "lost": [
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]",
+                  "[Object(4 keys)]"
+                ],
+                "injured": []
+              },
+              "squad": {
+                "id": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+                "version": 2,
+                "heroes": [
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]",
+                  "[Object(1 keys)]"
+                ],
+                "units": [
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]",
+                  "[Object(2 keys)]"
+                ]
+              }
+            },
+            "pushUserId": 1216438103
+          },
+          "type": "mobRallyAttackResult"
+        },
+        "method": "msg"
+      }
+    },
+    "newMail": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:07:08.285Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "newMail",
+          "body": {
+            "letter": {
+              "id": 3424557520,
+              "type": "common",
+              "senderId": -3,
+              "message": "",
+              "params": {
+                "clanTitle": "4-LEAF CLOVER",
+                "headId": 5,
+                "deadHeads": 6,
+                "titleIdent": "LIB_MAIL_TYPE_CLANBOSS_DEFAULT_TITLE",
+                "textIdent": "LIB_MAIL_TYPE_CLANBOSS_GRATZ_TEXT",
+                "textParams": [
+                  "UI_CLAN_BOSS_SELECT_DIFFICULTY1_COLORED",
+                  "LIB_MAIL_TYPE_CLANBOSS_HEAD_ORDER_6"
+                ]
+              },
+              "reward": {
+                "coin": {
+                  "18": 80
+                },
+                "consumable": {
+                  "46": 1
+                }
+              },
+              "read": 0,
+              "ctime": 1794204429,
+              "availableUntil": 1794463629
+            },
+            "user": {
+              "id": -3,
+              "name": "Disposer",
+              "avatarId": 30,
+              "experience": 81070,
+              "level": 80
+            },
+            "pushId": "0ae3eeb1-bf3e-4e6f-a179-bd7489886aa4",
+            "pushTs": 1794204429,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 24531,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "newReport": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:14.075Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "reportId": "cec50282-3319-4691-9dc8-d03eb34d74d1",
+            "type": "mineGatheringResult",
+            "pushUserId": 1216438103
+          },
+          "type": "newReport"
+        },
+        "method": "msg"
+      }
+    },
+    "outpostUpdated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611221423_new_building_queue.json",
+        "capturedAt": "2026-11-22T07:21:46.336Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "memberId": 1216356317
+          },
+          "type": "outpostUpdated"
+        },
+        "method": "msg"
+      }
+    },
+    "questUpdateAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:06:20.061Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "questUpdateAll",
+          "body": {
+            "pushId": "0d648a15-277f-4b5e-ae11-089d7a4cebbb",
+            "pushTs": 1794161180,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 24377,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "rallyCancelled": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611222129.json",
+        "capturedAt": "2026-11-22T14:29:05.270Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "c279118a-54e9-49b0-bd20-a734dbc19be4"
+          },
+          "type": "rallyCancelled"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:29.814Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "8c0d228f-6191-479a-bbbc-2af4f2b416a2"
+          },
+          "type": "rallyCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyCreated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:29.812Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "8c0d228f-6191-479a-bbbc-2af4f2b416a2"
+          },
+          "type": "rallyCreated"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyMembersUpdated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:29.812Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "8c0d228f-6191-479a-bbbc-2af4f2b416a2",
+            "rallyVersion": 6
+          },
+          "type": "rallyMembersUpdated"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyReturnRouteCreated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611222129.json",
+        "capturedAt": "2026-11-22T14:29:05.284Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "c279118a-54e9-49b0-bd20-a734dbc19be4",
+            "squadId": "e61b3ee4-eeba-4d90-9ed6-a73098de96bb",
+            "route": {
+              "routeId": "4183af75-3fb9-4c93-b2ad-781352f2ca54",
+              "from": {
+                "coordinates": {
+                  "x": 611,
+                  "y": 379
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000d4038048",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "to": {
+                "coordinates": {
+                  "x": 606,
+                  "y": 376
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000575f8148",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "startedAt": 1795357745223,
+              "duration": 5799,
+              "durationMs": 5799
+            },
+            "pushUserId": 1216438103
+          },
+          "type": "rallyReturnRouteCreated"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyReturnToOutpostCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611222129.json",
+        "capturedAt": "2026-11-22T14:29:11.334Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "e61b3ee4-eeba-4d90-9ed6-a73098de96bb",
+            "rallyId": "c279118a-54e9-49b0-bd20-a734dbc19be4",
+            "pushUserId": 1216438103
+          },
+          "type": "rallyReturnToOutpostCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyRouteToLeaderCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:04:11.605Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+            "rallyId": "a6c33757-3569-4f14-9647-6514a8c3d98d",
+            "pushUserId": 1216438103
+          },
+          "type": "rallyRouteToLeaderCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyStarted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:29.813Z",
+        "topic": "hwm/pub/clan/<REDACTED_CLAN_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "8c0d228f-6191-479a-bbbc-2af4f2b416a2",
+            "rallyVersion": 13
+          },
+          "type": "rallyStarted"
+        },
+        "method": "msg"
+      }
+    },
+    "rallyUserAutojoined": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091315_dungeon.json",
+        "capturedAt": "2026-11-09T06:09:25.398Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "rallyId": "91a99be2-1282-4e78-b248-e30cc197b7c3",
+            "squad": {
+              "squadId": "2f27bd65-f6a3-4f11-957a-4a682661430c",
+              "heroes": [
+                {
+                  "heroId": 2,
+                  "level": 70,
+                  "color": 8,
+                  "star": 6
+                },
+                {
+                  "heroId": 51,
+                  "level": 75,
+                  "color": 7,
+                  "star": 5
+                },
+                {
+                  "heroId": 54,
+                  "level": 80,
+                  "color": 11,
+                  "star": 3
+                },
+                {
+                  "heroId": 70,
+                  "level": 75,
+                  "color": 8,
+                  "star": 5
+                },
+                {
+                  "heroId": 79,
+                  "level": 80,
+                  "color": 9,
+                  "star": 5
+                }
+              ],
+              "units": [
+                {
+                  "unitId": 7,
+                  "count": 1614,
+                  "amount": 0,
+                  "getCount": 1614
+                },
+                {
+                  "unitId": 17,
+                  "count": 1615,
+                  "amount": 0,
+                  "getCount": 1615
+                },
+                {
+                  "unitId": 27,
+                  "count": 1615,
+                  "amount": 0,
+                  "getCount": 1615
+                }
+              ]
+            },
+            "route": {
+              "routeId": "dab0dcf0-1896-41fc-8742-382ee5b52576",
+              "from": {
+                "coordinates": {
+                  "x": 606,
+                  "y": 376
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000575f8148",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "to": {
+                "coordinates": {
+                  "x": 618,
+                  "y": 388
+                },
+                "objectSizeId": 6,
+                "object": {
+                  "objectId": "00000000-0000-0000-0000-0000bbb58048",
+                  "objectType": "outpost",
+                  "objectSizeId": 6
+                }
+              },
+              "startedAt": 1794204566647,
+              "duration": 9720,
+              "durationMs": 9720
+            },
+            "rallyVersion": 2,
+            "pushUserId": 1216438103
+          },
+          "type": "rallyUserAutojoined"
+        },
+        "method": "msg"
+      }
+    },
+    "randomDraft_statusChanged": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:03:25.256Z",
+        "topic": "hwm/account/<REDACTED_ACCOUNT_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "method": "msg",
+        "result": {
+          "type": "randomDraft_statusChanged",
+          "body": {
+            "pushId": "e5a6dace-7c5a-4c9d-b817-e5bb8d308beb",
+            "pushTs": 1794161005,
+            "pushChannel": "hwm/account/105000000000000213256070",
+            "pushIndex": 24370,
+            "pushUserId": 1216438103
+          }
+        },
+        "error": null
+      }
+    },
+    "returnFromMineCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:14.075Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "a07e28b3-b6e8-4b94-b446-3c4e9e18de56",
+            "reward": [
+              {
+                "type": "material",
+                "id": 5,
+                "amount": 3240905
+              }
+            ],
+            "pushUserId": 1216438103
+          },
+          "type": "returnFromMineCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "returnFromMobCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:06:06.559Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+            "pushUserId": 1216438103
+          },
+          "type": "returnFromMobCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "returnToOutpostFromMob": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090106_legends_draft.json",
+        "capturedAt": "2026-11-08T18:06:06.559Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "squadId": "00abbe1e-728c-4622-81f9-0c9c2fa2b1cf",
+            "pushUserId": 1216438103
+          },
+          "type": "returnToOutpostFromMob"
+        },
+        "method": "msg"
+      }
+    },
+    "routeCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061038_start_raid_rally.json",
+        "capturedAt": "2026-11-06T03:37:42.394Z",
+        "topic": "hwm/pub/global-map/<REDACTED_MAP_UUID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "routeId": "95c941e2-a32b-475f-b005-738a633b47de"
+          },
+          "type": "routeCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "routeCreated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061038_start_raid_rally.json",
+        "capturedAt": "2026-11-06T03:37:42.537Z",
+        "topic": "hwm/pub/global-map/<REDACTED_MAP_UUID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "routeId": "574404bd-cfa1-4c30-a0d1-90e6d03d4f47",
+            "from": {
+              "x": 711,
+              "y": 304
+            },
+            "to": {
+              "x": 719,
+              "y": 308
+            }
+          },
+          "type": "routeCreated"
+        },
+        "method": "msg"
+      }
+    },
+    "routeToMineCompleted": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:39.936Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "mineId": "920d0082-6d1b-450d-9148-c99e27649fde",
+            "mineConfigId": 86,
+            "squadId": "6c46f572-d5f1-4634-bf6b-38e309a69930",
+            "startedAt": 1793936381025,
+            "plannedDuration": 34829722,
+            "plannedDurationMs": 34829722,
+            "plannedGatheredResourceAmount": 375000,
+            "pushUserId": 1216438103
+          },
+          "type": "routeToMineCompleted"
+        },
+        "method": "msg"
+      }
+    },
+    "specialQuestEvents": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:38.762Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "pushUserId": 1216438103,
+            "events": [
+              {
+                "id": 100275,
+                "start": 1794794400000,
+                "end": 1795312800000,
+                "groups": [
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]"
+                ],
+                "viewId": 65
+              },
+              {
+                "id": 100292,
+                "start": 1792980000000,
+                "end": 1795399200000,
+                "groups": [
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]",
+                  {
+                    "_truncatedArrayItems": 2,
+                    "_totalLength": 7
+                  }
+                ],
+                "viewId": 94
+              },
+              {
+                "id": 100309,
+                "start": 1792980000000,
+                "end": 1795399200000,
+                "groups": [
+                  "[Object(8 keys)]"
+                ],
+                "viewId": 99
+              },
+              {
+                "id": 100376,
+                "start": 1794794400000,
+                "end": 1795399200000,
+                "groups": [
+                  "[Object(6 keys)]",
+                  "[Object(6 keys)]"
+                ],
+                "viewId": 134
+              },
+              {
+                "id": 100386,
+                "start": 1794794400000,
+                "end": 1795399200000,
+                "groups": [
+                  "[Object(6 keys)]"
+                ],
+                "viewId": 8
+              },
+              {
+                "_truncatedArrayItems": 6,
+                "_totalLength": 11
+              }
+            ]
+          },
+          "type": "specialQuestEvents"
+        },
+        "method": "msg"
+      }
+    },
+    "userVsProgressUpdated": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611090956_tower.json",
+        "capturedAt": "2026-11-09T02:54:53.791Z",
+        "topic": "hwm/user/<REDACTED_USER_ID>",
+        "eventMethod": "msg",
+        "truncated": false
+      },
+      "payload": {
+        "result": {
+          "body": {
+            "progress": 312150,
+            "timestamp": 1794192893846,
+            "pushUserId": 1216438103
+          },
+          "type": "userVsProgressUpdated"
+        },
+        "method": "msg"
+      }
+    }
+  }
+}

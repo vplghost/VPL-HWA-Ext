@@ -1,0 +1,105 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "city-buildings-research",
+  "description": "City building construction start, completion, speedup, and resident summary",
+  "methodCount": 4,
+  "methods": {
+    "completeConstruction": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:29:22.122Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "buildingId": 163,
+        "nextLevel": 11,
+        "completeDate": 1793777360468
+      },
+      "response": {}
+    },
+    "getResidentSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "residents": [
+          {
+            "id": 1,
+            "state": "assigned"
+          },
+          {
+            "id": 2,
+            "state": "assigned"
+          },
+          {
+            "id": 3,
+            "state": "assigned"
+          },
+          {
+            "id": 4,
+            "state": "assigned"
+          },
+          {
+            "id": 5,
+            "state": "assigned"
+          },
+          {
+            "_truncatedArrayItems": 27,
+            "_totalLength": 32
+          }
+        ]
+      }
+    },
+    "speedUpConstructionWithResources": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151039_user_speedup.json",
+        "capturedAt": "2026-11-15T03:39:06.542Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "buildingId": 20,
+        "resourcesToSpend": [
+          {
+            "type": "speedUpConstruction",
+            "id": 1,
+            "amount": 1
+          }
+        ],
+        "resourcesToReward": [],
+        "speedUpDate": 1794713945573,
+        "nextLevel": 21
+      },
+      "response": {}
+    },
+    "startConstruction": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:29:25.610Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "buildingId": 170,
+        "nextLevel": 11,
+        "startDate": 1793777364029,
+        "durationMs": 10336000
+      },
+      "response": {}
+    }
+  }
+}

@@ -1,0 +1,433 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "roster-inventory",
+  "description": "Titan roster, evolution, summoning circle, titan artifacts",
+  "methodCount": 4,
+  "methods": {
+    "titanEvolve": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021309_titan_evolve.json",
+        "capturedAt": "2026-11-02T06:09:22.861Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "titanId": 4004
+      },
+      "response": {
+        "consumable": {
+          "24": 1078
+        }
+      }
+    },
+    "titanGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "4000": {
+          "id": 4000,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4001": 45
+          },
+          "power": 7358,
+          "artifacts": [
+            {
+              "level": 20,
+              "star": 3
+            },
+            {
+              "level": 15,
+              "star": 1
+            },
+            {
+              "level": 20,
+              "star": 2
+            }
+          ],
+          "skins": {
+            "10001": 20
+          },
+          "currentSkin": 10001,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4001": {
+          "id": 4001,
+          "xp": 18060,
+          "level": 45,
+          "star": 4,
+          "skills": {
+            "4003": 45
+          },
+          "power": 8874,
+          "artifacts": [
+            {
+              "level": 10,
+              "star": 1
+            },
+            {
+              "level": 5,
+              "star": 1
+            },
+            {
+              "level": 10,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10002": 12
+          },
+          "currentSkin": 10002,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4002": {
+          "id": 4002,
+          "xp": 13110,
+          "level": 40,
+          "star": 4,
+          "skills": {
+            "4005": 40
+          },
+          "power": 7410,
+          "artifacts": [
+            {
+              "level": 5,
+              "star": 1
+            },
+            {
+              "level": 2,
+              "star": 1
+            },
+            {
+              "level": 4,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10003": 10
+          },
+          "currentSkin": 10003,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4004": {
+          "id": 4004,
+          "xp": 13110,
+          "level": 40,
+          "star": 2,
+          "skills": {
+            "4052": 40,
+            "4053": 40
+          },
+          "power": 3670,
+          "artifacts": [
+            {
+              "level": 16,
+              "star": 1
+            },
+            {
+              "level": 11,
+              "star": 1
+            },
+            {
+              "level": 13,
+              "star": 2
+            }
+          ],
+          "skins": {
+            "10044": 11
+          },
+          "currentSkin": 10044,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4010": {
+          "id": 4010,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4010": 45
+          },
+          "power": 7336,
+          "artifacts": [
+            {
+              "level": 20,
+              "star": 3
+            },
+            {
+              "level": 15,
+              "star": 1
+            },
+            {
+              "level": 20,
+              "star": 2
+            }
+          ],
+          "skins": {
+            "10005": 20
+          },
+          "currentSkin": 10005,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4011": {
+          "id": 4011,
+          "xp": 16970,
+          "level": 44,
+          "star": 3,
+          "skills": {
+            "4012": 44
+          },
+          "power": 6368,
+          "artifacts": [
+            {
+              "level": 5,
+              "star": 1
+            },
+            {
+              "level": 2,
+              "star": 1
+            },
+            {
+              "level": 4,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10006": 7
+          },
+          "currentSkin": 10006,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4012": {
+          "id": 4012,
+          "xp": 13110,
+          "level": 40,
+          "star": 3,
+          "skills": {
+            "4014": 40
+          },
+          "power": 5689,
+          "artifacts": [
+            {
+              "level": 1,
+              "star": 1
+            },
+            {
+              "level": 1,
+              "star": 1
+            },
+            {
+              "level": 8,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10007": 10
+          },
+          "currentSkin": 10007,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4013": {
+          "id": 4013,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4016": 45,
+            "4017": 45
+          },
+          "power": 6963,
+          "artifacts": [
+            {
+              "level": 20,
+              "star": 2
+            },
+            {
+              "level": 10,
+              "star": 2
+            },
+            {
+              "level": 10,
+              "star": 2
+            }
+          ],
+          "skins": {
+            "10008": 14
+          },
+          "currentSkin": 10008,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4020": {
+          "id": 4020,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4019": 45
+          },
+          "power": 6797,
+          "artifacts": [
+            {
+              "level": 10,
+              "star": 2
+            },
+            {
+              "level": 10,
+              "star": 1
+            },
+            {
+              "level": 16,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10009": 10
+          },
+          "currentSkin": 10009,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4021": {
+          "id": 4021,
+          "xp": 9410,
+          "level": 35,
+          "star": 3,
+          "skills": {
+            "4021": 35
+          },
+          "power": 4453,
+          "artifacts": [
+            {
+              "level": 1,
+              "star": 1
+            },
+            {
+              "level": 1,
+              "star": 1
+            },
+            {
+              "level": 1,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10010": 2
+          },
+          "currentSkin": 10010,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4022": {
+          "id": 4022,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4023": 45
+          },
+          "power": 6930,
+          "artifacts": [
+            {
+              "level": 20,
+              "star": 3
+            },
+            {
+              "level": 5,
+              "star": 1
+            },
+            {
+              "level": 15,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10011": 13
+          },
+          "currentSkin": 10011,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "4023": {
+          "id": 4023,
+          "xp": 18060,
+          "level": 45,
+          "star": 3,
+          "skills": {
+            "4025": 45,
+            "4026": 45
+          },
+          "power": 7088,
+          "artifacts": [
+            {
+              "level": 20,
+              "star": 3
+            },
+            {
+              "level": 15,
+              "star": 1
+            },
+            {
+              "level": 15,
+              "star": 1
+            }
+          ],
+          "skins": {
+            "10012": 16
+          },
+          "currentSkin": 10012,
+          "skinsInfo": [],
+          "currentSkinRank": 0
+        },
+        "_truncatedKeys": 8,
+        "_totalKeys": 20
+      }
+    },
+    "titanGetSummoningCircle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "starmoneySpent": 315
+      }
+    },
+    "titan_artifactGetCounters": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "x10Opened": 1
+      }
+    }
+  }
+}

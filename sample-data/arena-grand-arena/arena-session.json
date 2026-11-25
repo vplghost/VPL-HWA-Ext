@@ -1,0 +1,3733 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "arena-grand-arena",
+  "description": "Arena matchmaking, league info, custom arena, brawl, and battle history/team configuration",
+  "methodCount": 15,
+  "methods": {
+    "League_getInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "drafts"
+      },
+      "response": {
+        "league": 13,
+        "rewards": [
+          {
+            "id": 43254149,
+            "userId": 1216438103,
+            "rewardType": "Regular",
+            "leagueRewardId": 41,
+            "leagueId": 13,
+            "seasonId": 34,
+            "status": "new",
+            "availableFrom": 1793584800
+          },
+          {
+            "id": 43254150,
+            "userId": 1216438103,
+            "rewardType": "Season",
+            "leagueRewardId": 50,
+            "leagueId": 13,
+            "seasonId": 34,
+            "status": "new",
+            "availableFrom": 1795399200
+          },
+          {
+            "id": 43672341,
+            "userId": 1216438103,
+            "rewardType": "Regular",
+            "leagueRewardId": 41,
+            "leagueId": 13,
+            "seasonId": 34,
+            "status": "new",
+            "availableFrom": 1794189600
+          }
+        ],
+        "leagueClaimedRewards": [
+          {
+            "leagueId": 20,
+            "promotionRewardsClaimed": false,
+            "oneTimeRewardsClaimed": false
+          },
+          {
+            "leagueId": 19,
+            "promotionRewardsClaimed": false,
+            "oneTimeRewardsClaimed": false
+          },
+          {
+            "leagueId": 18,
+            "promotionRewardsClaimed": false,
+            "oneTimeRewardsClaimed": false
+          },
+          {
+            "leagueId": 17,
+            "promotionRewardsClaimed": false,
+            "oneTimeRewardsClaimed": false
+          },
+          {
+            "leagueId": 16,
+            "promotionRewardsClaimed": false,
+            "oneTimeRewardsClaimed": false
+          },
+          {
+            "_truncatedArrayItems": 5,
+            "_totalLength": 10
+          }
+        ]
+      }
+    },
+    "arenaFindEnemies": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611241410_arena.json",
+        "capturedAt": "2026-11-24T07:09:28.352Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "type": "RatingArena",
+        "useCustomArenaMode": true,
+        "enemies": [
+          {
+            "heroes": [
+              {
+                "id": 2,
+                "level": 101,
+                "color": 10,
+                "star": 4,
+                "power": 32398,
+                "skinData": {
+                  "id": 307,
+                  "rank": 0,
+                  "color": 0
+                },
+                "patron": 0
+              },
+              {
+                "id": 1,
+                "level": 101,
+                "color": 10,
+                "star": 4,
+                "power": 34111,
+                "skinData": {
+                  "id": 54,
+                  "rank": 0,
+                  "color": 0
+                },
+                "patron": 0
+              },
+              {
+                "id": 15,
+                "level": 101,
+                "color": 8,
+                "star": 4,
+                "power": 30715,
+                "skinData": {
+                  "id": 15,
+                  "rank": 0,
+                  "color": 0
+                },
+                "patron": 0
+              },
+              {
+                "id": 64,
+                "level": 101,
+                "color": 7,
+                "star": 6,
+                "power": 34007,
+                "skinData": {
+                  "id": 416,
+                  "rank": 0,
+                  "color": 0
+                },
+                "patron": 0
+              },
+              {
+                "id": 7,
+                "level": 62,
+                "color": 7,
+                "star": 4,
+                "power": 21897,
+                "skinData": {
+                  "id": 7,
+                  "rank": 0,
+                  "color": 0
+                },
+                "patron": 0
+              }
+            ],
+            "power": 153048,
+            "rating": 7000,
+            "userId": "1201131921",
+            "rewards": {
+              "win": 34,
+              "lose": -14
+            },
+            "user": {
+              "id": "1201131921",
+              "accountId": "101000000000000201626592",
+              "name": "aristote75116",
+              "lastLoginTime": "1795446132",
+              "serverId": "1282",
+              "level": "103",
+              "clanId": "100739733",
+              "clanRole": "255",
+              "avatarId": "30",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": null,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            }
+          }
+        ]
+      }
+    },
+    "arenaGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "userId": "1216438103",
+        "arenaPlace": "12046",
+        "arenaHeroes": [
+          {
+            "id": 79,
+            "level": 75,
+            "color": 9,
+            "star": 5,
+            "power": 25948,
+            "skinData": {
+              "id": 489,
+              "rank": 0,
+              "color": 0
+            },
+            "patron": 0
+          },
+          {
+            "id": 72,
+            "level": 75,
+            "color": 8,
+            "star": 4,
+            "power": 18857,
+            "skinData": {
+              "id": 435,
+              "rank": 0,
+              "color": 0
+            },
+            "patron": 0
+          },
+          {
+            "id": 16,
+            "level": 75,
+            "color": 10,
+            "star": 3,
+            "power": 26461,
+            "skinData": {
+              "id": 58,
+              "rank": 0,
+              "color": 0
+            },
+            "patron": 0
+          },
+          {
+            "id": 70,
+            "level": 75,
+            "color": 8,
+            "star": 4,
+            "power": 19219,
+            "skinData": {
+              "id": 433,
+              "rank": 0,
+              "color": 0
+            },
+            "patron": 0
+          },
+          {
+            "id": 60,
+            "level": 75,
+            "color": 9,
+            "star": 3,
+            "power": 19777,
+            "skinData": {
+              "id": 303,
+              "rank": 0,
+              "color": 0
+            },
+            "patron": 0
+          }
+        ],
+        "grandPlace": "84",
+        "grandHeroes": [
+          [
+            {
+              "id": 5,
+              "level": 68,
+              "color": 7,
+              "star": 3,
+              "power": 12409,
+              "skinData": {
+                "id": 5,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 36,
+              "level": 70,
+              "color": 7,
+              "star": 4,
+              "power": 14806,
+              "skinData": {
+                "id": 49,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 503,
+              "level": 70,
+              "color": 7,
+              "star": 4,
+              "power": 14041,
+              "skinData": {
+                "id": 1007,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 2,
+              "level": 70,
+              "color": 8,
+              "star": 5,
+              "power": 27826,
+              "skinData": {
+                "id": 307,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 56,
+              "level": 70,
+              "color": 7,
+              "star": 3,
+              "power": 12857,
+              "skinData": {
+                "id": 256,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            }
+          ],
+          [
+            {
+              "id": 7,
+              "level": 70,
+              "color": 7,
+              "star": 4,
+              "power": 17269,
+              "skinData": {
+                "id": 7,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 30,
+              "level": 70,
+              "color": 7,
+              "star": 3,
+              "power": 12958,
+              "skinData": {
+                "id": 30,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 67,
+              "level": 70,
+              "color": 7,
+              "star": 4,
+              "power": 15193,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 51,
+              "level": 70,
+              "color": 7,
+              "star": 5,
+              "power": 18729,
+              "skinData": {
+                "id": 1010,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 4,
+              "level": 75,
+              "color": 8,
+              "star": 3,
+              "power": 19531,
+              "skinData": {
+                "id": 305,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            }
+          ],
+          [
+            {
+              "id": 60,
+              "level": 75,
+              "color": 9,
+              "star": 3,
+              "power": 19777,
+              "skinData": {
+                "id": 303,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 70,
+              "level": 75,
+              "color": 8,
+              "star": 4,
+              "power": 19219,
+              "skinData": {
+                "id": 433,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 16,
+              "level": 75,
+              "color": 10,
+              "star": 3,
+              "power": 26461,
+              "skinData": {
+                "id": 58,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 72,
+              "level": 75,
+              "color": 8,
+              "star": 4,
+              "power": 18857,
+              "skinData": {
+                "id": 435,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 79,
+              "level": 75,
+              "color": 9,
+              "star": 5,
+              "power": 25948,
+              "skinData": {
+                "id": 489,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            }
+          ]
+        ],
+        "grandCoin": 352.21233333333,
+        "grandCoinTime": 1793594172,
+        "arenaPower": "110242",
+        "grandPower": "275881",
+        "arenaBest": "12046",
+        "grandBest": "61"
+      }
+    },
+    "battleGetByType": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611241410_arena.json",
+        "capturedAt": "2026-11-24T07:09:28.352Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "arena",
+        "limit": 20,
+        "offset": 0
+      },
+      "response": {
+        "replays": [
+          {
+            "userId": "1208281052",
+            "typeId": "1216438103",
+            "attackers": {
+              "37": {
+                "id": 37,
+                "xp": 2948945,
+                "level": 120,
+                "color": 14,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0
+                },
+                "skills": {
+                  "185": 120,
+                  "186": 120,
+                  "187": 120,
+                  "188": 120
+                },
+                "power": 61887,
+                "star": 3,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  26,
+                  40,
+                  40,
+                  39
+                ],
+                "skins": {
+                  "50": 60,
+                  "415": 37
+                },
+                "currentSkin": 50,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              },
+              "49": {
+                "id": 49,
+                "xp": 2948945,
+                "level": 120,
+                "color": 10,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0
+                },
+                "skills": {
+                  "295": 120,
+                  "296": 120,
+                  "297": 120,
+                  "298": 120
+                },
+                "power": 46571,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  36
+                ],
+                "skins": {
+                  "179": 47,
+                  "297": 22,
+                  "390": 30
+                },
+                "currentSkin": 390,
+                "_truncatedKeys": 23,
+                "_totalKeys": 35
+              },
+              "72": {
+                "id": 72,
+                "xp": 2948945,
+                "level": 120,
+                "color": 10,
+                "slots": {
+                  "1": 0
+                },
+                "skills": {
+                  "410": 120,
+                  "411": 120,
+                  "412": 120,
+                  "413": 120
+                },
+                "power": 38437,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  12,
+                  10,
+                  10,
+                  14,
+                  9
+                ],
+                "skins": {
+                  "435": 60
+                },
+                "currentSkin": 435,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "77": {
+                "id": 77,
+                "xp": 2948945,
+                "level": 120,
+                "color": 9,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0
+                },
+                "skills": {
+                  "452": 65,
+                  "453": 65,
+                  "454": 85,
+                  "455": 105,
+                  "456": 120
+                },
+                "power": 37449,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  10,
+                  7,
+                  10,
+                  1
+                ],
+                "skins": {
+                  "443": 37
+                },
+                "currentSkin": 443,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              },
+              "79": {
+                "id": 79,
+                "xp": 2948945,
+                "level": 120,
+                "color": 10,
+                "slots": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "skills": {
+                  "472": 120,
+                  "473": 120,
+                  "474": 120,
+                  "475": 120
+                },
+                "power": 41954,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  24,
+                  17,
+                  28,
+                  23,
+                  18
+                ],
+                "skins": {
+                  "489": 25
+                },
+                "currentSkin": 489,
+                "_truncatedKeys": 23,
+                "_totalKeys": 35
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 79,
+                  "xp": 1103839,
+                  "level": 90,
+                  "color": 9,
+                  "slots": "[Object(2 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 33143,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 489,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "2": {
+                  "id": 72,
+                  "xp": 867757,
+                  "level": 85,
+                  "color": 8,
+                  "slots": "[Array(0)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26978,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 486,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "3": {
+                  "id": 16,
+                  "xp": 1108927,
+                  "level": 90,
+                  "color": 12,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 50777,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 58,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 54,
+                  "xp": 1104174,
+                  "level": 90,
+                  "color": 11,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 35930,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(3 keys)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 242,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 60,
+                  "xp": 1103577,
+                  "level": 90,
+                  "color": 10,
+                  "slots": "[Array(1)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26054,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 303,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": "1795498271",
+            "seed": "3501531471",
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            },
+            "id": "1795498271754852774",
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          {
+            "userId": "1205343633",
+            "typeId": "1216438103",
+            "attackers": {
+              "4": {
+                "id": 4,
+                "xp": 2109632,
+                "level": 107,
+                "color": 13,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "255": 107,
+                  "256": 107,
+                  "257": 107,
+                  "258": 107
+                },
+                "power": 64896,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  26,
+                  26,
+                  26,
+                  26,
+                  25
+                ],
+                "skins": {
+                  "4": 54,
+                  "35": 19,
+                  "92": 40,
+                  "161": 12,
+                  "241": 22,
+                  "305": 20
+                },
+                "currentSkin": 161,
+                "_truncatedKeys": 20,
+                "_totalKeys": 32
+              },
+              "6": {
+                "id": 6,
+                "xp": 2109632,
+                "level": 107,
+                "color": 12,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "28": 107,
+                  "29": 107,
+                  "30": 107,
+                  "10164": 107
+                },
+                "power": 47261,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  23,
+                  22,
+                  22,
+                  22,
+                  22
+                ],
+                "skins": {
+                  "6": 47,
+                  "202": 22
+                },
+                "currentSkin": 202,
+                "_truncatedKeys": 20,
+                "_totalKeys": 32
+              },
+              "16": {
+                "id": 16,
+                "xp": 2109632,
+                "level": 107,
+                "color": 12,
+                "slots": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "skills": {
+                  "290": 107,
+                  "291": 107,
+                  "292": 107,
+                  "293": 107
+                },
+                "power": 64350,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  30,
+                  30,
+                  30,
+                  30,
+                  26
+                ],
+                "skins": {
+                  "16": 60,
+                  "176": 36,
+                  "183": 12,
+                  "309": 31
+                },
+                "currentSkin": 183,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "36": {
+                "id": 36,
+                "xp": 2107244,
+                "level": 107,
+                "color": 10,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "180": 107,
+                  "181": 107,
+                  "182": 107,
+                  "183": 107
+                },
+                "power": 41273,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  20,
+                  20,
+                  20,
+                  20,
+                  20
+                ],
+                "skins": {
+                  "49": 38,
+                  "419": 21
+                },
+                "currentSkin": 419,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "79": {
+                "id": 79,
+                "xp": 2109632,
+                "level": 107,
+                "color": 11,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "472": 107,
+                  "473": 107,
+                  "474": 107,
+                  "475": 107
+                },
+                "power": 47345,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  38,
+                  37,
+                  37,
+                  37,
+                  37
+                ],
+                "skins": {
+                  "489": 25
+                },
+                "currentSkin": 489,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 79,
+                  "xp": 1010389,
+                  "level": 88,
+                  "color": 9,
+                  "slots": "[Object(2 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 32763,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 489,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "2": {
+                  "id": 72,
+                  "xp": 867757,
+                  "level": 85,
+                  "color": 8,
+                  "slots": "[Array(0)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26978,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 486,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "3": {
+                  "id": 16,
+                  "xp": 1108927,
+                  "level": 90,
+                  "color": 12,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 50777,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 58,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 54,
+                  "xp": 1104174,
+                  "level": 90,
+                  "color": 11,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 35930,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(3 keys)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 242,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 60,
+                  "xp": 1103577,
+                  "level": 90,
+                  "color": 10,
+                  "slots": "[Array(1)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26054,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 303,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": "1795449968",
+            "seed": "3555927196",
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            },
+            "id": "1795449968847874772",
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          {
+            "userId": "116038969",
+            "typeId": "1216438103",
+            "attackers": {
+              "2": {
+                "id": 2,
+                "xp": 2948945,
+                "level": 120,
+                "color": 14,
+                "slots": {
+                  "1": 0,
+                  "2": 0
+                },
+                "skills": {
+                  "270": 120,
+                  "271": 120,
+                  "272": 120,
+                  "273": 120,
+                  "50006": 1
+                },
+                "power": 66977,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "2": 46,
+                  "69": 47
+                },
+                "currentSkin": 69,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "16": {
+                "id": 16,
+                "xp": 2948945,
+                "level": 120,
+                "color": 13,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "290": 120,
+                  "291": 120,
+                  "292": 120,
+                  "293": 120,
+                  "50003": 1
+                },
+                "power": 67031,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "16": 55,
+                  "183": 60
+                },
+                "currentSkin": 183,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "18": {
+                "id": 18,
+                "xp": 2948945,
+                "level": 120,
+                "color": 13,
+                "slots": [
+                  0,
+                  0,
+                  0
+                ],
+                "skills": {
+                  "87": 120,
+                  "88": 120,
+                  "89": 120,
+                  "90": 120,
+                  "50000": 2
+                },
+                "power": 66156,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "18": 42,
+                  "76": 42
+                },
+                "currentSkin": 76,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "35": {
+                "id": 35,
+                "xp": 2948945,
+                "level": 120,
+                "color": 13,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0
+                },
+                "skills": {
+                  "175": 120,
+                  "176": 120,
+                  "177": 120,
+                  "178": 120,
+                  "50000": 2
+                },
+                "power": 63227,
+                "star": 6,
+                "runes": [
+                  50,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "48": 42,
+                  "74": 42
+                },
+                "currentSkin": 74,
+                "_truncatedKeys": 20,
+                "_totalKeys": 32
+              },
+              "36": {
+                "id": 36,
+                "xp": 2948945,
+                "level": 120,
+                "color": 14,
+                "slots": [],
+                "skills": {
+                  "180": 120,
+                  "181": 120,
+                  "182": 120,
+                  "183": 120,
+                  "50001": 1
+                },
+                "power": 70251,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  40,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "49": 44,
+                  "78": 44,
+                  "419": 32
+                },
+                "currentSkin": 419,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 79,
+                  "xp": 1010389,
+                  "level": 88,
+                  "color": 9,
+                  "slots": "[Object(2 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 32763,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 489,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "2": {
+                  "id": 72,
+                  "xp": 867757,
+                  "level": 85,
+                  "color": 8,
+                  "slots": "[Array(0)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26978,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 486,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "3": {
+                  "id": 16,
+                  "xp": 1108927,
+                  "level": 90,
+                  "color": 12,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 50777,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 58,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 54,
+                  "xp": 1104174,
+                  "level": 90,
+                  "color": 11,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 35930,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(3 keys)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 242,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 60,
+                  "xp": 1103577,
+                  "level": 90,
+                  "color": 10,
+                  "slots": "[Array(1)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26054,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 303,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": "1795443385",
+            "seed": "2251823619",
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            },
+            "id": "1795443385648899911",
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          {
+            "userId": "1212042734",
+            "typeId": "1216438103",
+            "attackers": {
+              "17": {
+                "id": 17,
+                "xp": 1856793,
+                "level": 103,
+                "color": 11,
+                "slots": {
+                  "0": 0,
+                  "4": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "82": 91,
+                  "83": 90,
+                  "84": 90,
+                  "85": 90
+                },
+                "power": 45572,
+                "star": 3,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  30,
+                  30,
+                  30,
+                  30,
+                  30
+                ],
+                "skins": {
+                  "17": 60,
+                  "488": 35
+                },
+                "currentSkin": 488,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              },
+              "36": {
+                "id": 36,
+                "xp": 1862538,
+                "level": 103,
+                "color": 11,
+                "slots": [],
+                "skills": {
+                  "180": 96,
+                  "181": 96,
+                  "182": 96,
+                  "183": 96
+                },
+                "power": 46896,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  25,
+                  25,
+                  25,
+                  25,
+                  25
+                ],
+                "skins": {
+                  "49": 33,
+                  "78": 15,
+                  "84": 30
+                },
+                "currentSkin": 84,
+                "_truncatedKeys": 20,
+                "_totalKeys": 32
+              },
+              "55": {
+                "id": 55,
+                "xp": 1981595,
+                "level": 105,
+                "color": 11,
+                "slots": {
+                  "4": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "325": 105,
+                  "326": 105,
+                  "327": 105,
+                  "328": 103
+                },
+                "power": 53114,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  34,
+                  34,
+                  34,
+                  34,
+                  34
+                ],
+                "skins": {
+                  "255": 38,
+                  "332": 11
+                },
+                "currentSkin": 332,
+                "_truncatedKeys": 20,
+                "_totalKeys": 32
+              },
+              "78": {
+                "id": 78,
+                "xp": 1981494,
+                "level": 105,
+                "color": 11,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "4": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "459": 60,
+                  "460": 60,
+                  "461": 80,
+                  "462": 100
+                },
+                "power": 47577,
+                "star": 2,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  22,
+                  40,
+                  22,
+                  22,
+                  36
+                ],
+                "skins": {
+                  "444": 52
+                },
+                "currentSkin": 444,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "503": {
+                "id": 503,
+                "xp": 1862345,
+                "level": 103,
+                "color": 11,
+                "slots": {
+                  "5": 0
+                },
+                "skills": {
+                  "11016": 103,
+                  "11017": 102,
+                  "11018": 102,
+                  "11019": 102
+                },
+                "power": 48659,
+                "star": 4,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  30,
+                  30,
+                  30,
+                  30,
+                  30
+                ],
+                "skins": {
+                  "452": 11,
+                  "1007": 60
+                },
+                "currentSkin": 452,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 79,
+                  "xp": 1010389,
+                  "level": 88,
+                  "color": 9,
+                  "slots": "[Object(2 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 32683,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 489,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "2": {
+                  "id": 72,
+                  "xp": 867757,
+                  "level": 85,
+                  "color": 8,
+                  "slots": "[Array(0)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26978,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 486,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "3": {
+                  "id": 16,
+                  "xp": 1108927,
+                  "level": 90,
+                  "color": 12,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 50777,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 58,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 54,
+                  "xp": 1104174,
+                  "level": 90,
+                  "color": 11,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 35930,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(3 keys)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 242,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 60,
+                  "xp": 1103577,
+                  "level": 90,
+                  "color": 10,
+                  "slots": "[Array(1)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26054,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 303,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": "1795433519",
+            "seed": "3776018139",
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            },
+            "id": "1795433520051094856",
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          {
+            "userId": "1205613542",
+            "typeId": "1216438103",
+            "attackers": {
+              "37": {
+                "id": 37,
+                "xp": 2555442,
+                "level": 114,
+                "color": 12,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "3": 0,
+                  "4": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "185": 114,
+                  "186": 114,
+                  "187": 114,
+                  "188": 114
+                },
+                "power": 41723,
+                "star": 3,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  21,
+                  22,
+                  20
+                ],
+                "skins": {
+                  "50": 30,
+                  "83": 2,
+                  "111": 1,
+                  "153": 1,
+                  "223": 10,
+                  "415": 10
+                },
+                "currentSkin": 415,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              },
+              "68": {
+                "id": 68,
+                "xp": 2555237,
+                "level": 114,
+                "color": 12,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "380": 114,
+                  "381": 114,
+                  "382": 114,
+                  "383": 114
+                },
+                "power": 45454,
+                "star": 4,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  20,
+                  20,
+                  20
+                ],
+                "skins": {
+                  "348": 27,
+                  "374": 10,
+                  "391": 10,
+                  "421": 25,
+                  "567": 1
+                },
+                "currentSkin": 567,
+                "_truncatedKeys": 23,
+                "_totalKeys": 35
+              },
+              "71": {
+                "id": 71,
+                "xp": 2490469,
+                "level": 113,
+                "color": 12,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "405": 113,
+                  "406": 113,
+                  "407": 113,
+                  "408": 113
+                },
+                "power": 43058,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  35,
+                  34,
+                  20,
+                  20,
+                  21
+                ],
+                "skins": {
+                  "418": 10,
+                  "427": 1,
+                  "434": 8,
+                  "448": 1,
+                  "458": 2
+                },
+                "currentSkin": 427,
+                "_truncatedKeys": 23,
+                "_totalKeys": 35
+              },
+              "73": {
+                "id": 73,
+                "xp": 2555241,
+                "level": 114,
+                "color": 13,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "424": 114,
+                  "425": 114,
+                  "426": 114,
+                  "427": 114
+                },
+                "power": 39102,
+                "star": 1,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  15,
+                  11,
+                  30
+                ],
+                "skins": {
+                  "439": 22,
+                  "445": 11,
+                  "459": 1,
+                  "490": 10,
+                  "491": 6
+                },
+                "currentSkin": 459,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              },
+              "79": {
+                "id": 79,
+                "xp": 2555244,
+                "level": 114,
+                "color": 14,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "2": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "472": 114,
+                  "473": 114,
+                  "474": 114,
+                  "475": 114
+                },
+                "power": 66447,
+                "star": 6,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  40,
+                  40,
+                  25,
+                  21,
+                  21
+                ],
+                "skins": {
+                  "489": 35
+                },
+                "currentSkin": 489,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 79,
+                  "xp": 1010389,
+                  "level": 88,
+                  "color": 9,
+                  "slots": "[Object(2 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 32683,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 489,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "2": {
+                  "id": 72,
+                  "xp": 867757,
+                  "level": 85,
+                  "color": 8,
+                  "slots": "[Array(0)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26978,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(3)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 486,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "3": {
+                  "id": 16,
+                  "xp": 1108927,
+                  "level": 90,
+                  "color": 12,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 50777,
+                  "star": 5,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 58,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 54,
+                  "xp": 1104174,
+                  "level": 90,
+                  "color": 11,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 35930,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(3 keys)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 242,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 60,
+                  "xp": 1103577,
+                  "level": 90,
+                  "color": 10,
+                  "slots": "[Array(1)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26054,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 303,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": "1795415670",
+            "seed": "1947708378",
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            },
+            "id": "1795415670742741115",
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          {
+            "_truncatedArrayItems": 15,
+            "_totalLength": 20
+          }
+        ],
+        "users": {
+          "75977521": {
+            "id": "75977521",
+            "accountId": "101000000000000047759614",
+            "name": "Raptor",
+            "lastLoginTime": "1795499340",
+            "serverId": "125",
+            "level": "120",
+            "clanId": "67124851",
+            "clanRole": "3",
+            "avatarId": "1161",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "116038969": {
+            "id": "116038969",
+            "accountId": "102000000000000095245254",
+            "name": "Настенька",
+            "lastLoginTime": "1795444982",
+            "serverId": "209",
+            "level": "120",
+            "clanId": "100691289",
+            "clanRole": "2",
+            "avatarId": "11245",
+            "borderId": 127,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "584242524": {
+            "id": "584242524",
+            "accountId": "102000000000000199407918",
+            "name": "Edilson ",
+            "lastLoginTime": "1795480563",
+            "serverId": "83",
+            "level": "106",
+            "clanId": "357007",
+            "clanRole": "255",
+            "avatarId": "11243",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "616165293": {
+            "id": "616165293",
+            "accountId": "102000000000000182382584",
+            "name": "Dark Dragon ",
+            "lastLoginTime": "1795410938",
+            "serverId": "1158",
+            "level": "120",
+            "clanId": "67175306",
+            "clanRole": "2",
+            "avatarId": "1303",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 1,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "618093275": {
+            "id": "618093275",
+            "accountId": "101000000000000197570498",
+            "name": "Милый Лемминг и",
+            "lastLoginTime": "1795458265",
+            "serverId": "1267",
+            "level": "114",
+            "clanId": "67184059",
+            "clanRole": "2",
+            "avatarId": "11259",
+            "borderId": 1,
+            "isChatModerator": false,
+            "frameId": 1,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "632862519": {
+            "id": "632862519",
+            "accountId": "102000000000000161898129",
+            "name": "BraindeadPeddle",
+            "lastLoginTime": "1795497994",
+            "serverId": "1202",
+            "level": "120",
+            "clanId": "83949907",
+            "clanRole": "255",
+            "avatarId": "3",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1091545377": {
+            "id": "1091545377",
+            "accountId": "102000000000000195146864",
+            "name": "Алексей",
+            "lastLoginTime": "1795486793",
+            "serverId": "1207",
+            "level": "105",
+            "clanId": null,
+            "clanRole": null,
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 0,
+            "_truncatedKeys": 2,
+            "_totalKeys": 14
+          },
+          "1200323675": {
+            "id": "1200323675",
+            "accountId": "102000000000000053861678",
+            "name": "Alllexxx001",
+            "lastLoginTime": "1795501564",
+            "serverId": "1284",
+            "level": "94",
+            "clanId": "408428",
+            "clanRole": "2",
+            "avatarId": "1763",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1203252894": {
+            "id": "1203252894",
+            "accountId": "102000000000000203172882",
+            "name": "cool",
+            "lastLoginTime": "1795439381",
+            "serverId": "1283",
+            "level": "100",
+            "clanId": "67193867",
+            "clanRole": "255",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1204795289": {
+            "id": "1204795289",
+            "accountId": "102000000000000204311809",
+            "name": "michael11153",
+            "lastLoginTime": "1795463918",
+            "serverId": "1284",
+            "level": "82",
+            "clanId": "405285",
+            "clanRole": "255",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1205343633": {
+            "id": "1205343633",
+            "accountId": "101000000000000204728640",
+            "name": "ArcaneDuck1207",
+            "lastLoginTime": "1795503072",
+            "serverId": "1282",
+            "level": "107",
+            "clanId": "100744167",
+            "clanRole": "4",
+            "avatarId": "11248",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1205613542": {
+            "id": "1205613542",
+            "accountId": "102000000000000204941448",
+            "name": "Fedorovich",
+            "lastLoginTime": "1795501316",
+            "serverId": "1284",
+            "level": "114",
+            "clanId": "387795",
+            "clanRole": "2",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 1,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "_truncatedKeys": 9,
+          "_totalKeys": 21
+        }
+      }
+    },
+    "battle_teamGetClient": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "arena": [
+          [
+            4,
+            79,
+            72,
+            16,
+            60
+          ]
+        ],
+        "misiions": [
+          [
+            79,
+            72,
+            16,
+            70,
+            60
+          ]
+        ],
+        "bossFight": [
+          [
+            1,
+            2,
+            64,
+            15,
+            7
+          ]
+        ],
+        "clanBossHead_4": [
+          [
+            56,
+            503,
+            36,
+            37,
+            17
+          ],
+          [
+            2,
+            79,
+            51,
+            67,
+            7
+          ],
+          [
+            71,
+            72,
+            16,
+            70,
+            60
+          ]
+        ],
+        "clanBossHead_3": [
+          [
+            4,
+            2,
+            79,
+            70,
+            7
+          ],
+          [
+            56,
+            503,
+            36,
+            37,
+            17
+          ],
+          [
+            71,
+            72,
+            16,
+            51,
+            60
+          ]
+        ],
+        "clanBossHead_1": [
+          [
+            1,
+            2,
+            15,
+            20,
+            7
+          ],
+          [
+            4,
+            45,
+            36,
+            3,
+            18
+          ],
+          [
+            501,
+            17,
+            9,
+            64,
+            29
+          ]
+        ],
+        "brawl_71": [
+          [
+            74,
+            5,
+            72,
+            504,
+            24
+          ]
+        ],
+        "clanBossHead_5": [
+          [
+            4,
+            2,
+            79,
+            18,
+            7
+          ],
+          [
+            56,
+            72,
+            36,
+            70,
+            5
+          ],
+          [
+            1,
+            501,
+            17,
+            15,
+            29
+          ]
+        ],
+        "globalMapCamp": [
+          [
+            79,
+            72,
+            16,
+            70,
+            60
+          ]
+        ],
+        "globalMapTeamKey": [
+          [
+            16,
+            79,
+            60,
+            72,
+            51
+          ]
+        ],
+        "globalMapRallyAutoJoinTeamKey": [
+          [
+            2,
+            36,
+            7,
+            4,
+            15
+          ]
+        ],
+        "clanBossHead_2": [
+          [
+            4,
+            2,
+            79,
+            67,
+            7
+          ],
+          [
+            71,
+            72,
+            16,
+            51,
+            60
+          ],
+          [
+            56,
+            503,
+            36,
+            37,
+            17
+          ]
+        ],
+        "_truncatedKeys": 4,
+        "_totalKeys": 16
+      }
+    },
+    "battle_teamSet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:27.626Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "key": "globalMapTeamKey",
+        "units": [
+          [
+            504,
+            53,
+            8,
+            19,
+            10
+          ]
+        ]
+      },
+      "response": {
+        "response": null
+      }
+    },
+    "brawl_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "brawlId": "72",
+          "wins": "0",
+          "defenceTeam": [
+            {
+              "id": 19,
+              "level": 120,
+              "color": 16,
+              "star": 6,
+              "power": 213054,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 41,
+              "level": 120,
+              "color": 16,
+              "star": 6,
+              "power": 222933,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 44,
+              "level": 120,
+              "color": 16,
+              "star": 6,
+              "power": 217070,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 53,
+              "level": 120,
+              "color": 16,
+              "star": 6,
+              "power": 227445,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            },
+            {
+              "id": 501,
+              "level": 120,
+              "color": 16,
+              "star": 6,
+              "power": 224962,
+              "skinData": {
+                "id": 0,
+                "rank": 0,
+                "color": 0
+              },
+              "patron": 0
+            }
+          ],
+          "power": "1105464",
+          "isQuestFarmed": true,
+          "enemies": {
+            "enemies": [
+              {
+                "userId": "1216348128",
+                "power": "1238371",
+                "units": [
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]"
+                ]
+              },
+              {
+                "userId": "1216366031",
+                "power": "1098117",
+                "units": [
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]",
+                  "[Object(7 keys)]"
+                ]
+              }
+            ],
+            "users": {
+              "1216348128": {
+                "id": "1216348128",
+                "accountId": "102000000000000213187560",
+                "name": "Healer",
+                "lastLoginTime": "1793589637",
+                "serverId": "1431",
+                "level": "88",
+                "clanId": "305081",
+                "clanRole": "255",
+                "avatarId": "137",
+                "borderId": 127493,
+                "isChatModerator": false,
+                "frameId": 3,
+                "_truncatedKeys": 4,
+                "_totalKeys": 16
+              },
+              "1216366031": {
+                "id": "1216366031",
+                "accountId": "101000000000000206463567",
+                "name": "とわちん",
+                "lastLoginTime": "1793589041",
+                "serverId": "1431",
+                "level": "48",
+                "clanId": "305372",
+                "clanRole": "2",
+                "avatarId": "30",
+                "borderId": null,
+                "isChatModerator": false,
+                "frameId": null,
+                "_truncatedKeys": 4,
+                "_totalKeys": 16
+              }
+            }
+          },
+          "groupNum": "1",
+          "nextDayReset": 1793671200
+        }
+      ]
+    },
+    "customArena_endBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611241410_arena.json",
+        "capturedAt": "2026-11-24T07:09:54.003Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "NormalArena",
+        "result": [
+          {
+            "win": true,
+            "stars": 3
+          }
+        ],
+        "progress": [
+          [
+            {
+              "defenders": {
+                "heroes": {},
+                "input": []
+              },
+              "attackers": {
+                "heroes": {
+                  "16": {
+                    "isDead": false,
+                    "hp": 161577,
+                    "energy": 1000
+                  },
+                  "54": {
+                    "isDead": false,
+                    "hp": 111721,
+                    "energy": 634
+                  },
+                  "60": {
+                    "isDead": false,
+                    "hp": 107559,
+                    "energy": 235
+                  },
+                  "72": {
+                    "isDead": false,
+                    "hp": 115718,
+                    "energy": 880
+                  },
+                  "79": {
+                    "isDead": false,
+                    "hp": 151800,
+                    "energy": 1000
+                  }
+                },
+                "input": []
+              },
+              "duration": 19.940215576,
+              "seed": 1153971605
+            }
+          ]
+        ],
+        "auto": true
+      },
+      "response": {
+        "state": {
+          "arenaType": "NormalArena",
+          "userId": 1216438103,
+          "serverId": 1431,
+          "rating": 0,
+          "place": 12046,
+          "bestRating": 0,
+          "bestPlace": 12046,
+          "lastBattleTs": 0,
+          "dayStreak": 0,
+          "winStreak": 0,
+          "numBattles": 267,
+          "numWins": 260,
+          "_truncatedKeys": 3,
+          "_totalKeys": 15
+        },
+        "reward": {
+          "coin": {
+            "1": 20
+          }
+        },
+        "enemies": {
+          "type": "RatingArena",
+          "useCustomArenaMode": true,
+          "enemies": [
+            {
+              "heroes": [
+                {
+                  "id": 4,
+                  "level": 106,
+                  "color": 11,
+                  "star": 4,
+                  "power": 48520,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 45,
+                  "level": 106,
+                  "color": 11,
+                  "star": 6,
+                  "power": 64618,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 43,
+                  "level": 106,
+                  "color": 12,
+                  "star": 2,
+                  "power": 41037,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 10,
+                  "level": 106,
+                  "color": 11,
+                  "star": 5,
+                  "power": 45909,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                },
+                {
+                  "id": 23,
+                  "level": 106,
+                  "color": 11,
+                  "star": 3,
+                  "power": 38106,
+                  "skinData": "[Object(3 keys)]",
+                  "patron": 0
+                }
+              ],
+              "power": 238170,
+              "rating": 7031,
+              "userId": "583189594",
+              "rewards": {
+                "win": 33,
+                "lose": -14
+              },
+              "user": {
+                "id": "583189594",
+                "accountId": "102000000000000188634407",
+                "name": "⋆. Евко˚⋆ ",
+                "lastLoginTime": "1795459552",
+                "serverId": "1206",
+                "level": "106",
+                "clanId": "331631",
+                "clanRole": "2",
+                "avatarId": "77",
+                "borderId": 16,
+                "isChatModerator": false,
+                "frameId": null,
+                "_truncatedKeys": 4,
+                "_totalKeys": 16
+              }
+            }
+          ]
+        },
+        "valid": true,
+        "replayId": "1795504193172943810"
+      }
+    },
+    "customArena_startBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611241410_arena.json",
+        "capturedAt": "2026-11-24T07:09:53.377Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "NormalArena",
+        "userId": "603563468",
+        "units": [
+          79,
+          72,
+          16,
+          54,
+          60
+        ]
+      },
+      "response": {
+        "battles": [
+          {
+            "userId": "1216438103",
+            "typeId": 603563468,
+            "attackers": {
+              "16": {
+                "id": 16,
+                "xp": 1108927,
+                "level": 90,
+                "color": 12,
+                "slots": {
+                  "1": 0,
+                  "3": 0,
+                  "4": 0
+                },
+                "skills": {
+                  "290": 90,
+                  "291": 90,
+                  "292": 90,
+                  "293": 90
+                },
+                "power": 50777,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  30,
+                  15,
+                  10,
+                  40,
+                  40
+                ],
+                "skins": {
+                  "16": 32,
+                  "58": 53
+                },
+                "currentSkin": 58,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "54": {
+                "id": 54,
+                "xp": 1104174,
+                "level": 90,
+                "color": 11,
+                "slots": {
+                  "0": 0,
+                  "1": 0,
+                  "3": 0,
+                  "4": 0,
+                  "5": 0
+                },
+                "skills": {
+                  "320": 90,
+                  "321": 90,
+                  "322": 90,
+                  "323": 90
+                },
+                "power": 35930,
+                "star": 4,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": {
+                  "0": 40,
+                  "1": 1,
+                  "4": 40
+                },
+                "skins": {
+                  "242": 30
+                },
+                "currentSkin": 242,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "60": {
+                "id": 60,
+                "xp": 1103577,
+                "level": 90,
+                "color": 10,
+                "slots": [
+                  0
+                ],
+                "skills": {
+                  "350": 90,
+                  "351": 90,
+                  "352": 90,
+                  "353": 90
+                },
+                "power": 26054,
+                "star": 3,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  19,
+                  5
+                ],
+                "skins": {
+                  "303": 23
+                },
+                "currentSkin": 303,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "72": {
+                "id": 72,
+                "xp": 867757,
+                "level": 85,
+                "color": 8,
+                "slots": [],
+                "skills": {
+                  "410": 85,
+                  "411": 85,
+                  "412": 85,
+                  "413": 70
+                },
+                "power": 26978,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  10,
+                  10,
+                  15
+                ],
+                "skins": {
+                  "435": 22,
+                  "486": 1
+                },
+                "currentSkin": 486,
+                "_truncatedKeys": 21,
+                "_totalKeys": 33
+              },
+              "79": {
+                "id": 79,
+                "xp": 1103839,
+                "level": 90,
+                "color": 9,
+                "slots": {
+                  "1": 0,
+                  "2": 0
+                },
+                "skills": {
+                  "472": 90,
+                  "473": 90,
+                  "474": 90,
+                  "475": 90
+                },
+                "power": 33143,
+                "star": 5,
+                "runes": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "hero_runes": [
+                  20,
+                  20,
+                  20,
+                  20,
+                  30
+                ],
+                "skins": {
+                  "489": 31
+                },
+                "currentSkin": 489,
+                "_truncatedKeys": 22,
+                "_totalKeys": 34
+              }
+            },
+            "defenders": [
+              {
+                "1": {
+                  "id": 2,
+                  "xp": 1794965,
+                  "level": 102,
+                  "color": 10,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 48385,
+                  "star": 6,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 134,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "2": {
+                  "id": 1,
+                  "xp": 731907,
+                  "level": 82,
+                  "color": 9,
+                  "slots": "[Object(5 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 30873,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 1,
+                  "_truncatedKeys": 22,
+                  "_totalKeys": 34
+                },
+                "3": {
+                  "id": 15,
+                  "xp": 690965,
+                  "level": 81,
+                  "color": 10,
+                  "slots": "[Object(3 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 30082,
+                  "star": 4,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(5)]",
+                  "skins": "[Object(1 keys)]",
+                  "currentSkin": 15,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "4": {
+                  "id": 64,
+                  "xp": 160144,
+                  "level": 60,
+                  "color": 6,
+                  "slots": "[Array(3)]",
+                  "skills": "[Object(3 keys)]",
+                  "power": 18939,
+                  "star": 2,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Array(2)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 405,
+                  "_truncatedKeys": 21,
+                  "_totalKeys": 33
+                },
+                "5": {
+                  "id": 6,
+                  "xp": 690840,
+                  "level": 81,
+                  "color": 9,
+                  "slots": "[Object(4 keys)]",
+                  "skills": "[Object(4 keys)]",
+                  "power": 26534,
+                  "star": 3,
+                  "runes": "[Array(5)]",
+                  "hero_runes": "[Object(4 keys)]",
+                  "skins": "[Object(2 keys)]",
+                  "currentSkin": 402,
+                  "_truncatedKeys": 20,
+                  "_totalKeys": 32
+                }
+              }
+            ],
+            "effects": [],
+            "reward": [],
+            "startTime": 1795504193,
+            "seed": 1153971605,
+            "type": "arena",
+            "battleFeatures": [
+              "battleFeature_202",
+              "battleFeature_204",
+              "battleFeature_207",
+              "battleFeature_208",
+              "battleFeature_209",
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ],
+            "battleEffects": {
+              "LightTitanShield": 1,
+              "Buff_Duplicate": 71,
+              "StatUp": 5,
+              "AntimagePassive": 7,
+              "EnergyWarlockDamageRetarget": 9,
+              "Levitation": 251,
+              "Curse": 11,
+              "Hero500MUlt": 441,
+              "Hero500MArmorDebuff": 13,
+              "AstarothResurrect": 35,
+              "RufusResurrect": 36,
+              "MorriganResurrect": 37,
+              "_truncatedKeys": 438,
+              "_totalKeys": 450
+            }
+          }
+        ],
+        "paid": {
+          "refillable": {
+            "5": 1,
+            "6": 1
+          }
+        }
+      }
+    },
+    "getCurrentBattle": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:29.389Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "clanId": 305081
+      },
+      "response": {
+        "league": "bronze",
+        "remainingTime": 1794189600,
+        "clan": {
+          "id": 305081,
+          "name": "4-LEAF CLOVER",
+          "server": "1431",
+          "icon": {
+            "flagColor1": 1,
+            "flagColor2": 19,
+            "flagShape": 14,
+            "iconColor": 1,
+            "iconShape": 24,
+            "border": 12
+          },
+          "isActive": true
+        },
+        "enemyClan": {
+          "id": 100752873,
+          "name": "Black",
+          "server": "1410",
+          "icon": {
+            "flagColor1": 7,
+            "flagColor2": 7,
+            "flagShape": 3,
+            "iconColor": 7,
+            "iconShape": 5,
+            "border": 0
+          },
+          "isActive": true
+        },
+        "clanBattleScore": 0,
+        "enemyClanBattleScore": 0,
+        "clanRoundPoints": 10145150,
+        "enemyClanRoundPoints": 657950,
+        "clanBattleTotalPoints": 10145150,
+        "enemyClanBattleTotalPoints": 657950,
+        "bestPlayer": {
+          "userId": 1216348128,
+          "clanId": 305081,
+          "level": 0,
+          "avatarUrl": ""
+        },
+        "bestEnemyPlayer": {
+          "userId": 1214920823,
+          "clanId": 100752873,
+          "level": 0,
+          "avatarUrl": ""
+        },
+        "_truncatedKeys": 1,
+        "_totalKeys": 13
+      }
+    },
+    "getLeaderboardPowerSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "places": [
+          {
+            "leaderboardType": "buildingPowerServer",
+            "place": 41,
+            "totalMemberCount": 1139
+          },
+          {
+            "leaderboardType": "unitPowerServer",
+            "place": 26,
+            "totalMemberCount": 1030
+          },
+          {
+            "leaderboardType": "personalResearchPowerServer",
+            "place": 54,
+            "totalMemberCount": 888
+          },
+          {
+            "leaderboardType": "heroPowerServer",
+            "place": 62,
+            "totalMemberCount": 11860
+          }
+        ],
+        "topScores": [
+          {
+            "leaderboardType": "heroPowerServer",
+            "score": 3424697
+          }
+        ]
+      }
+    },
+    "getRatingInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:21.005Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "ratingStartDate": 1793584800,
+        "ratingEndDate": 1794189600,
+        "rewards": []
+      }
+    },
+    "getUserPlace": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.314Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "leaderboardType": "personalResearchPowerServer"
+      },
+      "response": {
+        "place": 54,
+        "totalMemberCount": 888
+      }
+    },
+    "teamGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "mission": [
+          79,
+          72,
+          16,
+          70,
+          60
+        ],
+        "arena": [
+          4,
+          79,
+          72,
+          16,
+          60
+        ],
+        "boss_fight": [
+          1,
+          2,
+          64,
+          15,
+          7
+        ],
+        "magicTower": [
+          79,
+          72,
+          16,
+          70,
+          60
+        ],
+        "clanDefence_heroes": [
+          79,
+          72,
+          16,
+          70,
+          60
+        ],
+        "clanDefence_titans": [
+          4000,
+          4001,
+          4004,
+          4002,
+          4053
+        ],
+        "dungeon_water": [
+          4000,
+          4001,
+          4052,
+          4004,
+          4002
+        ],
+        "dungeon_neutral": [
+          4000,
+          4001,
+          4004,
+          4002,
+          4053
+        ],
+        "adventure_battle": [
+          79,
+          16,
+          60,
+          72,
+          70
+        ],
+        "dungeon_fire": [
+          4010,
+          4011,
+          4013,
+          4012
+        ],
+        "clan_boss": [
+          [
+            56,
+            503,
+            36,
+            37,
+            17
+          ],
+          [
+            2,
+            79,
+            51,
+            67,
+            7
+          ],
+          [
+            71,
+            72,
+            16,
+            70,
+            60
+          ]
+        ],
+        "brawl": [
+          24,
+          504,
+          72,
+          5,
+          74
+        ],
+        "_truncatedKeys": 6,
+        "_totalKeys": 18
+      }
+    },
+    "topGet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:19.674Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "drafts",
+        "selfOnly": false
+      },
+      "response": {
+        "top": [
+          {
+            "place": 1,
+            "points": 7778,
+            "objectId": "617865581"
+          },
+          {
+            "place": 2,
+            "points": 7756,
+            "objectId": "568219613"
+          },
+          {
+            "place": 3,
+            "points": 7751,
+            "objectId": "538899958"
+          },
+          {
+            "place": 4,
+            "points": 7748,
+            "objectId": "75291301"
+          },
+          {
+            "place": 5,
+            "points": 7746,
+            "objectId": "1091818339"
+          },
+          {
+            "_truncatedArrayItems": 47,
+            "_totalLength": 52
+          }
+        ],
+        "reference": {
+          "type": "user",
+          "list": {
+            "32994348": {
+              "id": "32994348",
+              "accountId": "102000000000000134733045",
+              "name": "Lugh",
+              "lastLoginTime": "1793570086",
+              "serverId": "1",
+              "level": "120",
+              "clanId": "111408",
+              "clanRole": "4",
+              "avatarId": "11261",
+              "borderId": 161,
+              "isChatModerator": false,
+              "frameId": 1,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "54545480": {
+              "id": "54545480",
+              "accountId": "101000000000000071841254",
+              "name": "СУПСТАНЦИЯ",
+              "lastLoginTime": "1793593471",
+              "serverId": "34",
+              "level": "120",
+              "clanId": "162867",
+              "clanRole": "4",
+              "avatarId": "24",
+              "borderId": 146,
+              "isChatModerator": false,
+              "frameId": 2,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "54994696": {
+              "id": "54994696",
+              "accountId": "101000000000000156650649",
+              "name": "[ Gr3y8eard ]",
+              "lastLoginTime": "1793586759",
+              "serverId": "873",
+              "level": "120",
+              "clanId": "158428",
+              "clanRole": "2",
+              "avatarId": "1302",
+              "borderId": 142,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "62358505": {
+              "id": "62358505",
+              "accountId": "102000000000000167084206",
+              "name": "Phobos",
+              "lastLoginTime": "1793558163",
+              "serverId": "873",
+              "level": "120",
+              "clanId": "162547",
+              "clanRole": "2",
+              "avatarId": "2229",
+              "borderId": 140,
+              "isChatModerator": false,
+              "frameId": null,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "63215930": {
+              "id": "63215930",
+              "accountId": "102000000000000166353289",
+              "name": "crf Berserker",
+              "lastLoginTime": "1793575115",
+              "serverId": "1120",
+              "level": "120",
+              "clanId": "100727251",
+              "clanRole": "4",
+              "avatarId": "2246",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "75291301": {
+              "id": "75291301",
+              "accountId": "101000000000000033682971",
+              "name": "Mechanico",
+              "lastLoginTime": "1793592040",
+              "serverId": "125",
+              "level": "120",
+              "clanId": "67126631",
+              "clanRole": "4",
+              "avatarId": "11256",
+              "borderId": 40024,
+              "isChatModerator": false,
+              "frameId": 1,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "88274002": {
+              "id": "88274002",
+              "accountId": "101000000000000102910480",
+              "name": "Saltkin",
+              "lastLoginTime": "1793574891",
+              "serverId": "132",
+              "level": "120",
+              "clanId": "83896456",
+              "clanRole": "4",
+              "avatarId": "1022",
+              "borderId": 152,
+              "isChatModerator": false,
+              "frameId": 1,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "538899958": {
+              "id": "538899958",
+              "accountId": "102000000000000150751457",
+              "name": "꧁ לאכימ ꧂",
+              "lastLoginTime": "1793587584",
+              "serverId": "158",
+              "level": "120",
+              "clanId": "277286",
+              "clanRole": "4",
+              "avatarId": "120",
+              "borderId": 141,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "542174851": {
+              "id": "542174851",
+              "accountId": "102000000000000198120517",
+              "name": "살랑",
+              "lastLoginTime": "1793591443",
+              "serverId": "1268",
+              "level": "120",
+              "clanId": "100733112",
+              "clanRole": "3",
+              "avatarId": "11267",
+              "borderId": 1,
+              "isChatModerator": false,
+              "frameId": 3,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "565804064": {
+              "id": "565804064",
+              "accountId": "102000000000000166233158",
+              "name": "lito10000000005",
+              "lastLoginTime": "1793565298",
+              "serverId": "815",
+              "level": "120",
+              "clanId": "280086",
+              "clanRole": "3",
+              "avatarId": "1895",
+              "borderId": null,
+              "isChatModerator": false,
+              "frameId": 1,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "568219613": {
+              "id": "568219613",
+              "accountId": "101000000000000133828244",
+              "name": "Luby&Songtao +",
+              "lastLoginTime": "1793589055",
+              "serverId": "50",
+              "level": "120",
+              "clanId": "179598",
+              "clanRole": "2",
+              "avatarId": "1789",
+              "borderId": 133,
+              "isChatModerator": false,
+              "frameId": 2,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "568932788": {
+              "id": "568932788",
+              "accountId": "101000000000000182177461",
+              "name": "Xeesor",
+              "lastLoginTime": "1793566370",
+              "serverId": "1223",
+              "level": "120",
+              "clanId": "316210",
+              "clanRole": "4",
+              "avatarId": "11230",
+              "borderId": 140,
+              "isChatModerator": false,
+              "frameId": 2,
+              "_truncatedKeys": 4,
+              "_totalKeys": 16
+            },
+            "_truncatedKeys": 39,
+            "_totalKeys": 51
+          }
+        },
+        "count": 360417
+      }
+    }
+  }
+}

@@ -1,0 +1,328 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "world-map-gather-rally",
+  "description": "World Map mine search, gathering, stop gathering, mine summary, resource collection",
+  "methodCount": 8,
+  "methods": {
+    "attackMine": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:28.544Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mineId": "920d0082-6d1b-450d-9148-c99e27649fde",
+        "battleType": "pve",
+        "squad": {
+          "heroes": [
+            {
+              "heroId": 504
+            },
+            {
+              "heroId": 53
+            },
+            {
+              "heroId": 8
+            },
+            {
+              "heroId": 19
+            },
+            {
+              "heroId": 10
+            }
+          ],
+          "units": [
+            {
+              "unitId": 7,
+              "count": 1424
+            },
+            {
+              "unitId": 17,
+              "count": 1424
+            },
+            {
+              "unitId": 27,
+              "count": 1424
+            }
+          ]
+        }
+      },
+      "response": {
+        "squadId": "6c46f572-d5f1-4634-bf6b-38e309a69930",
+        "route": {
+          "routeId": "ae5f7b8e-81db-4dc8-825b-a42f250e8dc5",
+          "from": {
+            "coordinates": {
+              "x": 606,
+              "y": 376
+            },
+            "objectSizeId": 6,
+            "object": {
+              "objectId": "00000000-0000-0000-0000-0000575f8148",
+              "objectType": "outpost",
+              "objectSizeId": 6
+            }
+          },
+          "to": {
+            "coordinates": {
+              "x": 618,
+              "y": 362
+            },
+            "objectSizeId": 4,
+            "object": {
+              "objectId": "920d0082-6d1b-450d-9148-c99e27649fde",
+              "objectType": "mine",
+              "objectSizeId": 4
+            }
+          },
+          "startedAt": 1793936369721,
+          "duration": 10461,
+          "durationMs": 10461
+        }
+      }
+    },
+    "collectResource": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:29:12.373Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "producerId": 1,
+        "collectDate": 1793777348543,
+        "collectedAmount": 797095
+      },
+      "response": {}
+    },
+    "getMineById": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:39:16.726Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mineId": "920d0082-6d1b-450d-9148-c99e27649fde"
+      },
+      "response": {
+        "mineId": "920d0082-6d1b-450d-9148-c99e27649fde",
+        "resourceAmount": 375000
+      }
+    },
+    "getMineSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "gatherings": [
+          {
+            "mineId": "e0630201-fe40-475f-8bcc-307194ec4d97",
+            "squadId": "76bdc966-4ebb-4023-ad12-14303ffbd895",
+            "startedAt": 1793592986591,
+            "plannedDuration": 21792119,
+            "plannedDurationMs": 21792119,
+            "plannedGatheredResourceAmount": 5000000
+          },
+          {
+            "mineId": "f0ae8a5b-5276-4072-94e2-d0bc1166f227",
+            "squadId": "18ac4091-ff6b-4aa9-a797-a2d66ff5f200",
+            "startedAt": 1793593005852,
+            "plannedDuration": 23566379,
+            "plannedDurationMs": 23566379,
+            "plannedGatheredResourceAmount": 250000
+          }
+        ]
+      }
+    },
+    "getOutpostById": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141923_under_attack2.json",
+        "capturedAt": "2026-11-14T12:22:43.878Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "outpostId": "00000000-0000-0000-0000-000043d47e48"
+      },
+      "response": {
+        "outpostId": "00000000-0000-0000-0000-000043d47e48",
+        "avatarId": 2067,
+        "avatarBorderId": 127493,
+        "userServerId": 1431,
+        "clanName": "【★】 Continental  【★】",
+        "power": 3341496,
+        "teamLevel": 116,
+        "clanInfo": {
+          "clanId": 304509,
+          "clanName": "【★】 Continental  【★】",
+          "clanIcon": {
+            "flagColor1": 9,
+            "flagColor2": 7,
+            "flagShape": 7,
+            "iconColor": 18,
+            "iconShape": 56,
+            "border": 412
+          }
+        },
+        "attackForbiddenReason": "default"
+      }
+    },
+    "getOutpostSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.314Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "outpostId": "00000000-0000-0000-0000-0000575f8148",
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mapConfigId": 8,
+        "mapTemplateId": 8,
+        "mapType": "multiplayer",
+        "coordinates": {
+          "x": 507,
+          "y": 113
+        },
+        "homeMap": {
+          "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+          "mapTemplateId": 8,
+          "coordinates": {
+            "x": 507,
+            "y": 113
+          }
+        },
+        "version": 13
+      }
+    },
+    "searchMine": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061045_search_mines.json",
+        "capturedAt": "2026-11-06T03:45:11.762Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mineConfigIds": [
+          66
+        ],
+        "fullOnly": true,
+        "center": {
+          "x": 606,
+          "y": 376
+        }
+      },
+      "response": {
+        "mines": [
+          {
+            "mineId": "53664b93-34f2-47a0-888d-c08bae47583b",
+            "coordinates": {
+              "x": 634,
+              "y": 376
+            }
+          },
+          {
+            "mineId": "84109b21-6c6c-4cef-8534-7d457b284d07",
+            "coordinates": {
+              "x": 579,
+              "y": 392
+            }
+          },
+          {
+            "mineId": "bd4249ae-62dd-4170-8c76-6510c8bc018f",
+            "coordinates": {
+              "x": 653,
+              "y": 388
+            }
+          },
+          {
+            "mineId": "7e963419-2d76-4776-8123-fb508efd30fe",
+            "coordinates": {
+              "x": 604,
+              "y": 426
+            }
+          },
+          {
+            "mineId": "43aac664-f580-4b27-86db-491e3d030cd6",
+            "coordinates": {
+              "x": 647,
+              "y": 411
+            }
+          }
+        ]
+      }
+    },
+    "stopMineGathering": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611061040_gathering.json",
+        "capturedAt": "2026-11-06T03:38:53.994Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "squadId": "a07e28b3-b6e8-4b94-b446-3c4e9e18de56"
+      },
+      "response": {
+        "squadId": "a07e28b3-b6e8-4b94-b446-3c4e9e18de56",
+        "remainingResourceAmount": 4259095,
+        "route": {
+          "routeId": "54fcab9a-c328-4ddd-bc38-40e9b8f0f4f3",
+          "from": {
+            "coordinates": {
+              "x": 630,
+              "y": 362
+            },
+            "objectSizeId": 4,
+            "object": {
+              "objectId": "de8dbbe5-cefa-43d4-a5fa-583f0f9e6a45",
+              "objectType": "mine",
+              "objectSizeId": 4
+            }
+          },
+          "to": {
+            "coordinates": {
+              "x": 606,
+              "y": 376
+            },
+            "objectSizeId": 6,
+            "object": {
+              "objectId": "00000000-0000-0000-0000-0000575f8148",
+              "objectType": "outpost",
+              "objectSizeId": 6
+            }
+          },
+          "startedAt": 1793936335115,
+          "duration": 19807,
+          "durationMs": 19807
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,666 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "account-session",
+  "description": "User profile, avatars, settings, chat, consent/cookies, activity markers",
+  "methodCount": 21,
+  "methods": {
+    "chatGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "chatType": "server"
+      },
+      "response": {
+        "messages": [
+          {
+            "id": "50732569",
+            "userId": "1216348128",
+            "messageType": "text",
+            "chatType": "server",
+            "ctime": "1793591417",
+            "data": {
+              "text": "lol",
+              "ids": []
+            }
+          },
+          {
+            "id": "50732567",
+            "userId": "1216302443",
+            "messageType": "text",
+            "chatType": "server",
+            "ctime": "1793591401",
+            "data": {
+              "text": "yeah i see it now, just glanced over it every other time i tried to find it lol",
+              "ids": []
+            }
+          },
+          {
+            "id": "50732556",
+            "userId": "1216348128",
+            "messageType": "text",
+            "chatType": "server",
+            "ctime": "1793591360",
+            "data": {
+              "text": "lol it's just beside there don't you see?",
+              "ids": []
+            }
+          },
+          {
+            "id": "50732553",
+            "userId": "1216302443",
+            "messageType": "text",
+            "chatType": "server",
+            "ctime": "1793591341",
+            "data": {
+              "text": "i've looked there like 20 times hahahhahahhaha",
+              "ids": []
+            }
+          },
+          {
+            "id": "50732549",
+            "userId": "1216348128",
+            "messageType": "text",
+            "chatType": "server",
+            "ctime": "1793591320",
+            "data": {
+              "text": "🤣🤣🤣🤣🤣",
+              "ids": []
+            }
+          },
+          {
+            "_truncatedArrayItems": 45,
+            "_totalLength": 50
+          }
+        ],
+        "users": {
+          "1216251207": {
+            "id": "1216251207",
+            "accountId": "101000000000000207898251",
+            "name": "༺ Community ༻",
+            "lastLoginTime": "1793582551",
+            "serverId": "1431",
+            "level": "120",
+            "clanId": "304509",
+            "clanRole": "255",
+            "avatarId": "2245",
+            "borderId": 1,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216255673": {
+            "id": "1216255673",
+            "accountId": "102000000000000165100543",
+            "name": "ХорёкРагнарёк",
+            "lastLoginTime": "1793591440",
+            "serverId": "1431",
+            "level": "91",
+            "clanId": "304509",
+            "clanRole": "4",
+            "avatarId": "1251",
+            "borderId": 127493,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216257328": {
+            "id": "1216257328",
+            "accountId": "101000000000000213117831",
+            "name": "joeyfromthebay",
+            "lastLoginTime": "1793568842",
+            "serverId": "1431",
+            "level": "51",
+            "clanId": "305559",
+            "clanRole": "2",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216282705": {
+            "id": "1216282705",
+            "accountId": "105000000000000213137319",
+            "name": "Tui@Pim",
+            "lastLoginTime": "1793586759",
+            "serverId": "1431",
+            "level": "68",
+            "clanId": "304684",
+            "clanRole": "255",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 1,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216290582": {
+            "id": "1216290582",
+            "accountId": "102000000000000213143260",
+            "name": "GFXBYBOSS",
+            "lastLoginTime": "1793590150",
+            "serverId": "1431",
+            "level": "57",
+            "clanId": "304673",
+            "clanRole": "2",
+            "avatarId": "30",
+            "borderId": 1,
+            "isChatModerator": false,
+            "frameId": null,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216299649": {
+            "id": "1216299649",
+            "accountId": "102000000000000213149960",
+            "name": "MajorBacon ",
+            "lastLoginTime": "1793586731",
+            "serverId": "1431",
+            "level": "90",
+            "clanId": "305531",
+            "clanRole": "2",
+            "avatarId": "2213",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216302443": {
+            "id": "1216302443",
+            "accountId": "102000000000000212311684",
+            "name": "Blackbeerd",
+            "lastLoginTime": "1793586693",
+            "serverId": "1431",
+            "level": "70",
+            "clanId": "304788",
+            "clanRole": "2",
+            "avatarId": "21",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216348128": {
+            "id": "1216348128",
+            "accountId": "102000000000000213187560",
+            "name": "Healer",
+            "lastLoginTime": "1793589637",
+            "serverId": "1431",
+            "level": "88",
+            "clanId": "305081",
+            "clanRole": "255",
+            "avatarId": "137",
+            "borderId": 127493,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216356692": {
+            "id": "1216356692",
+            "accountId": "102000000000000213194004",
+            "name": "moonknight",
+            "lastLoginTime": "1793580679",
+            "serverId": "1431",
+            "level": "52",
+            "clanId": "304549",
+            "clanRole": "2",
+            "avatarId": "2277",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 2,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216358258": {
+            "id": "1216358258",
+            "accountId": "101000000000000101219746",
+            "name": "Nechuzhoy",
+            "lastLoginTime": "1793573206",
+            "serverId": "1431",
+            "level": "100",
+            "clanId": "304509",
+            "clanRole": "2",
+            "avatarId": "2245",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216362410": {
+            "id": "1216362410",
+            "accountId": "101000000000000213198225",
+            "name": "sway331",
+            "lastLoginTime": "1793584849",
+            "serverId": "1431",
+            "level": "115",
+            "clanId": "304633",
+            "clanRole": "4",
+            "avatarId": "1142",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216368348": {
+            "id": "1216368348",
+            "accountId": "102000000000000213202697",
+            "name": "Kwnia",
+            "lastLoginTime": "1793588515",
+            "serverId": "1431",
+            "level": "112",
+            "clanId": "304509",
+            "clanRole": "2",
+            "avatarId": "482",
+            "borderId": 127493,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "_truncatedKeys": 2,
+          "_totalKeys": 14
+        },
+        "chatStatus": "available"
+      }
+    },
+    "chatGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "banUntil": "0",
+        "subscribeServer": "1",
+        "lastMessageTime": "1793593513",
+        "blackList": [],
+        "settings": []
+      }
+    },
+    "chatSendText": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:12:59.065Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "chatType": "clan",
+        "text": "I place my main team on the wall, with half of troops there"
+      },
+      "response": {
+        "response": null
+      }
+    },
+    "chatServerSubscribe": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "response": null
+      }
+    },
+    "chat_getBanStatus": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:30:18.109Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "isBanned": false
+      }
+    },
+    "chat_getBlackList": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:19.674Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "userInfos": []
+      }
+    },
+    "chat_getPrivateChats": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:19.674Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "count": 25,
+        "offset": 0
+      },
+      "response": {
+        "userInfos": [
+          "{\"serverId\":1431,\"level\":69,\"clanId\":304491,\"clanTitle\":\"KFC\",\"clanIcon\":{\"flagColor1\":0,\"flagColor2\":3,\"flagShape\":3,\"iconColor\":1,\"iconShape\":2},\"avatarId\":30,\"isChatModerator\":false,\"battleIsAllowed\":false,\"flagId\":8,\"id\":1216256157,\"accountId\":\"101000000000000213116937\",\"name\":\"青紫のシグマ36\"}",
+          "{\"serverId\":1431,\"level\":78,\"clanId\":305434,\"clanTitle\":\"EvoRewardClan\",\"clanIcon\":{\"flagColor1\":7,\"flagColor2\":0,\"flagShape\":0,\"iconColor\":3,\"iconShape\":101},\"avatarId\":1706,\"isChatModerator\":false,\"battleIsAllowed\":false,\"flagId\":2,\"id\":1216413574,\"accountId\":\"102000000000000213236897\",\"name\":\"Spooky\"}",
+          "{\"serverId\":1431,\"level\":88,\"clanId\":305081,\"clanTitle\":\"4-LEAF CLOVER\",\"clanIcon\":{\"flagColor1\":1,\"flagColor2\":19,\"flagShape\":14,\"iconColor\":1,\"iconShape\":24,\"border\":12},\"avatarId\":137,\"borderId\":127493,\"isChatModerator\":false,\"battleIsAllowed\":false,\"flagId\":3,\"id\":1216348128,\"accountId\":\"102000000000000213187560\",\"name\":\"Healer\"}"
+        ]
+      }
+    },
+    "getEmailInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "rewardCollected": true,
+        "email": "[REDACTED]",
+        "emailLinked": true,
+        "subscribed": false,
+        "marketingConsent": false,
+        "emailChangeAllowedStamp": 1793594177
+      }
+    },
+    "getNameChangedCount": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": 3
+    },
+    "rateUsGetCooldown": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "cooldown": 1790231840,
+        "nativeCooldown": 0,
+        "shortAttemptsLeft": 3
+      }
+    },
+    "sendConsent": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:04.777Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "accepted": true,
+        "metrics": true,
+        "partners": true,
+        "version": 3,
+        "mode": "A"
+      },
+      "response": {}
+    },
+    "sendCookie": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:10.097Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "cookies": [
+          {
+            "cookieName": "_ga",
+            "cookieValue": "GA1.1.1928827203.1791436120"
+          },
+          {
+            "cookieName": "_ga_8ZYRM3VLVK",
+            "cookieValue": "GS2.1.s1793589710$o92$g1$t1793594164$j59$l0$h0"
+          },
+          {
+            "cookieName": "userAgent",
+            "cookieValue": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          },
+          {
+            "cookieName": "href",
+            "cookieValue": "https://www.hero-wars-alliance.com/"
+          },
+          {
+            "cookieName": "appsFlyerId",
+            "cookieValue": "aaf1ad22-e047-4cb5-b5fe-660695867e2b-p"
+          }
+        ]
+      },
+      "response": {}
+    },
+    "settingsGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "sounds": false,
+        "music": false,
+        "simpleHealthView": false,
+        "push.privateChat": true,
+        "battleSettings": "{\"adventure\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"adventure_boss\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"boss\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"bossFight\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"brawls\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_boss\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_pvp\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_trainings_hero\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_trainings_titan\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"core\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"default\":{\"auto\":{\"value\":true,\"... [truncated 3407 chars]",
+        "skillPointBundlesPopupWasShown": true,
+        "push.freeStamina1": true,
+        "push.freeStamina2": true,
+        "push.freeStamina3": true,
+        "clanWarStartScreen": true,
+        "clanWarPlanScreen": true,
+        "skinShopSavedSkin": 58,
+        "_truncatedKeys": 7,
+        "_totalKeys": 19
+      }
+    },
+    "settingsSet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611031237_tower_session.json",
+        "capturedAt": "2026-11-03T05:33:25.114Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "battleSettings": "{\"adventure\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"adventure_boss\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"boss\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"bossFight\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"brawls\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_boss\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_pvp\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_trainings_hero\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"clan_trainings_titan\":{\"auto\":{\"value\":true,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"core\":{\"auto\":{\"value\":false,\"canUpdateAfterBattle\":true},\"fast\":{\"value\":false,\"canUpdateAfterBattle\":true}},\"default\":{\"auto\":{\"value\":true,\"... [truncated 3406 chars]"
+      },
+      "response": {
+        "response": null
+      }
+    },
+    "settings_getAccount": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "playerPlatforms": "[\"webgl\"]",
+        "registrationPlatform": "webgl"
+      }
+    },
+    "userActivityMarkers_getKeyValues": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "heroChest_last_ts": "1793656800",
+        "magicTower_last_reset_ts": "1793656800",
+        "boss_last_ts": "1793484000"
+      }
+    },
+    "userGetAvailableAvatars": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        {
+          "_truncatedArrayItems": 85,
+          "_totalLength": 90
+        }
+      ]
+    },
+    "userGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "id": "1216438103",
+        "accountId": "105000000000000213256070",
+        "name": "VplGhost",
+        "lastLoginTime": "1793593122",
+        "serverId": "1431",
+        "level": "78",
+        "clanId": "305081",
+        "clanRole": "3",
+        "avatarId": "146",
+        "borderId": 127493,
+        "isChatModerator": false,
+        "frameId": 3,
+        "_truncatedKeys": 17,
+        "_totalKeys": 29
+      }
+    },
+    "userGetInfoByIds": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:50.847Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "ids": [
+          "1214920823"
+        ]
+      },
+      "response": {
+        "users": [
+          {
+            "id": "1214920823",
+            "accountId": "102000000000000212067633",
+            "name": "Pavel362",
+            "lastLoginTime": "1793593740",
+            "serverId": "1410",
+            "level": "90",
+            "clanId": "100752873",
+            "clanRole": "3",
+            "avatarId": "11271",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 2,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          }
+        ]
+      }
+    },
+    "user_getNextDayTime": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "ts": 1793656800
+      }
+    },
+    "user_isEnableIdfa": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "enable": false
+      }
+    }
+  }
+}

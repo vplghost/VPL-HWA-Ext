@@ -1,0 +1,1250 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "tower-frontier",
+  "description": "Campaign missions/raids, Eternal Story (Frontier), Adventure, IsometricRPG, Town Gate, Hero Story",
+  "methodCount": 20,
+  "methods": {
+    "IsometricRPG_getMapState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:21:13.413Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": 17
+      },
+      "response": {
+        "mapId": 17,
+        "timeStamp": 0,
+        "data": []
+      }
+    },
+    "adventureGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "response": null
+      }
+    },
+    "eternalStory_autoFight": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611231422_frontier.json",
+        "capturedAt": "2026-11-23T07:19:07.775Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "hero_packs": [
+          [
+            79,
+            72,
+            16,
+            54,
+            60
+          ]
+        ]
+      },
+      "response": {
+        "reward": {
+          "coin": {
+            "23": 1000
+          }
+        },
+        "state": {
+          "mission": {
+            "position": 252,
+            "preset_id": 124,
+            "defender_packs": [
+              [
+                {
+                  "id": 2,
+                  "level": 120,
+                  "color": 11,
+                  "star": 5,
+                  "power": 41288,
+                  "skinData": "[Object(3 keys)]",
+                  "talisman": "[Object(3 keys)]"
+                },
+                {
+                  "id": 24,
+                  "level": 120,
+                  "color": 11,
+                  "star": 5,
+                  "power": 45387,
+                  "skinData": "[Object(3 keys)]",
+                  "talisman": "[Object(3 keys)]"
+                },
+                {
+                  "id": 25,
+                  "level": 120,
+                  "color": 11,
+                  "star": 5,
+                  "power": 41666,
+                  "skinData": "[Object(3 keys)]",
+                  "talisman": "[Object(3 keys)]"
+                },
+                {
+                  "id": 37,
+                  "level": 120,
+                  "color": 11,
+                  "star": 5,
+                  "power": 40446,
+                  "skinData": "[Object(3 keys)]",
+                  "talisman": "[Object(3 keys)]"
+                },
+                {
+                  "id": 49,
+                  "level": 120,
+                  "color": 11,
+                  "star": 5,
+                  "power": 41057,
+                  "skinData": "[Object(3 keys)]",
+                  "talisman": "[Object(3 keys)]"
+                }
+              ]
+            ],
+            "reward": {
+              "coin": {
+                "23": 1000
+              }
+            },
+            "world": 3
+          },
+          "skip": null
+        },
+        "lost_battle": null
+      }
+    },
+    "eternalStory_collectChest": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211627._claim_rewards.json",
+        "capturedAt": "2026-11-21T09:26:29.708Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "reward": {
+          "coin": {
+            "23": 4983
+          }
+        },
+        "collected_from": 1795191677,
+        "collected_to": 1795253189
+      }
+    },
+    "eternalStory_getChest": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:16.757Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "reward": {
+          "coin": {
+            "23": 3490
+          }
+        },
+        "filled_in_percents": 49,
+        "collected_at": 1795191677
+      }
+    },
+    "eternalStory_getState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:16.757Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "hero_packs": null
+      },
+      "response": {
+        "mission": {
+          "position": 26,
+          "preset_id": 123,
+          "defender_packs": [
+            [
+              {
+                "id": 32,
+                "level": 111,
+                "color": 11,
+                "star": 5,
+                "power": 37538,
+                "skinData": {
+                  "id": 81,
+                  "rank": 0,
+                  "color": 0
+                },
+                "talisman": null
+              },
+              {
+                "id": 35,
+                "level": 111,
+                "color": 11,
+                "star": 5,
+                "power": 37357,
+                "skinData": {
+                  "id": 74,
+                  "rank": 0,
+                  "color": 0
+                },
+                "talisman": null
+              },
+              {
+                "id": 41,
+                "level": 111,
+                "color": 11,
+                "star": 5,
+                "power": 38314,
+                "skinData": {
+                  "id": 90,
+                  "rank": 0,
+                  "color": 0
+                },
+                "talisman": null
+              },
+              {
+                "id": 43,
+                "level": 111,
+                "color": 11,
+                "star": 5,
+                "power": 37312,
+                "skinData": {
+                  "id": 326,
+                  "rank": 0,
+                  "color": 0
+                },
+                "talisman": null
+              },
+              {
+                "id": 52,
+                "level": 111,
+                "color": 11,
+                "star": 5,
+                "power": 37552,
+                "skinData": {
+                  "id": 293,
+                  "rank": 0,
+                  "color": 0
+                },
+                "talisman": null
+              }
+            ]
+          ],
+          "reward": {
+            "coin": {
+              "23": 1000
+            }
+          },
+          "world": 1
+        },
+        "skip": null
+      }
+    },
+    "getChapters": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "completedChapters": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          {
+            "_truncatedArrayItems": 4,
+            "_totalLength": 9
+          }
+        ],
+        "allChaptersCompleted": true,
+        "quests": [
+          {
+            "id": 49,
+            "state": "completed",
+            "progress": 2,
+            "completionCount": 1
+          },
+          {
+            "id": 50,
+            "state": "completed",
+            "progress": 1,
+            "completionCount": 1
+          },
+          {
+            "id": 51,
+            "state": "completed",
+            "progress": 1,
+            "completionCount": 1
+          },
+          {
+            "id": 52,
+            "state": "completed",
+            "progress": 1,
+            "completionCount": 1
+          },
+          {
+            "id": 53,
+            "state": "completed",
+            "progress": 1,
+            "completionCount": 1
+          },
+          {
+            "_truncatedArrayItems": 63,
+            "_totalLength": 68
+          }
+        ]
+      }
+    },
+    "getMaps": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.314Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "maps": [
+          {
+            "mapId": "0279e473-01af-4dab-8d07-86c1a2d3f9e6",
+            "mapTemplateId": 8,
+            "serverId": 1252
+          },
+          {
+            "mapId": "6096c758-fa0a-498b-af44-a82a4081a460",
+            "mapTemplateId": 8,
+            "serverId": 1464
+          },
+          {
+            "mapId": "76bcaf6a-3fbf-4740-a344-73360df761ab",
+            "mapTemplateId": 8,
+            "serverId": 1251
+          },
+          {
+            "mapId": "9d0ed3ea-4f65-4c65-8cb1-3807277d261c",
+            "mapTemplateId": 8,
+            "serverId": 1201
+          },
+          {
+            "mapId": "c068d0f1-7f37-44ce-8999-00c70957ec78",
+            "mapTemplateId": 8,
+            "serverId": 141
+          },
+          {
+            "_truncatedArrayItems": 185,
+            "_totalLength": 190
+          }
+        ]
+      }
+    },
+    "getUserProgress": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:19.674Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "progress": {
+          "score": 123700
+        },
+        "chestNumbers": [
+          1,
+          2
+        ]
+      }
+    },
+    "heroStoryChapter_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "available": [],
+        "farmed": [
+          7,
+          8,
+          37,
+          38,
+          43,
+          {
+            "_truncatedArrayItems": 5,
+            "_totalLength": 10
+          }
+        ]
+      }
+    },
+    "isometricRPG_getFarmedMapObjects": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:21:13.413Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": 17
+      },
+      "response": {
+        "mapId": 17,
+        "objects": []
+      }
+    },
+    "missionEnd": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151543_manual_campain.json",
+        "capturedAt": "2026-11-15T08:43:50.098Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "id": 190,
+        "result": {
+          "win": true,
+          "stars": 3
+        },
+        "progress": [
+          {
+            "defenders": {
+              "heroes": {},
+              "input": []
+            },
+            "attackers": {
+              "heroes": {
+                "16": {
+                  "isDead": false,
+                  "hp": 144299,
+                  "energy": 332
+                },
+                "54": {
+                  "isDead": false,
+                  "hp": 99484,
+                  "energy": 400
+                },
+                "60": {
+                  "isDead": false,
+                  "hp": 104974,
+                  "energy": 564
+                },
+                "72": {
+                  "isDead": false,
+                  "hp": 114237,
+                  "energy": 132
+                },
+                "79": {
+                  "isDead": false,
+                  "hp": 172378,
+                  "energy": 1000
+                }
+              },
+              "input": []
+            },
+            "duration": 29.8093363329,
+            "seed": 2232998840
+          },
+          {
+            "defenders": {
+              "heroes": {},
+              "input": []
+            },
+            "attackers": {
+              "heroes": {
+                "16": {
+                  "isDead": false,
+                  "hp": 144893,
+                  "energy": 554
+                },
+                "54": {
+                  "isDead": false,
+                  "hp": 110317,
+                  "energy": 500
+                },
+                "60": {
+                  "isDead": false,
+                  "hp": 104974,
+                  "energy": 364
+                },
+                "72": {
+                  "isDead": false,
+                  "hp": 112611,
+                  "energy": 300
+                },
+                "79": {
+                  "isDead": false,
+                  "hp": 134120,
+                  "energy": 100
+                }
+              },
+              "input": []
+            },
+            "duration": 20.7514880004,
+            "seed": 2232998841
+          },
+          {
+            "defenders": {
+              "heroes": {},
+              "input": []
+            },
+            "attackers": {
+              "heroes": {
+                "16": {
+                  "isDead": false,
+                  "hp": 119774,
+                  "energy": 278
+                },
+                "54": {
+                  "isDead": false,
+                  "hp": 44231,
+                  "energy": 1000
+                },
+                "60": {
+                  "isDead": false,
+                  "hp": 104974,
+                  "energy": 164
+                },
+                "72": {
+                  "isDead": false,
+                  "hp": 25226,
+                  "energy": 836
+                },
+                "79": {
+                  "isDead": false,
+                  "hp": 102678,
+                  "energy": 400
+                }
+              },
+              "input": []
+            },
+            "duration": 42.4993264283,
+            "seed": 2232998842
+          }
+        ]
+      },
+      "response": {
+        "rewards": {
+          "experience": 30,
+          "heroXp": {
+            "16": 810,
+            "54": 810,
+            "60": 810,
+            "72": 810,
+            "79": 810
+          },
+          "fragmentScroll": {
+            "158": 1,
+            "192": 1,
+            "205": 1
+          },
+          "fragmentHero": {
+            "32": 1
+          },
+          "consumable": {
+            "10": 1
+          },
+          "gold": 6201
+        },
+        "videoAvailable": false
+      }
+    },
+    "missionGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 600,
+          "stars": 3,
+          "triesSpent": 0,
+          "resetToday": 0
+        },
+        {
+          "id": 601,
+          "stars": 3,
+          "triesSpent": 0,
+          "resetToday": 0
+        },
+        {
+          "id": 603,
+          "stars": 3,
+          "triesSpent": 0,
+          "resetToday": 0
+        },
+        {
+          "id": 610,
+          "stars": 3,
+          "triesSpent": 0,
+          "resetToday": 0
+        },
+        {
+          "id": 609,
+          "stars": 1,
+          "triesSpent": 0,
+          "resetToday": 0
+        },
+        {
+          "_truncatedArrayItems": 189,
+          "_totalLength": 194
+        }
+      ]
+    },
+    "missionRaid": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611092009_raid_for_item.json",
+        "capturedAt": "2026-11-09T13:08:56.934Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "id": 135,
+        "times": 1
+      },
+      "response": {
+        "0": {
+          "gold": 1521,
+          "experience": 8
+        },
+        "raid": {
+          "consumable": {
+            "9": 2,
+            "10": 2
+          }
+        }
+      }
+    },
+    "missionStart": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151543_manual_campain.json",
+        "capturedAt": "2026-11-15T08:42:29.081Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "id": 190,
+        "heroes": [
+          79,
+          72,
+          16,
+          54,
+          60
+        ]
+      },
+      "response": {
+        "userId": "1216438103",
+        "typeId": 190,
+        "attackers": {
+          "16": {
+            "id": 16,
+            "xp": 861198,
+            "level": 85,
+            "color": 11,
+            "slots": {
+              "1": 0
+            },
+            "skills": {
+              "290": 85,
+              "291": 85,
+              "292": 85,
+              "293": 85
+            },
+            "power": 42211,
+            "star": 4,
+            "runes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "hero_runes": [
+              30,
+              15,
+              10,
+              40,
+              40
+            ],
+            "skins": {
+              "16": 32,
+              "58": 41
+            },
+            "currentSkin": 58,
+            "_truncatedKeys": 21,
+            "_totalKeys": 33
+          },
+          "54": {
+            "id": 54,
+            "xp": 861195,
+            "level": 85,
+            "color": 11,
+            "slots": [],
+            "skills": {
+              "320": 85,
+              "321": 85,
+              "322": 85,
+              "323": 85
+            },
+            "power": 26069,
+            "star": 3,
+            "runes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "hero_runes": {
+              "0": 2,
+              "1": 1,
+              "4": 10
+            },
+            "skins": {
+              "242": 28
+            },
+            "currentSkin": 242,
+            "_truncatedKeys": 21,
+            "_totalKeys": 33
+          },
+          "60": {
+            "id": 60,
+            "xp": 861248,
+            "level": 85,
+            "color": 10,
+            "slots": [],
+            "skills": {
+              "350": 85,
+              "351": 85,
+              "352": 85,
+              "353": 85
+            },
+            "power": 24367,
+            "star": 3,
+            "runes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "hero_runes": [
+              19,
+              5
+            ],
+            "skins": {
+              "303": 23
+            },
+            "currentSkin": 303,
+            "_truncatedKeys": 21,
+            "_totalKeys": 33
+          },
+          "72": {
+            "id": 72,
+            "xp": 866078,
+            "level": 85,
+            "color": 8,
+            "slots": [],
+            "skills": {
+              "410": 80,
+              "411": 80,
+              "412": 80,
+              "413": 70
+            },
+            "power": 22997,
+            "star": 4,
+            "runes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "hero_runes": [
+              10,
+              10,
+              15
+            ],
+            "skins": {
+              "435": 22
+            },
+            "currentSkin": 435,
+            "_truncatedKeys": 21,
+            "_totalKeys": 33
+          },
+          "79": {
+            "id": 79,
+            "xp": 863960,
+            "level": 85,
+            "color": 9,
+            "slots": {
+              "1": 0,
+              "2": 0
+            },
+            "skills": {
+              "472": 80,
+              "473": 80,
+              "474": 75,
+              "475": 75
+            },
+            "power": 30238,
+            "star": 5,
+            "runes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "hero_runes": [
+              20,
+              20,
+              20,
+              20,
+              30
+            ],
+            "skins": {
+              "489": 29
+            },
+            "currentSkin": 489,
+            "_truncatedKeys": 22,
+            "_totalKeys": 34
+          }
+        },
+        "defenders": [
+          [
+            {
+              "id": 1051,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": {
+                "1052": 120
+              },
+              "power": 36606,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 17,
+              "_totalKeys": 29
+            },
+            {
+              "id": 1050,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": [],
+              "power": 36379,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 16,
+              "_totalKeys": 28
+            },
+            {
+              "id": 1055,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": {
+                "1058": 120
+              },
+              "power": 40400,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 16,
+              "_totalKeys": 28
+            }
+          ],
+          [
+            {
+              "id": 1051,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": {
+                "1052": 120
+              },
+              "power": 36606,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 17,
+              "_totalKeys": 29
+            },
+            {
+              "id": 1050,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": [],
+              "power": 36379,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 16,
+              "_totalKeys": 28
+            },
+            {
+              "id": 1054,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": [],
+              "power": 38918,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 18,
+              "_totalKeys": 30
+            },
+            {
+              "id": 32,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": {
+                "160": 120,
+                "161": 120,
+                "162": 120,
+                "163": 120
+              },
+              "power": 41066,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 20,
+              "_totalKeys": 32
+            }
+          ],
+          [
+            {
+              "id": 1057,
+              "xp": 2948945,
+              "level": 120,
+              "color": 15,
+              "slots": [],
+              "skills": {
+                "1063": 120,
+                "1064": 120
+              },
+              "power": 53637,
+              "star": "6",
+              "runes": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "hero_runes": [],
+              "skins": [],
+              "currentSkin": 0,
+              "_truncatedKeys": 21,
+              "_totalKeys": 33
+            }
+          ]
+        ],
+        "effects": [],
+        "reward": {
+          "experience": 30,
+          "heroXp": {
+            "16": 810,
+            "54": 810,
+            "60": 810,
+            "72": 810,
+            "79": 810
+          },
+          "fragmentScroll": {
+            "158": 1,
+            "192": 1,
+            "205": 1
+          },
+          "fragmentHero": {
+            "32": 1
+          },
+          "consumable": {
+            "10": 1
+          },
+          "gold": 6201
+        },
+        "startTime": 1794732148,
+        "seed": 2232998840,
+        "type": "mission",
+        "battleFeatures": [
+          "battleFeature_202",
+          "battleFeature_204",
+          "battleFeature_207"
+        ],
+        "battleEffects": {
+          "LightTitanShield": 1,
+          "Buff_Duplicate": 71,
+          "StatUp": 5,
+          "AntimagePassive": 7,
+          "EnergyWarlockDamageRetarget": 9,
+          "Levitation": 251,
+          "Curse": 11,
+          "Hero500MUlt": 441,
+          "Hero500MArmorDebuff": 13,
+          "AstarothResurrect": 35,
+          "RufusResurrect": 36,
+          "MorriganResurrect": 37,
+          "_truncatedKeys": 431,
+          "_totalKeys": 443
+        }
+      }
+    },
+    "mission_raid": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611112019_campain_raid_errors.json",
+        "capturedAt": "2026-11-11T13:19:02.585Z",
+        "status": 200,
+        "hasResponse": false,
+        "hasError": true,
+        "truncated": false
+      },
+      "args": {
+        "missionId": 162,
+        "times": 1
+      },
+      "response": null
+    },
+    "modularAdventure_getStates": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "adventureId": 18
+      },
+      "response": [
+        {
+          "adventureId": 18,
+          "modulePath": [
+            "0"
+          ],
+          "state": 3
+        },
+        {
+          "adventureId": 18,
+          "modulePath": [
+            "0",
+            "0"
+          ],
+          "state": 3
+        },
+        {
+          "adventureId": 18,
+          "modulePath": [
+            "0",
+            "0",
+            "0"
+          ],
+          "state": 3
+        },
+        {
+          "adventureId": 18,
+          "modulePath": [
+            "0",
+            "0",
+            "1"
+          ],
+          "state": 3
+        },
+        {
+          "adventureId": 18,
+          "modulePath": [
+            "0",
+            "1"
+          ],
+          "state": 3
+        },
+        {
+          "_truncatedArrayItems": 90,
+          "_totalLength": 95
+        }
+      ]
+    },
+    "playable_getAvailable": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611092009_raid_for_item.json",
+        "capturedAt": "2026-11-09T13:08:56.934Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "townGate_getLastMinigame": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "mapId": 6,
+        "towerId": 28,
+        "rewardClaimed": true
+      }
+    },
+    "worldStars_getAvailable": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 1,
+          "passed": true
+        },
+        {
+          "id": 2,
+          "passed": true
+        },
+        {
+          "id": 3,
+          "passed": true
+        },
+        {
+          "id": 4,
+          "passed": true
+        },
+        {
+          "id": 5,
+          "passed": true
+        },
+        {
+          "_truncatedArrayItems": 7,
+          "_totalLength": 12
+        }
+      ]
+    }
+  }
+}

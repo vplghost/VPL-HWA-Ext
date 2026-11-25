@@ -1,0 +1,67 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "city-buildings-research",
+  "description": "City research start, completion, and speedup",
+  "methodCount": 3,
+  "methods": {
+    "completeResearch": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091653_research.json",
+        "capturedAt": "2026-11-09T09:52:18.188Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "researchId": 139,
+        "level": 1,
+        "completeDate": 1794217937596
+      },
+      "response": {}
+    },
+    "speedUpResearchWithResources": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151039_user_speedup.json",
+        "capturedAt": "2026-11-15T03:39:32.755Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "researchId": 122,
+        "resourcesToSpend": [
+          {
+            "type": "speedUpResearch",
+            "id": 1,
+            "amount": 3
+          }
+        ],
+        "resourcesToReward": [],
+        "speedUpDate": 1794713971852,
+        "nextLevel": 4
+      },
+      "response": {}
+    },
+    "startResearch": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611091653_research.json",
+        "capturedAt": "2026-11-09T09:53:35.956Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "researchId": 143,
+        "nextLevel": 1,
+        "startDate": 1794218015445,
+        "durationMs": 28544000,
+        "queueNumber": 0
+      },
+      "response": {}
+    }
+  }
+}

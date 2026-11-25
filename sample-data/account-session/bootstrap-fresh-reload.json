@@ -1,0 +1,913 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "account-session",
+  "description": "Login, migrations, remoteConfig, splitGetMap, time sync, server list, game info, stashClient",
+  "methodCount": 15,
+  "methods": {
+    "applyMigrationsBeforeInit": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {}
+    },
+    "getGameInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:04.455Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "networkIdent": "android",
+        "version": "1.292.100",
+        "accountId": "105000000000000213256070",
+        "userId": 1216438103,
+        "buildUrl": "https://cdn.hero-wars-alliance.com/build/release/501713fd-ba23-437b-912c-39bf4a1d0006",
+        "loadingAssets": {
+          "css": [],
+          "js": [
+            "launcher.js",
+            "Build/ee1497d41d5ec19f51f73b817f3bba08.loader.js",
+            "StreamingAssets/build-info.js"
+          ],
+          "deferredJs": [
+            "paho-mqtt-min.js"
+          ]
+        }
+      }
+    },
+    "getInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "clanId": 305081
+      },
+      "response": {
+        "eventId": 18,
+        "battleId": 52,
+        "battleNumber": 4,
+        "battleEndTime": 1794189600,
+        "roundId": 331,
+        "roundNumber": 1,
+        "roundEndTime": 1793671200,
+        "league": 58,
+        "battlesPerSeason": 4,
+        "personalRequirementsIsSatisfied": true,
+        "guildRequirementsIsSatisfied": true,
+        "numActiveUsers": 5,
+        "_truncatedKeys": 4,
+        "_totalKeys": 16
+      }
+    },
+    "getPushdCredentials": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "type": "pushD",
+        "networkIdent": "an",
+        "applicationId": "com.nexters.titanhunters",
+        "accountId": "105000000000000213256070",
+        "authToken": "1793594172:PZrreWEP:olBEgShhSXV5l1w5XRdT+Q",
+        "host": "emqx-ext.hwmb.prod.nexters.team",
+        "port": "443",
+        "wssHost": "emqx-hwmb-wss.nextersglobal.com/mqtt",
+        "token": "[REDACTED]",
+        "topics": [
+          "hwm/all",
+          "hwm/account/105000000000000213256070",
+          "hwm/user/1216438103"
+        ]
+      }
+    },
+    "getTime": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": 1793594170
+    },
+    "indexGet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "deviceId": "3b87b92d-5828-42d3-9ff9-56ca73d52296",
+        "hash": "ebb22592897e597c92458033c7cd0f4c",
+        "variant": "webgl"
+      },
+      "response": {
+        "staticVersionUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/",
+        "assetLib": {
+          "asset": {
+            "font": [],
+            "gui": [],
+            "rsx": {
+              "battle_interface": {
+                "ident": "battle_interface",
+                "asset": "battle_interface.rsx",
+                "mandatory": 1,
+                "permanent": 1,
+                "mobile_priority": 0
+              },
+              "boss_icons": {
+                "ident": "boss_icons",
+                "asset": "boss_icons.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "boss_map_cave": {
+                "ident": "boss_map_cave",
+                "asset": "boss_map_cave.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "boss_map_lava": {
+                "ident": "boss_map_lava",
+                "asset": "boss_map_lava.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "boss_map_ork": {
+                "ident": "boss_map_ork",
+                "asset": "boss_map_ork.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "clan_icons": {
+                "ident": "clan_icons",
+                "asset": "clan_icons.rsx",
+                "mandatory": 1,
+                "permanent": 1,
+                "mobile_priority": 10
+              },
+              "clan_war_dialog_bg.rsx": {
+                "ident": "clan_war_dialog_bg.rsx",
+                "asset": "clan_war_dialog_bg.rsx",
+                "mandatory": 0,
+                "permanent": 1,
+                "mobile_priority": 0
+              },
+              "common_dungeon_fx.rsx": {
+                "ident": "common_dungeon_fx.rsx",
+                "asset": "common_dungeon_fx.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "common_fx.rsx": {
+                "ident": "common_fx.rsx",
+                "asset": "common_fx.rsx",
+                "mandatory": 1,
+                "permanent": 1,
+                "mobile_priority": 0
+              },
+              "dialog_basic": {
+                "ident": "dialog_basic",
+                "asset": "dialog_basic.rsx",
+                "mandatory": 1,
+                "permanent": 1,
+                "mobile_priority": 0
+              },
+              "dialog_battle_defeat": {
+                "ident": "dialog_battle_defeat",
+                "asset": "dialog_battle_defeat.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "dialog_boss": {
+                "ident": "dialog_boss",
+                "asset": "dialog_boss.rsx",
+                "mandatory": 0,
+                "permanent": 0,
+                "mobile_priority": 0
+              },
+              "_truncatedKeys": 11,
+              "_totalKeys": 23
+            },
+            "mandatory": {
+              "bundleiconsharedassets": {
+                "ident": "bundleiconsharedassets",
+                "asset": "bundleiconsharedassets.unity3d",
+                "mandatory": 1,
+                "priority": 0
+              },
+              "textmeshprofonts": {
+                "ident": "textmeshprofonts",
+                "asset": "textmeshprofonts.unity3d",
+                "mandatory": 1,
+                "priority": 0
+              }
+            }
+          }
+        },
+        "syncSystem": {
+          "version": 2
+        },
+        "clientConfig": {
+          "applePlugins": "1",
+          "bloomreach": "1",
+          "embrace": {
+            "enabled": 1,
+            "percent": 100
+          },
+          "performanceProfileSettings": {
+            "enabled": true,
+            "version": 2,
+            "detectionOnLaunch": true,
+            "settingsPopup": false,
+            "defaultProfile": 0,
+            "webProfile": 2,
+            "ramIos": [
+              3,
+              5
+            ],
+            "ramAn": [
+              5,
+              8
+            ]
+          },
+          "rpcTransportTest": {
+            "name": "test2",
+            "version": 1,
+            "groups": [
+              {
+                "clientType": "httpClient",
+                "params": {
+                  "timeoutSec": 45
+                }
+              },
+              {
+                "clientType": "httpClient",
+                "params": {
+                  "timeoutSec": 0
+                }
+              }
+            ]
+          },
+          "syncSystem": "2"
+        },
+        "geoCountry": "VN",
+        "index": {
+          "base": {
+            "hash": "456ba681f9a60b39df741a4dc82a3866",
+            "url": "b527645970cada2b75e2571dedf0e89c/idxcache"
+          },
+          "hash": "6359797b041ac80bcf03d6bc3e87c998",
+          "url": "4064f47bcaccde8d2b0809029ab9dda2/idxcache",
+          "static": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/"
+        },
+        "lib": {
+          "splitlib.json.zip": {
+            "path": "lib",
+            "version": "v0096/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 5761865,
+            "md5": "82d4f62d08b9b8384a622b39e9f228f7",
+            "content": [
+              {
+                "path": "skin.pb",
+                "size": 948408,
+                "md5": "b5dd000599553742cdd3a1a5d0f6fde2"
+              },
+              {
+                "path": "ads_rule.json",
+                "size": 1140,
+                "md5": "c9515984a23b2ab522102c5f19313fd5"
+              },
+              {
+                "path": "hero_synergy.pb",
+                "size": 166,
+                "md5": "a4cf1546168e39f41cdd60921ecc984c"
+              },
+              {
+                "path": "adventure_list.json",
+                "size": 251716,
+                "md5": "38bd6a714fd6de9c6a2429194849b088"
+              },
+              {
+                "path": "adventure_phase.json",
+                "size": 400158,
+                "md5": "12a7f5109da36b42a8eef3bc17e85664"
+              },
+              {
+                "_truncatedArrayItems": 416,
+                "_totalLength": 421
+              }
+            ]
+          },
+          "static": "https://heroesmobile-a-cdn.nextersglobal.com/v/an/1.292.0/"
+        },
+        "locale": {
+          "de.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 738943,
+            "md5": "f4f9ed7de516b4c193b222b436b45b79"
+          },
+          "en.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 682400,
+            "md5": "2782c27650e41028a814c8708ba73d19"
+          },
+          "es.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 712710,
+            "md5": "c219fed6b3b529f1be5d7d1b0e5249b9"
+          },
+          "fr.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 742172,
+            "md5": "be01b29b819daa47c49e527793882b29"
+          },
+          "it.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 709064,
+            "md5": "50a6737694adf333070d26b347eaa979"
+          },
+          "ja.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 763504,
+            "md5": "35ed39ec154c8385d57dd8448c8266ee"
+          },
+          "ko.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 728222,
+            "md5": "9669fa37e515e182f220f7a378649e72"
+          },
+          "pl.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 760086,
+            "md5": "799bff955448e396cc1ac1e25460165b"
+          },
+          "pt.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 714705,
+            "md5": "4c816270f79021ffc17316ac81345258"
+          },
+          "ru.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 822031,
+            "md5": "7053f8411bb19c087a73283004d2eb02"
+          },
+          "tr.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 469920,
+            "md5": "cd4f74173c13d416c766f87e87c3052e"
+          },
+          "zh-cn.json.gz": {
+            "path": "locale",
+            "version": "v0092/4064f47bcaccde8d2b0809029ab9dda2",
+            "size": 733076,
+            "md5": "b0dfbf58d32bda9b79fab95a19f75563"
+          },
+          "_truncatedKeys": 2,
+          "_totalKeys": 14
+        },
+        "currentVersionIndex": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/4064f47bcaccde8d2b0809029ab9dda2/index.latest.json.gz?hash=f4cbb6e323a7715aac6715fa2a3850ba"
+      }
+    },
+    "misc_preLogin": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "language": "en",
+        "device": {
+          "name": "Chrome 156.0.0.0",
+          "ram": 687,
+          "width": 1078,
+          "height": 492,
+          "os": "Windows 10"
+        }
+      },
+      "response": []
+    },
+    "mobileLogin": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "language": "en",
+        "deviceId": "3b87b92d-5828-42d3-9ff9-56ca73d52296",
+        "adid": null,
+        "sessionId": "[REDACTED]",
+        "device": {
+          "name": "Chrome 156.0.0.0",
+          "ram": 783,
+          "width": 1078,
+          "height": 492,
+          "os": "Windows 10"
+        },
+        "store": "web",
+        "reason": "start",
+        "att": "3",
+        "appsflyerId": "aaf1ad22-e047-4cb5-b5fe-660695867e2b-p"
+      },
+      "response": {
+        "userId": "1216438103",
+        "sessionId": "[REDACTED]",
+        "supportLink": {
+          "token": "[REDACTED]",
+          "ts": 1793594172
+        }
+      }
+    },
+    "onLogin": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "response": null,
+        "billingsUpdate": {
+          "billings": [
+            {
+              "id": 10703
+            },
+            {
+              "id": 20704
+            },
+            {
+              "id": 51596
+            },
+            {
+              "id": 51597
+            },
+            {
+              "id": 51600
+            },
+            {
+              "_truncatedArrayItems": 48,
+              "_totalLength": 53
+            }
+          ]
+        },
+        "quests": [
+          {
+            "id": 1020640,
+            "state": 2,
+            "progress": 4,
+            "multiplier": 0,
+            "reward": {
+              "consumable": {
+                "51": 50
+              }
+            }
+          }
+        ]
+      }
+    },
+    "remoteConfigInit": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "lang": "en"
+      },
+      "response": {
+        "gameTimeShift": "02:00:00",
+        "index": {
+          "id": "trunk:0.856.0:1793584800::en",
+          "configs": {
+            "renderBudget": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/renderBudget/c262c7e87e994dabc314fc105da30dcf.json",
+              "preload": false
+            },
+            "newbieGiftsSettings": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/newbieGiftsSettings/a0ac391822ea0dda12601cd47c59080d.json",
+              "preload": true
+            },
+            "battlepassView": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/battlepassView/78b35da4dd37ae98b332ff4ca243c5b6.json",
+              "preload": false
+            },
+            "gachaChest": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/gachaChest/1b496cf537476fd65da88642e429ef96.json",
+              "preload": false
+            },
+            "building": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/building/6079f8c3c425fbbef1d81bc09c925533.json",
+              "preload": false
+            },
+            "squadHeroSkillLevel": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/squadHeroSkillLevel/ff6d84751eb070073484dc2e1c8c6b2d.json",
+              "preload": false
+            },
+            "gachaPool": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/gachaPool/47eca306e4e417dfd1b13b16cebd3cf4.json",
+              "preload": false
+            },
+            "clanVersusLeagues": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/clanVersusLeagues/7d0155f835e13ae7fe159107bbe6e325.json",
+              "preload": false
+            },
+            "selectableOfferView": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/selectableOfferView/9753a3c8b87582837014bee05b475e3b.json",
+              "preload": false
+            },
+            "clanVersusBattles": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/clanVersusBattles/fcd648c3b3e80b1483aa75f00e7859bf.json",
+              "preload": false
+            },
+            "unitSkill": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/unitSkill/e55584b6c05632f1390d59fbf4c9d620.json",
+              "preload": false
+            },
+            "startPopup": {
+              "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/startPopup/db78fadf5cee2f70428659721710fe71.json",
+              "preload": false
+            },
+            "_truncatedKeys": 309,
+            "_totalKeys": 321
+          }
+        }
+      }
+    },
+    "remoteConfigProvideArchive": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "lang": "en"
+      },
+      "response": {
+        "url": "https://hwmb-remote-config-cdn.nextersglobal.com/archive/trunk/0.856.0/13e5c59a57b7d57317477f6424b08c56.zip",
+        "content": [
+          "config/battlepassPointsView/00660d4576a938d6ebc285cf34ae2d39.json",
+          "config/fortressFeatureFlags/abcfb25b163f99e93ee9ac0860a7abc9.json",
+          "config/ratingFeatureFlags/01f329328cc115c5a08a2dc03f147c7e.json",
+          "config/dailyQuestsChestConfig/5c0b6b42db510719d76b7c8da22ecfce.json",
+          "config/battleUnit/e48747c3931aff33509484623800923c.json",
+          {
+            "_truncatedArrayItems": 24,
+            "_totalLength": 29
+          }
+        ],
+        "index": {
+          "newbieGiftsSettings": {
+            "files": [
+              "config/newbieGiftsSettings/a0ac391822ea0dda12601cd47c59080d.json"
+            ]
+          },
+          "battlepassTrackResourceView": {
+            "files": [
+              "config/battlepassTrackResourceView/6aae213e90e8c38ffdc798571105239e.json"
+            ]
+          },
+          "legacyLocalization": {
+            "files": [
+              "config/legacyLocalization_en/e7a7355b5275e01ef3ca94e48bc0f202.json"
+            ]
+          },
+          "battlepassPointsView": {
+            "files": [
+              "config/battlepassPointsView/00660d4576a938d6ebc285cf34ae2d39.json"
+            ]
+          },
+          "ratingFeatureFlags": {
+            "files": [
+              "config/ratingFeatureFlags/01f329328cc115c5a08a2dc03f147c7e.json"
+            ]
+          },
+          "fortressFeatureFlags": {
+            "files": [
+              "config/fortressFeatureFlags/abcfb25b163f99e93ee9ac0860a7abc9.json"
+            ]
+          },
+          "heroFaction": {
+            "files": [
+              "config/heroFaction/3e18c341f2710dfe3ae5d1dc6e78c1f8.json"
+            ]
+          },
+          "dailyQuestsChestConfig": {
+            "files": [
+              "config/dailyQuestsChestConfig/5c0b6b42db510719d76b7c8da22ecfce.json",
+              "config/dailyQuestsChestConfig/df5aaecaf141038cbd66bf600efd17bd.json"
+            ]
+          },
+          "artifact": {
+            "files": [
+              "config/artifact/3231f98546da038f74aa095ba3673f22.json"
+            ]
+          },
+          "battleFeatures": {
+            "files": [
+              "config/battleFeatures/a5d2fdb6fdf3c4f24aab61bcce64c994.json"
+            ]
+          },
+          "featureFlags": {
+            "files": [
+              "config/featureFlags/607b34c0320dfbbd96596541aedc7b40.json",
+              "config/featureFlags/6716464a40b0905e8515d5978f4039a1.json",
+              "config/featureFlags/f623e96e1aafe322b8acf3b36e525a51.json",
+              "config/featureFlags/da4129b3dd2dda36a086b8d49c70a468.json",
+              "config/featureFlags/f7ced70ad7b28a7913360291b96ca15c.json",
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          },
+          "artifactType": {
+            "files": [
+              "config/artifactType/e849feb94a294121d69855b76602653d.json"
+            ]
+          },
+          "_truncatedKeys": 11,
+          "_totalKeys": 23
+        }
+      }
+    },
+    "serverGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "users": [
+          {
+            "id": "1216438103",
+            "accountId": "105000000000000213256070",
+            "name": "VplGhost",
+            "lastLoginTime": "1793594172",
+            "serverId": "1431",
+            "level": "78",
+            "clanId": "305081",
+            "clanRole": "3",
+            "avatarId": "146",
+            "borderId": 127493,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          }
+        ],
+        "servers": [
+          {
+            "id": 1,
+            "locales": [
+              "all"
+            ],
+            "serverNum": 1,
+            "region": 1
+          },
+          {
+            "id": 2,
+            "locales": [
+              "all"
+            ],
+            "serverNum": 2,
+            "region": 1
+          },
+          {
+            "id": 4,
+            "locales": [
+              "all"
+            ],
+            "serverNum": 4,
+            "region": 1
+          },
+          {
+            "id": 11,
+            "locales": [
+              "all"
+            ],
+            "serverNum": 11,
+            "region": 1
+          },
+          {
+            "id": 27,
+            "locales": [
+              "all"
+            ],
+            "serverNum": 27,
+            "region": 1
+          },
+          {
+            "_truncatedArrayItems": 186,
+            "_totalLength": 191
+          }
+        ]
+      }
+    },
+    "splitGetMap": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:09.673Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "webshop_rule": "webshop_rule_split_391.json"
+      }
+    },
+    "stashClient": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "data": [
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 0,
+              "actionType": "aghanimStore",
+              "actionSubtype": "tryRequestCatalog",
+              "value": 0,
+              "params": null,
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 2,
+              "actionType": "aghanimStore",
+              "actionSubtype": "requestCatalog",
+              "value": 1,
+              "params": "Items 1",
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 2,
+              "actionType": "splitlib_cache",
+              "actionSubtype": "loaded",
+              "value": 0,
+              "params": null,
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 2,
+              "actionType": "splitlib_cache",
+              "actionSubtype": "missing",
+              "value": 0,
+              "params": null,
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 2,
+              "actionType": "splitlib_cache",
+              "actionSubtype": "targets",
+              "value": 0,
+              "params": null,
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "type": ".client.techMetrics",
+            "params": {
+              "playTime": 2,
+              "actionType": "splitlib_cache",
+              "actionSubtype": "hits",
+              "value": 0,
+              "params": null,
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.292.1000"
+            }
+          },
+          {
+            "_truncatedArrayItems": 10,
+            "_totalLength": 16
+          }
+        ]
+      },
+      "response": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        {
+          "_truncatedArrayItems": 11,
+          "_totalLength": 16
+        }
+      ]
+    },
+    "tutorialGetInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": 9999,
+        "4": 9999,
+        "6": 9999,
+        "7": 9999,
+        "10": 0,
+        "12": 0,
+        "14": 9999,
+        "15": 0,
+        "16": 9999,
+        "17": 9999,
+        "18": 9999,
+        "19": 0,
+        "_truncatedKeys": 21,
+        "_totalKeys": 33
+      }
+    }
+  }
+}

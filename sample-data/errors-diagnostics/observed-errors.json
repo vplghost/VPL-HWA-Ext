@@ -1,0 +1,444 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "errors-diagnostics",
+  "domain": "errors-diagnostics",
+  "description": "Observed RPC errors (e.g. gather deadlock, invalid heroes, healing/claim errors) and diagnostic notes",
+  "rpcErrorCount": 19,
+  "markdownNoteCount": 3,
+  "rpcErrors": {
+    "artifact_expeditionStart::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151008_expedition.json",
+        "capturedAt": "2026-11-15T03:07:46.115Z",
+        "rpcName": "artifact_expeditionStart",
+        "status": 200
+      },
+      "args": {
+        "expeditionId": 0,
+        "heroes": [
+          16,
+          54,
+          79,
+          501
+        ]
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "hero count in /app/classes/RPCRequest.php (1324); rpc=`artifact_expeditionStart`",
+        "call": {
+          "name": "artifact_expeditionStart",
+          "args": {
+            "expeditionId": 0,
+            "heroes": [
+              16,
+              54,
+              79,
+              501
+            ]
+          },
+          "ident": "00b089a82fad6b180000389583b3d543"
+        }
+      }
+    },
+    "cinemaGetCounters::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "cinemaGetCounters",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "dailyBonusFarm::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "dailyBonusFarm",
+        "status": 200
+      },
+      "args": {
+        "vip": 1
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "dailyBonusGetInfo::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "dailyBonusGetInfo",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "getMarches::400": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151747_guild_start_rally.json",
+        "capturedAt": "2026-11-15T10:46:57.693Z",
+        "rpcName": "getMarches",
+        "status": 400
+      },
+      "args": {},
+      "error": {
+        "status": 400,
+        "outcome": "failed"
+      }
+    },
+    "getRallyAttackDefenders::500": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141518_boss_search.json",
+        "capturedAt": "2026-11-14T08:17:32.600Z",
+        "rpcName": "getRallyAttackDefenders",
+        "status": 500
+      },
+      "args": {
+        "PredefinedSquadId": 85
+      },
+      "error": {
+        "status": 500,
+        "outcome": "completed"
+      }
+    },
+    "getRallyById::400": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611151747_guild_start_rally.json",
+        "capturedAt": "2026-11-15T10:46:57.693Z",
+        "rpcName": "getRallyById",
+        "status": 400
+      },
+      "args": {
+        "rallyId": "e17fd7d2-974d-4f69-9c47-dbdef86709c6"
+      },
+      "error": {
+        "status": 400,
+        "outcome": "failed"
+      }
+    },
+    "inventoryGet::ArgumentError": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611112019_campain_raid_errors.json",
+        "capturedAt": "2026-11-11T13:19:02.585Z",
+        "rpcName": "inventoryGet",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "ArgumentError",
+        "description": "mandatory argument `id` is not specified in /app/classes/user/rpc/Mission.php (78); rpc=`mission_raid`",
+        "call": {
+          "feature": "campaign",
+          "name": "mission_raid",
+          "args": {
+            "missionId": 162,
+            "times": 1
+          },
+          "ident": "000f08b3d49f02fa00056f40ba99d938"
+        }
+      }
+    },
+    "inventoryGet::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "inventoryGet",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "mailGetAll::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "mailGetAll",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "mission_raid::ArgumentError": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611112019_campain_raid_errors.json",
+        "capturedAt": "2026-11-11T13:19:02.585Z",
+        "rpcName": "mission_raid",
+        "status": 200
+      },
+      "args": {
+        "missionId": 162,
+        "times": 1
+      },
+      "error": {
+        "name": "ArgumentError",
+        "description": "mandatory argument `id` is not specified in /app/classes/user/rpc/Mission.php (78); rpc=`mission_raid`",
+        "call": {
+          "feature": "campaign",
+          "name": "mission_raid",
+          "args": {
+            "missionId": 162,
+            "times": 1
+          },
+          "ident": "000f08b3d49f02fa00056f40ba99d938"
+        }
+      }
+    },
+    "offerFarmReward::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "offerFarmReward",
+        "status": 200
+      },
+      "args": {
+        "offerId": 1000016958
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "offerGetAll::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "offerGetAll",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "questGetAll::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "questGetAll",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "readAndClaimAll::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "readAndClaimAll",
+        "status": 200
+      },
+      "args": {
+        "types": [
+          "soloMobAttackResult",
+          "rallyMobAttackResult",
+          "rallyCancelled",
+          "mineGatheringResult",
+          "outpostScoutResult",
+          "outpostAttackResult",
+          {
+            "_truncatedArrayItems": 7,
+            "_totalLength": 13
+          }
+        ]
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "refillableGetAll::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "refillableGetAll",
+        "status": 200
+      },
+      "args": {
+        "getAt": 1795239820454
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    },
+    "refillable_alchemyUseVideo::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141349_wheel_timer.json",
+        "capturedAt": "2026-11-14T06:49:21.255Z",
+        "rpcName": "refillable_alchemyUseVideo",
+        "status": 200
+      },
+      "args": {
+        "type": "alchemy"
+      },
+      "error": {
+        "name": "NotEnough",
+        "description": "Refillable 53. Has 0 need 1. Last refill 1794613856 now 1794638961 delta 25105 in /app/classes/RPCRequest.php (1324); rpc=`refillable_alchemyUseVideo`",
+        "call": {
+          "name": "refillable_alchemyUseVideo",
+          "args": {
+            "type": "alchemy"
+          },
+          "ident": "000270e8a7052db8005eb1aada0af868"
+        }
+      }
+    },
+    "stashClient::500": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141518_boss_search.json",
+        "capturedAt": "2026-11-14T08:17:32.600Z",
+        "rpcName": "stashClient",
+        "status": 500
+      },
+      "args": {
+        "data": [
+          {
+            "type": ".client.assetLoading",
+            "params": {
+              "playTime": 124,
+              "level": 87,
+              "path": "extends/strategic/monsters/strategic_monster_flame_colossus.img",
+              "lastCompletedTutorialTaskId": "30680",
+              "appVersion": "1.293.1010"
+            }
+          }
+        ]
+      },
+      "error": {
+        "status": 500,
+        "outcome": "completed"
+      }
+    },
+    "userGetInfo::NotEnough": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611211244_claim_all_error.json",
+        "capturedAt": "2026-11-21T05:43:40.938Z",
+        "rpcName": "userGetInfo",
+        "status": 200
+      },
+      "args": {},
+      "error": {
+        "name": "NotEnough",
+        "description": "vip level in /app/classes/RPCRequest.php (1325); rpc=`dailyBonus_farm`",
+        "call": {
+          "name": "dailyBonusFarm",
+          "args": {
+            "vip": 1
+          },
+          "ident": "0008085e28e6f513006f16b90fbd86d8"
+        }
+      }
+    }
+  },
+  "markdownNotes": {
+    "artifact_levelup_error.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/artifact_levelup_error.md",
+        "kind": "markdown-error-note"
+      },
+      "excerpt": "Request\r\n{\"calls\":[{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"000196b991d4105e00cd667f1c6b2f08\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"00a09b5494ca33b800008e620bb4bfe2\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"00031f7a976434be006f5b273c8a1af8\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"006980e299e0d0380001cea5fa6cfdc5\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"0020b9de9c9fd668000f2f773a350545\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"001fcd2432d08b18001b0e08a8665428\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"0031b8919629a9580006add1e50d3891\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"000224fe5de042ff000ee8757d9f3d18\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"000df966f170837d0009283a631fda9e\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"003e60d5efab52680000edce2a032c2a\"},{\"name\":\"artifact_levelUp\",\"args\":{\"heroId\":502,\"slotId\":1},\"ident\":\"000d8729e8ab047a0019bee1c3ab1878\"},{\"name\":\"artifact_levelUp\",\"args\":{\"h"
+    },
+    "extension-console-error.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/extension-console-error.md",
+        "kind": "markdown-error-note"
+      },
+      "excerpt": "Extension version: v0.10.45\r\n7popup-BOdUqmcj.js:1 TypeError: r.find is not a function\r\n    at Object.ie [as extractEventGoals] (popup-BOdUqmcj.js:12:19151)\r\n    at Yt.fn (popup-BOdUqmcj.js:20:190376)\r\n    at Pe (popup-BOdUqmcj.js:1:7942)\r\n    at get value (popup-BOdUqmcj.js:1:18974)\r\n    at Proxy.<anonymous> (popup-BOdUqmcj.js:20:191468)\r\n    at wi (popup-BOdUqmcj.js:1:45767)\r\n    at we.s [as fn] (popup-BOdUqmcj.js:1:55277)\r\n    at we.run (popup-BOdUqmcj.js:1:6552)\r\n    at we.runIfDirty (popup-BOdUqmcj.js:1:6862)\r\n    at rn (popup-BOdUqmcj.js:1:20850)"
+    },
+    "healing_errors.md": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/healing_errors.md",
+        "kind": "markdown-error-note"
+      },
+      "excerpt": "Lỗi sau khi sử dụng nút heal trên dashboard.\r\nUI popup ngay sau nhấn có hiện timer, nhưng khi reload thì không thực sự có thực hiện heal\r\nSau khi F5 vẫn lỗi\r\n\r\n\r\nTypeError: ((intermediate value) || []).map is not a function\r\nTypeError: j.value?.mobConfigIds?.includes is not a function\r\nTypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))\r\nTypeError: ((intermediate value) || []).filter is not a function\r\nTypeError: ((intermediate value) || []).flatMap is not a function\r\nTypeError: (n || []).filter is not a function\r\nTypeError: ((intermediate value) || []).flatMap is not a function\r\nTypeError: ((intermediate value) || []).filter is not a function\r\nTypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))\r\n\r\n\r\nNếu reload lại extension trong extension manager, toàn bộ header bị mất kèm lỗi:\r\nTypeError: ((intermediate value) || []).filter is not a function\r\nTypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))\r\nTypeError: ((intermediate value) || []).map is not a function\r\nTypeError: ((intermediate value) || []).filter is not a function\r\nTypeError: j.value?.mobConfigIds?.includes is not a function\r\nTypeError: "
+    }
+  }
+}

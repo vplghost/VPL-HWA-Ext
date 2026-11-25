@@ -1,0 +1,559 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "world-map-gather-rally",
+  "description": "World Map mob/monster search & attack, marches, incoming marches, routes, map chunks, markers",
+  "methodCount": 11,
+  "methods": {
+    "attackMob": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611051201_attack_monster.json",
+        "capturedAt": "2026-11-05T05:00:08.658Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mobId": "d500baf7-0aca-4e63-bc2e-be3ae60e00a7",
+        "squad": {
+          "heroes": [
+            {
+              "heroId": 16
+            },
+            {
+              "heroId": 2
+            },
+            {
+              "heroId": 79
+            },
+            {
+              "heroId": 70
+            },
+            {
+              "heroId": 60
+            }
+          ],
+          "units": [
+            {
+              "unitId": 7,
+              "count": 1615
+            },
+            {
+              "unitId": 17,
+              "count": 1615
+            },
+            {
+              "unitId": 27,
+              "count": 1615
+            }
+          ]
+        }
+      },
+      "response": {
+        "squadId": "176c38ee-6f32-4452-b8cd-7b07b75e8251",
+        "route": {
+          "routeId": "dd8a21b6-8029-444d-8643-36f46ebbf24b",
+          "from": {
+            "coordinates": {
+              "x": 606,
+              "y": 376
+            },
+            "objectSizeId": 6,
+            "object": {
+              "objectId": "00000000-0000-0000-0000-0000575f8148",
+              "objectType": "outpost",
+              "objectSizeId": 6
+            }
+          },
+          "to": {
+            "coordinates": {
+              "x": 516,
+              "y": 386
+            },
+            "objectSizeId": 3,
+            "object": {
+              "objectId": "d500baf7-0aca-4e63-bc2e-be3ae60e00a7",
+              "objectType": "soloMob",
+              "objectSizeId": 3
+            }
+          },
+          "startedAt": 1793854809805,
+          "duration": 45730,
+          "durationMs": 45730
+        }
+      }
+    },
+    "getChunks": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021203_rally_turnback.json",
+        "capturedAt": "2026-11-02T05:03:30.508Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "lod": 1,
+        "chunkCoordinates": [
+          {
+            "x": 63,
+            "y": 21
+          }
+        ]
+      },
+      "response": {
+        "chunks": [
+          {
+            "chunkCoordinates": {
+              "x": 63,
+              "y": 21
+            },
+            "mobs": [
+              {
+                "mobId": "aedc3d80-3c04-4215-b1e8-0d23f058149f",
+                "mobType": "rally",
+                "mobConfigId": 70,
+                "coordinates": {
+                  "x": 633,
+                  "y": 215
+                },
+                "expiresAt": 1793607257865
+              }
+            ],
+            "mines": [
+              {
+                "mineId": "ee3ffb05-0858-41f4-b3b8-679d567f21a3",
+                "mineConfigId": 32,
+                "coordinates": {
+                  "x": 639,
+                  "y": 210
+                },
+                "resourceAmount": 3000000,
+                "expiresAt": 1793626751532
+              }
+            ],
+            "outposts": [],
+            "updatedAt": 1793595812207
+          }
+        ],
+        "routes": []
+      }
+    },
+    "getIncomingMarches": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "attacks": [],
+        "scouts": [],
+        "clans": []
+      }
+    },
+    "getMarches": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:21.005Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "marches": {
+          "waitingForRallyStart": [],
+          "moveToRallyLeader": [],
+          "moveToTargetInSolo": [],
+          "moveToTargetInRally": [],
+          "interactionWithTarget": [
+            {
+              "squadId": "18ac4091-ff6b-4aa9-a797-a2d66ff5f200",
+              "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+              "target": {
+                "objectId": "f0ae8a5b-5276-4072-94e2-d0bc1166f227",
+                "objectType": "mine",
+                "objectConfigId": 85,
+                "coordinates": {
+                  "x": 435,
+                  "y": 301
+                }
+              },
+              "targetId": "f0ae8a5b-5276-4072-94e2-d0bc1166f227",
+              "targetType": "mine",
+              "targetCoordinates": {
+                "x": 435,
+                "y": 301
+              },
+              "startedAt": 1793593005852,
+              "duration": 23566379,
+              "durationMs": 23566379
+            },
+            {
+              "squadId": "76bdc966-4ebb-4023-ad12-14303ffbd895",
+              "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+              "target": {
+                "objectId": "e0630201-fe40-475f-8bcc-307194ec4d97",
+                "objectType": "mine",
+                "objectConfigId": 65,
+                "coordinates": {
+                  "x": 453,
+                  "y": 305
+                }
+              },
+              "targetId": "e0630201-fe40-475f-8bcc-307194ec4d97",
+              "targetType": "mine",
+              "targetCoordinates": {
+                "x": 453,
+                "y": 305
+              },
+              "startedAt": 1793592986591,
+              "duration": 21792119,
+              "durationMs": 21792119
+            }
+          ],
+          "returnToOutpost": []
+        },
+        "scoutMarches": {
+          "moveToTargetInSolo": [],
+          "returnToOutpost": []
+        },
+        "clans": []
+      }
+    },
+    "getMarkers": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:34.574Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "clanMarkers": [
+          {
+            "id": "e40f1060-e0e2-4a2a-a21e-62a4e54d6ff4",
+            "type": "clanAssemblyPoint",
+            "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+            "coordinates": {
+              "x": 617,
+              "y": 380
+            },
+            "version": 1,
+            "updatedAt": 1793880050786
+          }
+        ],
+        "userMarkers": []
+      }
+    },
+    "getMobSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "maxDefeatedSoloMobLevel": 17,
+        "maxDefeatedRallyMobLevel": 21,
+        "rallyAttempts": {
+          "leaderUsedAttempts": 2,
+          "memberUsedAttempts": 0,
+          "lastResetAt": 1793584800000
+        },
+        "dailyRallyStatistics": {
+          "leaderWins": 2,
+          "memberWins": 0,
+          "lastResetAt": 1793584800000
+        },
+        "killedRallyMobsConfigIds": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          {
+            "_truncatedArrayItems": 16,
+            "_totalLength": 21
+          }
+        ],
+        "killedSoloMobsConfigIds": [
+          53,
+          54,
+          55,
+          56,
+          57,
+          {
+            "_truncatedArrayItems": 12,
+            "_totalLength": 17
+          }
+        ]
+      }
+    },
+    "getPage": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:20.665Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "limit": 10,
+        "cursor": null
+      },
+      "response": {
+        "reports": [
+          {
+            "id": "faf54fce-b738-4274-98a9-dd5b26d06e0e",
+            "createdAt": 1793593286044,
+            "expiresAt": 1794198086044,
+            "read": false,
+            "claimedReward": false,
+            "type": "rallyMobAttackResult",
+            "payload": {
+              "mobConfigId": 79,
+              "result": "win"
+            }
+          },
+          {
+            "id": "5de03a1d-4bf6-4abb-bb58-c6e9787312c4",
+            "createdAt": 1793592938950,
+            "expiresAt": 1794197738950,
+            "read": true,
+            "claimedReward": true,
+            "type": "rallyMobAttackResult",
+            "payload": {
+              "mobConfigId": 79,
+              "result": "win"
+            }
+          }
+        ]
+      }
+    },
+    "getRoutesByIds": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021203_rally_turnback.json",
+        "capturedAt": "2026-11-02T05:03:08.292Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "routeIds": [
+          "714451f1-fb2c-47a0-8d62-3c8224c35072"
+        ]
+      },
+      "response": {
+        "routes": [
+          {
+            "routeId": "714451f1-fb2c-47a0-8d62-3c8224c35072",
+            "type": "toTargetRallyPve",
+            "version": 1,
+            "leader": {
+              "userId": 1216284094,
+              "name": "HelpfulJester76",
+              "avatarId": 30,
+              "clanId": 305228
+            },
+            "strongestHeroId": 7,
+            "members": [
+              {
+                "userId": 1216402968,
+                "avatarId": 30,
+                "level": 79,
+                "name": "FrugalBasketbal",
+                "serverId": 1431,
+                "flagId": 17
+              },
+              {
+                "userId": 1216398132,
+                "avatarId": 11271,
+                "avatarBorderId": 1,
+                "level": 54,
+                "name": "Key Silvermoon",
+                "serverId": 1431,
+                "flagId": 105
+              }
+            ],
+            "from": {
+              "coordinates": {
+                "x": 708,
+                "y": 298
+              },
+              "objectSizeId": 6
+            },
+            "to": {
+              "coordinates": {
+                "x": 650,
+                "y": 246
+              },
+              "objectSizeId": 4
+            },
+            "startedAt": 1793595787976,
+            "duration": 39509,
+            "durationMs": 39509
+          }
+        ],
+        "clans": [
+          {
+            "clanId": 305228,
+            "tag": "xxx",
+            "icon": {
+              "flagColor1": 19,
+              "flagColor2": 13,
+              "flagShape": 14,
+              "iconColor": 0,
+              "iconShape": 39
+            },
+            "name": "ポイ活用"
+          }
+        ]
+      }
+    },
+    "getSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "persistentBonuses": [
+          13,
+          14,
+          15,
+          16,
+          17,
+          {
+            "_truncatedArrayItems": 3161,
+            "_totalLength": 3166
+          }
+        ],
+        "temporaryBonuses": [],
+        "scheduledBonuses": [],
+        "stackableBonuses": [],
+        "clanBonuses": {
+          "persistentBonuses": [],
+          "temporaryBonuses": [],
+          "scheduledBonuses": [],
+          "stackableBonuses": [
+            {
+              "id": 5519,
+              "counter": 2
+            },
+            {
+              "id": 5514,
+              "counter": 1
+            },
+            {
+              "id": 5516,
+              "counter": 1
+            },
+            {
+              "id": 5521,
+              "counter": 1
+            },
+            {
+              "id": 5515,
+              "counter": 1
+            }
+          ]
+        }
+      }
+    },
+    "robberGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "robbers": []
+      }
+    },
+    "searchMob": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611051201_attack_monster.json",
+        "capturedAt": "2026-11-05T05:00:02.578Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "mapId": "5929afff-c3a6-495d-8f2c-37e7c509a4dc",
+        "mobConfigIds": [
+          37,
+          67
+        ],
+        "mobType": "solo",
+        "center": {
+          "x": 606,
+          "y": 376
+        }
+      },
+      "response": {
+        "mobs": [
+          {
+            "mobId": "d500baf7-0aca-4e63-bc2e-be3ae60e00a7",
+            "coordinates": {
+              "x": 516,
+              "y": 386
+            }
+          },
+          {
+            "mobId": "1f78acff-dd64-4e2d-8344-c3ddad42b1a5",
+            "coordinates": {
+              "x": 684,
+              "y": 315
+            }
+          },
+          {
+            "mobId": "b8b55e0d-21dd-4c04-9381-9bfad1a57b4b",
+            "coordinates": {
+              "x": 646,
+              "y": 510
+            }
+          },
+          {
+            "mobId": "08c4024b-54c0-47f5-82d7-92677fad12e4",
+            "coordinates": {
+              "x": 716,
+              "y": 282
+            }
+          },
+          {
+            "mobId": "a382926e-bdb5-4c2a-904a-e2968bdb8d2d",
+            "coordinates": {
+              "x": 632,
+              "y": 231
+            }
+          }
+        ]
+      }
+    }
+  }
+}

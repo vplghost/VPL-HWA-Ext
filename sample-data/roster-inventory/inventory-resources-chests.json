@@ -1,0 +1,2923 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "roster-inventory",
+  "description": "Inventory, crafting, shops, refillables, lootboxes, lucky chest, gacha",
+  "methodCount": 17,
+  "methods": {
+    "claimChest": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021116.json",
+        "capturedAt": "2026-11-02T04:16:11.131Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "chestNumber": 2
+      },
+      "response": {}
+    },
+    "gachaGetLiveOpsState": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-logs-2026-11-21T04-22-53-975Z.json",
+        "capturedAt": "2026-11-21T04:19:16.757Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "gachas": [
+          {
+            "gachaId": 9,
+            "totalSpinCount": 0,
+            "spinCountSinceLastBonus": 0,
+            "lastBonusId": -1,
+            "dailySpinsRemaining": 0,
+            "expiresAt": "2026-11-23T02:00:00Z",
+            "freeSpinAvailable": false
+          }
+        ]
+      }
+    },
+    "gacha_getInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "2": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "3": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "4": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "5": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "6": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "7": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "8": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "9": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "10": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "11": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "12": {
+          "rollCount": 0,
+          "rolledReward": []
+        },
+        "_truncatedKeys": 3,
+        "_totalKeys": 15
+      }
+    },
+    "getInventory": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "inventory": {
+          "items": [
+            {
+              "type": "material",
+              "id": 3,
+              "quantity": 19724511
+            },
+            {
+              "type": "material",
+              "id": 4,
+              "quantity": 73646292
+            },
+            {
+              "type": "material",
+              "id": 5,
+              "quantity": 73577123
+            },
+            {
+              "type": "material",
+              "id": 1,
+              "quantity": 1233358
+            },
+            {
+              "type": "speedUpUnitTraining",
+              "id": 1,
+              "quantity": 505
+            },
+            {
+              "_truncatedArrayItems": 38,
+              "_totalLength": 43
+            }
+          ]
+        }
+      }
+    },
+    "getLuckyChestInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "openedChestsCount": 31,
+        "openedChestsAtCurrentLevel": 10,
+        "openCost": [
+          {
+            "id": 14,
+            "type": "material",
+            "amount": 10
+          }
+        ],
+        "chestLevel": 3
+      }
+    },
+    "inventoryCraftFragments": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611092009_raid_for_item.json",
+        "capturedAt": "2026-11-09T13:09:12.613Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "gear",
+        "libId": 57,
+        "amount": 1
+      },
+      "response": {
+        "gear": {
+          "57": 1
+        }
+      }
+    },
+    "inventoryCraftRecipe": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611092009_raid_for_item.json",
+        "capturedAt": "2026-11-09T13:09:13.888Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "gear",
+        "libId": 65,
+        "amount": 1
+      },
+      "response": {
+        "gear": {
+          "65": 1
+        }
+      }
+    },
+    "inventoryGet": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "consumable": {
+          "5": 1,
+          "6": 2,
+          "7": 36,
+          "9": 351,
+          "10": 261,
+          "11": 5,
+          "12": 1,
+          "14": 1,
+          "15": 4,
+          "16": 6,
+          "20": 11650,
+          "24": 1226,
+          "_truncatedKeys": 32,
+          "_totalKeys": 44
+        },
+        "gear": {
+          "1": 66,
+          "2": 30,
+          "3": 31,
+          "4": 21,
+          "5": 18,
+          "7": 30,
+          "8": 10,
+          "9": 27,
+          "10": 48,
+          "11": 45,
+          "12": 37,
+          "13": 16,
+          "_truncatedKeys": 30,
+          "_totalKeys": 42
+        },
+        "fragmentHero": {
+          "1": 73,
+          "2": 219,
+          "3": 71,
+          "4": 45,
+          "5": 41,
+          "6": 40,
+          "7": 13,
+          "8": 19,
+          "9": 34,
+          "10": 5,
+          "11": 12,
+          "12": 4,
+          "_truncatedKeys": 51,
+          "_totalKeys": 63
+        },
+        "coin": {
+          "1": 1157,
+          "2": 368,
+          "3": 2466,
+          "4": 7400,
+          "8": 410,
+          "9": 460,
+          "10": 150,
+          "13": 17,
+          "14": 4170,
+          "18": 437,
+          "19": 375,
+          "20": 2410,
+          "_truncatedKeys": 16,
+          "_totalKeys": 28
+        },
+        "scroll": {
+          "141": 13,
+          "142": 20,
+          "143": 9,
+          "144": 5,
+          "145": 1,
+          "146": 2,
+          "162": 1,
+          "163": 1
+        },
+        "fragmentTitan": {
+          "4000": 472,
+          "4001": 50,
+          "4002": 29,
+          "4004": 137,
+          "4010": 124,
+          "4011": 127,
+          "4012": 90,
+          "4020": 160,
+          "4021": 147,
+          "4022": 27,
+          "4023": 250,
+          "4031": 83,
+          "_truncatedKeys": 6,
+          "_totalKeys": 18
+        },
+        "fragmentScroll": {
+          "146": 8,
+          "148": 3,
+          "149": 16,
+          "150": 19,
+          "151": 19,
+          "152": 19,
+          "153": 21,
+          "154": 32,
+          "155": 16,
+          "156": 69,
+          "157": 52,
+          "158": 115,
+          "_truncatedKeys": 25,
+          "_totalKeys": 37
+        },
+        "fragmentGear": {
+          "47": 65,
+          "48": 116,
+          "49": 30,
+          "50": 8,
+          "57": 3,
+          "58": 1,
+          "59": 3,
+          "60": 2,
+          "61": 109,
+          "62": 33,
+          "74": 5,
+          "75": 7,
+          "_truncatedKeys": 22,
+          "_totalKeys": 34
+        },
+        "fragmentArtifact": {
+          "1001": 1,
+          "1002": 2,
+          "1003": 2,
+          "1004": 4,
+          "1006": 1,
+          "1007": 1,
+          "1008": 1,
+          "1009": 1,
+          "1012": 1,
+          "1013": 2,
+          "1015": 1,
+          "1016": 3,
+          "_truncatedKeys": 70,
+          "_totalKeys": 82
+        },
+        "border": {
+          "1": 1,
+          "127493": 1
+        },
+        "patron": {
+          "1": 98,
+          "3": 1,
+          "5": 1,
+          "13": 2,
+          "57": 30
+        },
+        "fragmentSkin": {
+          "1004": 1
+        }
+      }
+    },
+    "inventory_use": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021227_titan_dungeon.json",
+        "capturedAt": "2026-11-02T05:27:19.442Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "libId": 20,
+        "amount": 590,
+        "params": {
+          "unitId": 4052
+        }
+      },
+      "response": {
+        "titanXp": {
+          "4052": 590
+        },
+        "consumable": {
+          "24": 136
+        }
+      }
+    },
+    "openLootboxChanced": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021658_chest_opening.json",
+        "capturedAt": "2026-11-02T09:58:01.565Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "lootBoxId": 25,
+        "amount": 12,
+        "reward": []
+      },
+      "response": {
+        "reward": [
+          {
+            "type": "fragmentHero",
+            "id": 72,
+            "amount": 20
+          },
+          {
+            "type": "fragmentHero",
+            "id": 67,
+            "amount": 15
+          },
+          {
+            "type": "fragmentHero",
+            "id": 71,
+            "amount": 10
+          },
+          {
+            "type": "fragmentHero",
+            "id": 51,
+            "amount": 5
+          },
+          {
+            "type": "fragmentHero",
+            "id": 2,
+            "amount": 20
+          },
+          {
+            "_truncatedArrayItems": 1,
+            "_totalLength": 6
+          }
+        ]
+      }
+    },
+    "refillableGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "getAt": 1793594175080
+      },
+      "response": {
+        "refillables": [
+          {
+            "refillableId": 2,
+            "amount": 154,
+            "lastRefillAt": 1793594067225
+          },
+          {
+            "refillableId": 6,
+            "amount": 1,
+            "lastRefillAt": 1791000381978
+          }
+        ]
+      }
+    },
+    "refillable_alchemyUseVideo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611140651_roll_wheel_emerald_exchange.json",
+        "capturedAt": "2026-11-13T23:50:55.872Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "alchemy"
+      },
+      "response": [
+        {
+          "reward": {
+            "gold": 73800
+          },
+          "crit": 2
+        }
+      ]
+    },
+    "refillable_getAllUpgrades": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "refillable_skillpointsUseVideo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611181243_free_skillpoints.json",
+        "capturedAt": "2026-11-18T05:43:33.578Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "type": "skill_points"
+      },
+      "response": {
+        "skill_point": 10
+      }
+    },
+    "shopBuy": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611152215_buy_from_event_shop.json",
+        "capturedAt": "2026-11-15T15:15:28.011Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "shopId": 1000261,
+        "slot": 35,
+        "reward": {
+          "gear": {
+            "100": 1
+          }
+        },
+        "amount": 1
+      },
+      "response": {
+        "reward": {
+          "gear": {
+            "100": 1
+          }
+        },
+        "slot": {
+          "id": 35,
+          "reward": {
+            "gear": {
+              "100": 1
+            }
+          },
+          "bought": 4,
+          "cost": {
+            "coin": {
+              "40209": 1300
+            }
+          },
+          "uniqId": 0,
+          "limit": 5,
+          "buyRequirement": {
+            "adventureModule": {
+              "adventureId": 30,
+              "state": "done",
+              "modulePath": [
+                0,
+                14
+              ],
+              "moduleNumLocale": 14
+            }
+          }
+        },
+        "refreshTime": 0
+      }
+    },
+    "shopGetMany": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "shopIds": [
+          1000256,
+          1000261,
+          1000262,
+          1000260,
+          1,
+          4,
+          {
+            "_truncatedArrayItems": 10,
+            "_totalLength": 16
+          }
+        ]
+      },
+      "response": {
+        "1": {
+          "id": 1,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "consumable": {
+                  "10": "15"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 30000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "consumable": {
+                  "10": "40"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 80000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "consumable": {
+                  "16": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": "300"
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "29": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 750000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "scroll": {
+                  "145": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 1000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "fragmentGear": {
+                  "58": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 750
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "fragmentGear": {
+                  "56": "3"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 2250
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "consumable": {
+                  "101": "4"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 100
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793602800
+        },
+        "4": {
+          "id": 4,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "64": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "18": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "19": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "11": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "44": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "fragmentHero": {
+                  "55": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "gear": {
+                  "69": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 273
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "gear": {
+                  "75": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 396
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "gear": {
+                  "67": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 322
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "gear": {
+                  "84": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 1287
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "gear": {
+                  "60": "1"
+                }
+              },
+              "bought": 1,
+              "cost": {
+                "coin": {
+                  "1": 149
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "scroll": {
+                  "150": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "1": 363
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 3,
+            "_totalKeys": 15
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "5": {
+          "id": 5,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "60": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "23": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "21": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "25": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "42": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "fragmentHero": {
+                  "54": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "gear": {
+                  "125": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 6525
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "gear": {
+                  "120": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 3600
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "fragmentScroll": {
+                  "191": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 900
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "fragmentGear": {
+                  "177": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 900
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "fragmentScroll": {
+                  "206": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 900
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "coin": {
+                  "40077": "2100"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2": 1250
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "6": {
+          "id": 6,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "5": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "13": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "16": "5"
+                }
+              },
+              "bought": 1,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "36": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "53": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "fragmentHero": {
+                  "26": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "gold": 100000
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 100
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "scroll": {
+                  "150": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 363
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "scroll": {
+                  "162": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 1650
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "gear": {
+                  "91": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 1650
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "fragmentScroll": {
+                  "217": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "3": 820
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "10": {
+          "id": 10,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "27": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 500
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_1"
+              }
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "35": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 500
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_1"
+              }
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "38": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 500
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_1"
+              }
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "28": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 500
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_1"
+              }
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "coin": {
+                  "1010": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 17000
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "consumable": {
+                  "65": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 750
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "consumable": {
+                  "65": "3"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 2000
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "scroll": {
+                  "159": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 1375
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "fragmentGear": {
+                  "170": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 820
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "fragmentGear": {
+                  "171": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 820
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "fragmentGear": {
+                  "172": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "4": 820
+                }
+              },
+              "uniqId": 1,
+              "buyRequirement": null,
+              "clientData": {
+                "slotType": "boss_2"
+              }
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "11": {
+          "id": 11,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "56": "5"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "37": "5"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "39": "5"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "40": "5"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "41": "5"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "coin": {
+                  "20": "500"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 100
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "coin": {
+                  "20": "1000"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 200
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "consumable": {
+                  "20": "300"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 40
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "gold": 250000
+              },
+              "cost": {
+                "coin": {
+                  "105": 45
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "consumable": {
+                  "28": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 225
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "consumable": {
+                  "27": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 130
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "consumable": {
+                  "26": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "105": 80
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 24,
+            "_totalKeys": 36
+          },
+          "availableUntil": 0,
+          "refreshTime": 0
+        },
+        "13": {
+          "id": 13,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "47": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 200
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "consumable": {
+                  "11": "100"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 250
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "consumable": {
+                  "231": "25"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 600
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "consumable": {
+                  "12": "30"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 400
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "500": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 200
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "consumable": {
+                  "232": "25"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 750
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "coin": {
+                  "40077": "1200"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 350
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "coin": {
+                  "40077": "2400"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 500
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "dungeonActivity": 75
+              },
+              "bought": 0,
+              "cost": {
+                "starmoney": 300
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "coin": {
+                  "9": "100"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 500000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "coin": {
+                  "10": "100"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 500000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "coin": {
+                  "8": "100"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "gold": 500000
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 8,
+            "_totalKeys": 20
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "14": {
+          "id": 14,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "49": "8"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 700
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "502": "8"
+                }
+              },
+              "bought": 1,
+              "cost": {
+                "coin": {
+                  "19": 700
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "30": "8"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 700
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "fragmentHero": {
+                  "10": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "consumable": {
+                  "46": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 700
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "consumable": {
+                  "62": "4"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 400
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "consumable": {
+                  "63": "4"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 400
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "consumable": {
+                  "64": "2"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 220
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "coin": {
+                  "14": "300"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 400
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "coin": {
+                  "14": "300"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 400
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "consumable": {
+                  "24": "480"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "consumable": {
+                  "44": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "19": 12500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 1,
+            "_totalKeys": 13
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "15": {
+          "id": 15,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "coin": {
+                  "20": "400"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 300
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "coin": {
+                  "20": "600"
+                }
+              },
+              "bought": 1,
+              "cost": {
+                "coin": {
+                  "21": 450
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "coin": {
+                  "18": "150"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 360
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "consumable": {
+                  "20": "1000"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "fragmentHero": {
+                  "501": "5"
+                }
+              },
+              "bought": 1,
+              "cost": {
+                "coin": {
+                  "21": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "fragmentHero": {
+                  "503": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "fragmentHero": {
+                  "50": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "fragmentHero": {
+                  "45": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "21": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "16": {
+          "id": 16,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "consumable": {
+                  "209": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 1500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "consumable": {
+                  "211": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 1500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "consumable": {
+                  "210": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 1500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "coin": {
+                  "105": "10"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 3
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "coin": {
+                  "105": "100"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 30
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "teleporter": {
+                  "1": "1"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 250
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "border": {
+                  "38": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "border": {
+                  "39": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "border": {
+                  "40": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "border": {
+                  "41": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 500
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "border": {
+                  "5": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 150
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "border": {
+                  "6": 1
+                }
+              },
+              "cost": {
+                "coin": {
+                  "106": 150
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 11,
+            "_totalKeys": 23
+          },
+          "availableUntil": 0,
+          "refreshTime": 0
+        },
+        "1000": {
+          "id": 1000,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "stamina": 12
+              },
+              "cost": {
+                "coin": {
+                  "1000": 1
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "consumable": {
+                  "1001": "2"
+                }
+              },
+              "cost": {
+                "coin": {
+                  "1000": 1
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "starmoney": "30"
+              },
+              "cost": {
+                "coin": {
+                  "1000": 5
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "gold": "75000"
+              },
+              "cost": {
+                "coin": {
+                  "1000": 5
+                }
+              },
+              "bought": 0,
+              "uniqId": 0,
+              "buyRequirement": null
+            }
+          },
+          "availableUntil": 0,
+          "refreshTime": 0
+        },
+        "1001": {
+          "id": 1001,
+          "slots": {
+            "1": {
+              "id": 1,
+              "reward": {
+                "fragmentHero": {
+                  "504": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "2": {
+              "id": 2,
+              "reward": {
+                "fragmentHero": {
+                  "22": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "3": {
+              "id": 3,
+              "reward": {
+                "fragmentHero": {
+                  "51": "5"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 500
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "4": {
+              "id": 4,
+              "reward": {
+                "consumable": {
+                  "280": "3"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 420
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "5": {
+              "id": 5,
+              "reward": {
+                "consumable": {
+                  "339": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 600
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "6": {
+              "id": 6,
+              "reward": {
+                "consumable": {
+                  "282": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 1100
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "7": {
+              "id": 7,
+              "reward": {
+                "gold": 100000
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 100
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "8": {
+              "id": 8,
+              "reward": {
+                "gold": 200000
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 200
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "9": {
+              "id": 9,
+              "reward": {
+                "consumable": {
+                  "51": "10"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 375
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "10": {
+              "id": 10,
+              "reward": {
+                "gear": {
+                  "60": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 149
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "11": {
+              "id": 11,
+              "reward": {
+                "scroll": {
+                  "164": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 1650
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "12": {
+              "id": 12,
+              "reward": {
+                "scroll": {
+                  "151": "1"
+                }
+              },
+              "bought": 0,
+              "cost": {
+                "coin": {
+                  "2006": 363
+                }
+              },
+              "uniqId": 0,
+              "buyRequirement": null
+            },
+            "_truncatedKeys": 5,
+            "_totalKeys": 17
+          },
+          "availableUntil": 0,
+          "refreshTime": 1793628000
+        },
+        "_truncatedKeys": 4,
+        "_totalKeys": 16
+      }
+    },
+    "shopGetNext": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141923_under_attack2.json",
+        "capturedAt": "2026-11-14T12:22:16.074Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "shopId": 10
+      },
+      "response": {
+        "id": 10,
+        "slots": {
+          "1": {
+            "id": 1,
+            "reward": {
+              "fragmentHero": {
+                "27": "5"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 500
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_1"
+            }
+          },
+          "2": {
+            "id": 2,
+            "reward": {
+              "fragmentHero": {
+                "35": "5"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 500
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_1"
+            }
+          },
+          "3": {
+            "id": 3,
+            "reward": {
+              "fragmentHero": {
+                "38": "5"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 500
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_1"
+            }
+          },
+          "4": {
+            "id": 4,
+            "reward": {
+              "fragmentHero": {
+                "28": "5"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 500
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_1"
+            }
+          },
+          "5": {
+            "id": 5,
+            "reward": {
+              "coin": {
+                "1010": "1"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 17000
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "6": {
+            "id": 6,
+            "reward": {
+              "consumable": {
+                "65": "1"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 750
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "7": {
+            "id": 7,
+            "reward": {
+              "consumable": {
+                "65": "3"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 2000
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "8": {
+            "id": 8,
+            "reward": {
+              "gear": {
+                "114": "1"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 5400
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "9": {
+            "id": 9,
+            "reward": {
+              "fragmentGear": {
+                "170": "10"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 820
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "10": {
+            "id": 10,
+            "reward": {
+              "fragmentGear": {
+                "171": "10"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 820
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          },
+          "11": {
+            "id": 11,
+            "reward": {
+              "fragmentGear": {
+                "172": "10"
+              }
+            },
+            "bought": 0,
+            "cost": {
+              "coin": {
+                "4": 820
+              }
+            },
+            "uniqId": 1,
+            "clientData": {
+              "slotType": "boss_2"
+            }
+          }
+        },
+        "availableUntil": 0,
+        "refreshTime": 1794751200
+      }
+    }
+  }
+}

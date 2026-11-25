@@ -1,0 +1,449 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "guild-hydra-war",
+  "description": "Guild Hydra (clanBoss) history, day history, and boss encounters",
+  "methodCount": 7,
+  "methods": {
+    "bossGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 1,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        },
+        {
+          "id": 2,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        },
+        {
+          "id": 3,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        }
+      ]
+    },
+    "bossGetChestInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "starmoneySpent": 3600,
+        "freeChests": {
+          "1": false,
+          "2": false,
+          "3": false
+        }
+      }
+    },
+    "bossGetCurrent": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 1,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        },
+        {
+          "id": 2,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        },
+        {
+          "id": 3,
+          "mapId": 1,
+          "bossMapId": 2,
+          "mayOpenChest": true
+        }
+      ]
+    },
+    "clanBoss_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "headsBestResults": [
+          {
+            "bossHeadId": 1,
+            "damage": 0,
+            "enableRaid": false,
+            "isSelectRaid": false
+          },
+          {
+            "bossHeadId": 2,
+            "damage": 0,
+            "enableRaid": false,
+            "isSelectRaid": false
+          },
+          {
+            "bossHeadId": 3,
+            "damage": 0,
+            "enableRaid": false,
+            "isSelectRaid": false
+          },
+          {
+            "bossHeadId": 4,
+            "damage": 0,
+            "enableRaid": false,
+            "isSelectRaid": false
+          },
+          {
+            "bossHeadId": 5,
+            "damage": 0,
+            "enableRaid": false,
+            "isSelectRaid": false
+          },
+          {
+            "_truncatedArrayItems": 13,
+            "_totalLength": 18
+          }
+        ],
+        "heads": [
+          {
+            "bossHeadId": 1,
+            "heroId": 8013,
+            "attackerId": null,
+            "state": {
+              "isDead": true,
+              "hp": 0,
+              "energy": 0,
+              "maxHp": 5946906
+            }
+          },
+          {
+            "bossHeadId": 2,
+            "heroId": 8011,
+            "attackerId": null,
+            "state": {
+              "isDead": true,
+              "hp": 0,
+              "energy": 0,
+              "maxHp": 5946906
+            }
+          },
+          {
+            "bossHeadId": 3,
+            "heroId": 8012,
+            "attackerId": null,
+            "state": {
+              "isDead": true,
+              "hp": 0,
+              "energy": 0,
+              "maxHp": 5946906
+            }
+          },
+          {
+            "bossHeadId": 4,
+            "heroId": 8014,
+            "attackerId": null,
+            "state": {
+              "isDead": true,
+              "hp": 0,
+              "energy": 0,
+              "maxHp": 5946906
+            }
+          },
+          {
+            "bossHeadId": 5,
+            "heroId": 8015,
+            "attackerId": null,
+            "state": {
+              "isDead": true,
+              "hp": 0,
+              "energy": 0,
+              "maxHp": 5946906
+            }
+          },
+          {
+            "_truncatedArrayItems": 13,
+            "_totalLength": 18
+          }
+        ],
+        "tries": 0,
+        "superTries": 0,
+        "endDay": 1793671200
+      }
+    },
+    "clanBoss_getDayHistory": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:19.674Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "hydraId": 1,
+        "day": 1793498400
+      },
+      "response": {
+        "battles": {
+          "1793501051755570": {
+            "replays": [
+              "1793501051769929943",
+              "1793501051796173025"
+            ],
+            "userId": "1216399799",
+            "headId": "5",
+            "power": 300581,
+            "damage": 5946906,
+            "hpLeft": 0,
+            "startTime": "1793501051"
+          },
+          "1793501187000000": {
+            "replays": [],
+            "userId": 1216399799,
+            "raided": true,
+            "headId": 1,
+            "power": 0,
+            "damage": 5946906,
+            "hpLeft": 0,
+            "startTime": 1793501187
+          },
+          "1793501190000000": {
+            "replays": [],
+            "userId": 1216399799,
+            "raided": true,
+            "headId": 6,
+            "power": 0,
+            "damage": 5946906,
+            "hpLeft": 0,
+            "startTime": 1793501190
+          },
+          "1793505921685540": {
+            "replays": [
+              "1793505921701222233",
+              "1793505921734364448",
+              "1793505921739442787"
+            ],
+            "userId": "1216438103",
+            "headId": "3",
+            "power": 259054,
+            "damage": 4382516,
+            "hpLeft": 1564390,
+            "startTime": "1793505921"
+          },
+          "1793506047272656": {
+            "replays": [
+              "1793506047290273517",
+              "1793506047324438051",
+              "1793506047328685545"
+            ],
+            "userId": "1216438103",
+            "headId": "4",
+            "power": 259054,
+            "damage": 3903831,
+            "hpLeft": 2043075,
+            "startTime": "1793506047"
+          },
+          "1793506170189155": {
+            "replays": [
+              "1793506170205631227",
+              "1793506170245800056",
+              "1793506170249895381"
+            ],
+            "userId": "1216438103",
+            "headId": "2",
+            "power": 252793,
+            "damage": 4795918,
+            "hpLeft": 1150988,
+            "startTime": "1793506170"
+          },
+          "1793508285375750": {
+            "replays": [
+              "1793508285393984356",
+              "1793508285427456833"
+            ],
+            "userId": "1216417802",
+            "headId": "3",
+            "power": 167461,
+            "damage": 1564390,
+            "hpLeft": 0,
+            "startTime": "1793508285"
+          },
+          "1793508545764358": {
+            "replays": [
+              "1793508545779996393",
+              "1793508545811216450"
+            ],
+            "userId": "1216417802",
+            "headId": "2",
+            "power": 164179,
+            "damage": 1150988,
+            "hpLeft": 0,
+            "startTime": "1793508545"
+          },
+          "1793508718546868": {
+            "replays": [
+              "1793508718559939196",
+              "1793508718586056207",
+              "1793508718589648379"
+            ],
+            "userId": "1216417802",
+            "headId": "4",
+            "power": 237312,
+            "damage": 2043075,
+            "hpLeft": 0,
+            "startTime": "1793508718"
+          }
+        },
+        "users": {
+          "1216399799": {
+            "id": "1216399799",
+            "accountId": "101000000000000213226393",
+            "name": "Tiresome Warg o",
+            "lastLoginTime": "1793592541",
+            "serverId": "1431",
+            "level": "87",
+            "clanId": "305081",
+            "clanRole": "3",
+            "avatarId": "30",
+            "borderId": null,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216417802": {
+            "id": "1216417802",
+            "accountId": "102000000000000213240087",
+            "name": "Shadow976521358",
+            "lastLoginTime": "1793575833",
+            "serverId": "1431",
+            "level": "68",
+            "clanId": "305081",
+            "clanRole": "3",
+            "avatarId": "23",
+            "borderId": 1,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          },
+          "1216438103": {
+            "id": "1216438103",
+            "accountId": "105000000000000213256070",
+            "name": "VplGhost",
+            "lastLoginTime": "1793594172",
+            "serverId": "1431",
+            "level": "78",
+            "clanId": "305081",
+            "clanRole": "3",
+            "avatarId": "146",
+            "borderId": 127493,
+            "isChatModerator": false,
+            "frameId": 3,
+            "_truncatedKeys": 4,
+            "_totalKeys": 16
+          }
+        }
+      }
+    },
+    "clanBoss_getHistory": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "history": {
+          "1": [
+            1790992800,
+            1791079200,
+            1791165600,
+            1791252000,
+            1791338400,
+            {
+              "_truncatedArrayItems": 26,
+              "_totalLength": 31
+            }
+          ],
+          "2": [
+            1790992800,
+            1791079200,
+            1791165600,
+            1791252000,
+            1791338400,
+            {
+              "_truncatedArrayItems": 26,
+              "_totalLength": 31
+            }
+          ],
+          "3": [
+            1791079200,
+            1791252000,
+            1791338400,
+            1791424800,
+            1791511200,
+            {
+              "_truncatedArrayItems": 24,
+              "_totalLength": 29
+            }
+          ],
+          "4": [
+            1792029600,
+            1792720800,
+            1792807200,
+            1793584800
+          ],
+          "5": [
+            1793584800
+          ]
+        },
+        "today": 1793584800
+      }
+    },
+    "eventBoss_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    }
+  }
+}

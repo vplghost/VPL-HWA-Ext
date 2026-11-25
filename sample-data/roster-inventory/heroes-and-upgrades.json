@@ -1,0 +1,2766 @@
+{
+  "_schema": "hwa-sample-data/v1",
+  "kind": "rpc-domain",
+  "domain": "roster-inventory",
+  "description": "Hero roster, evolution, promotion, skills, skins, runes, artifacts, talismans, hero chest, hero way",
+  "methodCount": 22,
+  "methods": {
+    "artifactGetChestLevel": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "level": 5,
+        "xp": 534,
+        "starmoneySpent": 0
+      }
+    },
+    "artifact_LevelUpCost": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-20261120165_titan_power_up.json",
+        "capturedAt": "2026-11-20T09:54:11.708Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "unitId": 4013,
+        "artifactId": 13001
+      },
+      "response": {
+        "reward": {
+          "consumable": {
+            "24": 4
+          }
+        }
+      }
+    },
+    "artifact_evolve": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-20261120165_titan_power_up.json",
+        "capturedAt": "2026-11-20T09:55:57.966Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 4024,
+        "slotId": 2
+      },
+      "response": {
+        "reward": {
+          "consumable": {
+            "24": 4
+          }
+        }
+      }
+    },
+    "artifact_expeditionStart": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611141432_start_expedition.json",
+        "capturedAt": "2026-11-14T07:31:23.682Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "expeditionId": 4,
+        "heroes": [
+          15,
+          16,
+          72,
+          2,
+          56
+        ]
+      },
+      "response": {
+        "endTime": 1794641843
+      }
+    },
+    "artifact_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": {
+          "1001": {
+            "level": 5,
+            "star": 1
+          },
+          "2002": {
+            "level": 5,
+            "star": 1
+          },
+          "3002": {
+            "level": 5,
+            "star": 1
+          }
+        },
+        "2": {
+          "1002": {
+            "level": 40,
+            "star": 3
+          },
+          "2006": {
+            "level": 24,
+            "star": 2
+          },
+          "3002": {
+            "level": 23,
+            "star": 2
+          }
+        },
+        "3": {
+          "1003": {
+            "level": 5,
+            "star": 1
+          },
+          "2004": {
+            "level": 5,
+            "star": 1
+          },
+          "3003": {
+            "level": 7,
+            "star": 1
+          }
+        },
+        "4": {
+          "1004": {
+            "level": 25,
+            "star": 3
+          },
+          "2006": {
+            "level": 17,
+            "star": 3
+          },
+          "3002": {
+            "level": 25,
+            "star": 2
+          }
+        },
+        "5": {
+          "1005": {
+            "level": 2,
+            "star": 1
+          },
+          "2003": {
+            "level": 10,
+            "star": 1
+          },
+          "3001": {
+            "level": 10,
+            "star": 1
+          }
+        },
+        "6": {
+          "1006": {
+            "level": 1,
+            "star": 0
+          },
+          "2005": {
+            "level": 1,
+            "star": 0
+          },
+          "3001": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "7": {
+          "1007": {
+            "level": 25,
+            "star": 3
+          },
+          "2005": {
+            "level": 15,
+            "star": 2
+          },
+          "3001": {
+            "level": 16,
+            "star": 2
+          }
+        },
+        "8": {
+          "1008": {
+            "level": 1,
+            "star": 1
+          },
+          "2001": {
+            "level": 1,
+            "star": 0
+          },
+          "3003": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "9": {
+          "1009": {
+            "level": 1,
+            "star": 1
+          },
+          "2002": {
+            "level": 1,
+            "star": 0
+          },
+          "3001": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "10": {
+          "1010": {
+            "level": 1,
+            "star": 0
+          },
+          "2003": {
+            "level": 1,
+            "star": 0
+          },
+          "3001": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "11": {
+          "1011": {
+            "level": 1,
+            "star": 1
+          },
+          "2006": {
+            "level": 1,
+            "star": 0
+          },
+          "3002": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "13": {
+          "1013": {
+            "level": 1,
+            "star": 1
+          },
+          "2003": {
+            "level": 1,
+            "star": 0
+          },
+          "3001": {
+            "level": 1,
+            "star": 0
+          }
+        },
+        "_truncatedKeys": 67,
+        "_totalKeys": 79
+      }
+    },
+    "artifact_getExpeditionCapSession": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "didReachCapYesterday": true
+      }
+    },
+    "artifact_levelUp": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611192352_artifacts_level_up.json",
+        "capturedAt": "2026-11-19T16:51:43.900Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 501,
+        "slotId": 1
+      },
+      "response": {
+        "reward": []
+      }
+    },
+    "getHeroSummary": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "squadHeroSkills": [
+          {
+            "skillId": 1,
+            "level": 2
+          },
+          {
+            "skillId": 2,
+            "level": 2
+          },
+          {
+            "skillId": 3,
+            "level": 1
+          },
+          {
+            "skillId": 4,
+            "level": 1
+          },
+          {
+            "skillId": 5,
+            "level": 1
+          },
+          {
+            "_truncatedArrayItems": 33,
+            "_totalLength": 38
+          }
+        ]
+      }
+    },
+    "heroChest_getInfo": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "opensCount": 69,
+        "factionId": 4,
+        "startRewardLineupCompleted": false,
+        "videoCooldown": 1793596350
+      }
+    },
+    "heroEvolve": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021200_evolution.json",
+        "capturedAt": "2026-11-02T04:59:57.492Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 76
+      },
+      "response": {
+        "response": null,
+        "billingsUpdate": {
+          "billings": [
+            {
+              "id": 10703
+            },
+            {
+              "id": 20704
+            },
+            {
+              "id": 51596
+            },
+            {
+              "id": 51597
+            },
+            {
+              "id": 51600
+            },
+            {
+              "_truncatedArrayItems": 47,
+              "_totalLength": 52
+            }
+          ]
+        },
+        "liveOps_UPDATE_BANK_OFFER": [
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "slots": [
+              {
+                "id": 7,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 8,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 9,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 10,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 11,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_PERIODIC_HERO_OFFER": [
+          {
+            "id": 24,
+            "endTime": 0,
+            "refreshTime": 1793671200,
+            "heroId": 76,
+            "slots": [
+              {
+                "id": 1,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 2,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 3,
+                "bought": false,
+                "heroId": 76
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_OFFER": [
+          {
+            "id": 117,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 123,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 1018,
+            "endTime": 1794189540,
+            "refreshTime": 1793595598,
+            "boughtCount": 0
+          }
+        ],
+        "liveOps_UPDATE_LADDER_OFFER": [
+          {
+            "id": 1088,
+            "endTime": 2071015200,
+            "slots": [
+              {
+                "slotId": 1031,
+                "itemId": 1134,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1030,
+                "itemId": 1130,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1029,
+                "itemId": 1126,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1028,
+                "itemId": 1122,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 1027,
+                "itemId": 1118,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "_truncatedArrayItems": 27,
+                "_totalLength": 32
+              }
+            ]
+          },
+          {
+            "id": 1090,
+            "endTime": 0,
+            "slots": [
+              {
+                "slotId": 1032,
+                "itemId": 1138,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 120,
+                "itemId": 484,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 121,
+                "itemId": 489,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 122,
+                "itemId": 494,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "slotId": 123,
+                "itemId": 499,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              },
+              {
+                "_truncatedArrayItems": 12,
+                "_totalLength": 17
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_LADDER_OFFER": [
+          {
+            "id": 1024,
+            "endTime": 1793757599,
+            "slots": [
+              {
+                "slotId": 16,
+                "itemId": 52,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              }
+            ]
+          },
+          {
+            "id": 1080,
+            "endTime": 1793671140,
+            "slots": [
+              {
+                "slotId": 1021,
+                "itemId": 1088,
+                "purchasesLeft": 1,
+                "refreshTime": 1793671200
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_RETENTION_OFFER": [
+          {
+            "id": 2,
+            "isAcquired": false,
+            "endTime": 2071954800,
+            "rewards": [
+              {
+                "id": 8,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 9,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 10,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 11,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 12,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "_truncatedArrayItems": 25,
+                "_totalLength": 30
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SUBSCRIPTION": [
+          {
+            "id": 6,
+            "refreshDate": 1793678400,
+            "subscriptions": [
+              {
+                "id": 30,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "refreshDate": 1793678400,
+            "subscriptions": [
+              {
+                "id": 31,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 32,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 33,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 34,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 35,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_OLD_BANK_OFFER": [
+          {
+            "id": 3,
+            "endTime": 2071954800
+          }
+        ],
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 1,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          },
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          },
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "refreshTime": 1793671201,
+            "collected": true
+          },
+          {
+            "id": 15,
+            "endTime": 2071015200,
+            "refreshTime": 1793671200,
+            "collected": true
+          }
+        ]
+      }
+    },
+    "heroGetAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:11.912Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": {
+          "id": 1,
+          "xp": 342144,
+          "level": 70,
+          "color": 7,
+          "slots": {
+            "1": 0
+          },
+          "skills": {
+            "2": 30,
+            "3": 30,
+            "4": 35,
+            "5": 50
+          },
+          "power": 13124,
+          "star": 3,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [
+            10,
+            10
+          ],
+          "skins": {
+            "1": 11
+          },
+          "currentSkin": 1,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "2": {
+          "id": 2,
+          "xp": 342112,
+          "level": 70,
+          "color": 8,
+          "slots": {
+            "1": 0,
+            "4": 0,
+            "5": 0
+          },
+          "skills": {
+            "270": 40,
+            "271": 40,
+            "272": 50,
+            "273": 60
+          },
+          "power": 27826,
+          "star": 5,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [
+            40,
+            20,
+            20,
+            20,
+            0
+          ],
+          "skins": {
+            "2": 54,
+            "307": 20
+          },
+          "currentSkin": 307,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "3": {
+          "id": 3,
+          "xp": 160110,
+          "level": 60,
+          "color": 6,
+          "slots": [],
+          "skills": {
+            "260": 20,
+            "261": 20,
+            "262": 30
+          },
+          "power": 10451,
+          "star": 3,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": {
+            "1": 6
+          },
+          "skins": {
+            "3": 12
+          },
+          "currentSkin": 3,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "4": {
+          "id": 4,
+          "xp": 478584,
+          "level": 75,
+          "color": 8,
+          "slots": [],
+          "skills": {
+            "255": 60,
+            "256": 60,
+            "257": 50,
+            "258": 70
+          },
+          "power": 19531,
+          "star": 3,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [
+            20,
+            20,
+            20,
+            17
+          ],
+          "skins": {
+            "4": 32,
+            "305": 6
+          },
+          "currentSkin": 305,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "5": {
+          "id": 5,
+          "xp": 302800,
+          "level": 68,
+          "color": 7,
+          "slots": [],
+          "skills": {
+            "10236": 20,
+            "10237": 20,
+            "10238": 30,
+            "10239": 50
+          },
+          "power": 12409,
+          "star": 3,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [
+            5,
+            5
+          ],
+          "skins": {
+            "5": 10
+          },
+          "currentSkin": 5,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "6": {
+          "id": 6,
+          "xp": 7500,
+          "level": 31,
+          "color": 3,
+          "slots": [],
+          "skills": {
+            "28": 1,
+            "10164": 15
+          },
+          "power": 6140,
+          "star": 2,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": {
+            "202": 1
+          },
+          "currentSkin": 202,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "7": {
+          "id": 7,
+          "xp": 342118,
+          "level": 70,
+          "color": 7,
+          "slots": {
+            "2": 0,
+            "4": 0
+          },
+          "skills": {
+            "32": 40,
+            "33": 40,
+            "34": 50,
+            "35": 60
+          },
+          "power": 17269,
+          "star": 4,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [
+            15,
+            15,
+            15
+          ],
+          "skins": {
+            "7": 15
+          },
+          "currentSkin": 7,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "8": {
+          "id": 8,
+          "xp": 10200,
+          "level": 35,
+          "color": 2,
+          "slots": [],
+          "skills": {
+            "280": 10,
+            "281": 10
+          },
+          "power": 5898,
+          "star": 2,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": [],
+          "currentSkin": 0,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "9": {
+          "id": 9,
+          "xp": 19748,
+          "level": 40,
+          "color": 5,
+          "slots": {
+            "1": 0,
+            "2": 0,
+            "4": 0
+          },
+          "skills": {
+            "42": 10,
+            "43": 10,
+            "44": 25
+          },
+          "power": 8252,
+          "star": 3,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": [],
+          "currentSkin": 0,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "10": {
+          "id": 10,
+          "xp": 10300,
+          "level": 35,
+          "color": 3,
+          "slots": {
+            "3": 0
+          },
+          "skills": {
+            "47": 10,
+            "48": 10
+          },
+          "power": 5635,
+          "star": 1,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": {
+            "10": 1
+          },
+          "currentSkin": 10,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "11": {
+          "id": 11,
+          "xp": 7500,
+          "level": 31,
+          "color": 1,
+          "slots": [],
+          "skills": {
+            "52": 10
+          },
+          "power": 4979,
+          "star": 1,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": [],
+          "currentSkin": 0,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "13": {
+          "id": 13,
+          "xp": 7500,
+          "level": 31,
+          "color": 1,
+          "slots": [],
+          "skills": {
+            "62": 10
+          },
+          "power": 4967,
+          "star": 1,
+          "runes": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "hero_runes": [],
+          "skins": [],
+          "currentSkin": 0,
+          "_truncatedKeys": 8,
+          "_totalKeys": 20
+        },
+        "_truncatedKeys": 47,
+        "_totalKeys": 59
+      }
+    },
+    "heroInsertItem": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611120933_create_and_equip.json",
+        "capturedAt": "2026-11-12T02:33:00.374Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 502,
+        "slot": 0
+      },
+      "response": {
+        "response": null,
+        "liveOps_UPDATE_BANK_OFFER": [
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "slots": [
+              {
+                "id": 7,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 8,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 9,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 10,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 11,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_PERIODIC_HERO_OFFER": [
+          {
+            "id": 24,
+            "endTime": 0,
+            "refreshTime": 1794535200,
+            "heroId": 76,
+            "slots": [
+              {
+                "id": 1,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 2,
+                "bought": false,
+                "heroId": 76
+              },
+              {
+                "id": 3,
+                "bought": false,
+                "heroId": 76
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_OFFER": [
+          {
+            "id": 117,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 123,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 1019,
+            "endTime": 1796608740,
+            "refreshTime": 1794450781,
+            "boughtCount": 0
+          }
+        ],
+        "liveOps_UPDATE_LADDER_OFFER": [
+          {
+            "id": 1088,
+            "endTime": 2071015200,
+            "slots": [
+              {
+                "slotId": 1031,
+                "itemId": 1134,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 1030,
+                "itemId": 1130,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 1029,
+                "itemId": 1126,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 1028,
+                "itemId": 1122,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 1027,
+                "itemId": 1118,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "_truncatedArrayItems": 27,
+                "_totalLength": 32
+              }
+            ]
+          },
+          {
+            "id": 1090,
+            "endTime": 0,
+            "slots": [
+              {
+                "slotId": 1032,
+                "itemId": 1138,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 120,
+                "itemId": 484,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 121,
+                "itemId": 489,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 122,
+                "itemId": 494,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "slotId": 123,
+                "itemId": 499,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              },
+              {
+                "_truncatedArrayItems": 12,
+                "_totalLength": 17
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_LADDER_OFFER": [
+          {
+            "id": 1005,
+            "endTime": 1794535199,
+            "slots": [
+              {
+                "slotId": 113,
+                "itemId": 449,
+                "purchasesLeft": 1,
+                "refreshTime": 1794621600
+              }
+            ]
+          },
+          {
+            "id": 1027,
+            "endTime": 1794794399,
+            "slots": [
+              {
+                "slotId": 1049,
+                "itemId": 1195,
+                "purchasesLeft": 1
+              }
+            ]
+          },
+          {
+            "id": 1116,
+            "endTime": 1794535199,
+            "slots": [
+              {
+                "slotId": 1034,
+                "itemId": 1148,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              }
+            ]
+          },
+          {
+            "id": 1121,
+            "endTime": 1794535140,
+            "slots": [
+              {
+                "slotId": 1041,
+                "itemId": 1172,
+                "purchasesLeft": 1,
+                "refreshTime": 1794535200
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SELECTABLE_OFFER": [
+          {
+            "id": 241,
+            "endTime": 1794794399,
+            "refreshTime": 0,
+            "slots": [
+              {
+                "id": 75,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 76,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 77,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 78,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 79,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 244,
+            "endTime": 1794794399,
+            "refreshTime": 0,
+            "slots": [
+              {
+                "id": 116,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 117,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 118,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 119,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              },
+              {
+                "id": 120,
+                "boughtCount": 0,
+                "cells": [
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  "[Object(3 keys)]",
+                  {
+                    "_truncatedArrayItems": 1,
+                    "_totalLength": 6
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_RETENTION_OFFER": [
+          {
+            "id": 2,
+            "isAcquired": false,
+            "endTime": 2071954800,
+            "rewards": [
+              {
+                "id": 8,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 9,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 10,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 11,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 12,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "_truncatedArrayItems": 25,
+                "_totalLength": 30
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SUBSCRIPTION": [
+          {
+            "id": 6,
+            "refreshDate": 1794456000,
+            "subscriptions": [
+              {
+                "id": 30,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "refreshDate": 1794456000,
+            "subscriptions": [
+              {
+                "id": 31,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 32,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 33,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 34,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 35,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_OLD_BANK_OFFER": [
+          {
+            "id": 3,
+            "endTime": 2071954800
+          }
+        ],
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 1,
+            "endTime": 2071015200,
+            "refreshTime": 1794535200,
+            "collected": false
+          },
+          {
+            "id": 2,
+            "endTime": 1794794399,
+            "refreshTime": 1794535200,
+            "collected": false
+          },
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1794535200,
+            "collected": false
+          },
+          {
+            "id": 5,
+            "endTime": 1794794399,
+            "refreshTime": 1794535200,
+            "collected": false
+          },
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "refreshTime": 1794535201,
+            "collected": false
+          },
+          {
+            "_truncatedArrayItems": 1,
+            "_totalLength": 6
+          }
+        ]
+      }
+    },
+    "heroPromote": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611171942_promote_quipement.json",
+        "capturedAt": "2026-11-17T12:42:07.159Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 37
+      },
+      "response": {
+        "response": null,
+        "quests": [
+          {
+            "id": 132,
+            "state": 3,
+            "progress": 27,
+            "multiplier": 0,
+            "reward": {
+              "gold": 41000
+            }
+          },
+          {
+            "id": 133,
+            "state": 3,
+            "progress": 27,
+            "multiplier": 0,
+            "reward": {
+              "gold": 45000
+            }
+          }
+        ],
+        "liveOps_UPDATE_BANK_OFFER": [
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "slots": [
+              {
+                "id": 7,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 8,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 9,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 10,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 11,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_PERIODIC_HERO_OFFER": [
+          {
+            "id": 24,
+            "endTime": 0,
+            "refreshTime": 1794967200,
+            "heroId": 4,
+            "slots": [
+              {
+                "id": 1,
+                "bought": false,
+                "heroId": 4
+              },
+              {
+                "id": 2,
+                "bought": false,
+                "heroId": 4
+              },
+              {
+                "id": 3,
+                "bought": false,
+                "heroId": 4
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_OFFER": [
+          {
+            "id": 117,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 123,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 1019,
+            "endTime": 1796608740,
+            "refreshTime": 1794919327,
+            "boughtCount": 0
+          }
+        ],
+        "liveOps_UPDATE_LADDER_OFFER": [
+          {
+            "id": 1088,
+            "endTime": 2071015200,
+            "slots": [
+              {
+                "slotId": 1031,
+                "itemId": 1134,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 1030,
+                "itemId": 1130,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 1029,
+                "itemId": 1126,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 1028,
+                "itemId": 1122,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 1027,
+                "itemId": 1118,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "_truncatedArrayItems": 27,
+                "_totalLength": 32
+              }
+            ]
+          },
+          {
+            "id": 1151,
+            "endTime": 0,
+            "slots": [
+              {
+                "slotId": 1032,
+                "itemId": 1138,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 120,
+                "itemId": 484,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 121,
+                "itemId": 489,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 1044,
+                "itemId": 1187,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "slotId": 122,
+                "itemId": 494,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              },
+              {
+                "_truncatedArrayItems": 13,
+                "_totalLength": 18
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_LADDER_OFFER": [
+          {
+            "id": 1026,
+            "endTime": 1794967199,
+            "slots": [
+              {
+                "slotId": 16,
+                "itemId": 52,
+                "purchasesLeft": 1,
+                "refreshTime": 1795053600
+              }
+            ]
+          },
+          {
+            "id": 1099,
+            "endTime": 1794967199,
+            "slots": [
+              {
+                "slotId": 115,
+                "itemId": 459,
+                "purchasesLeft": 1,
+                "refreshTime": 1795053600
+              }
+            ]
+          },
+          {
+            "id": 1117,
+            "endTime": 1795139999,
+            "slots": [
+              {
+                "slotId": 1034,
+                "itemId": 1148,
+                "purchasesLeft": 1,
+                "refreshTime": 1795140000
+              }
+            ]
+          },
+          {
+            "id": 1125,
+            "endTime": 1794967140,
+            "slots": [
+              {
+                "slotId": 1039,
+                "itemId": 1162,
+                "purchasesLeft": 1,
+                "refreshTime": 1794967200
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_RETENTION_OFFER": [
+          {
+            "id": 2,
+            "isAcquired": false,
+            "endTime": 2071954800,
+            "rewards": [
+              {
+                "id": 8,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 9,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 10,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 11,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 12,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "_truncatedArrayItems": 25,
+                "_totalLength": 30
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SUBSCRIPTION": [
+          {
+            "id": 6,
+            "refreshDate": 1794974400,
+            "subscriptions": [
+              {
+                "id": 30,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "refreshDate": 1794974400,
+            "subscriptions": [
+              {
+                "id": 31,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 32,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 33,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 34,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 35,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_OLD_BANK_OFFER": [
+          {
+            "id": 3,
+            "endTime": 2071954800
+          }
+        ],
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 1,
+            "endTime": 2071015200,
+            "refreshTime": 1794967200,
+            "collected": true
+          },
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1794967200,
+            "collected": true
+          },
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "refreshTime": 1794967201,
+            "collected": true
+          },
+          {
+            "id": 15,
+            "endTime": 2071015200,
+            "refreshTime": 1794967200,
+            "collected": true
+          }
+        ]
+      }
+    },
+    "heroStatsBonus_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "statsBonusIds": [
+          1,
+          2,
+          11,
+          16,
+          26,
+          {
+            "_truncatedArrayItems": 4,
+            "_totalLength": 9
+          }
+        ]
+      }
+    },
+    "heroUpgradeSkill": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:29:46.160Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "heroId": 502,
+        "skill": 3
+      },
+      "response": {
+        "response": null,
+        "quests": [
+          {
+            "id": 10001,
+            "state": 3,
+            "progress": 56,
+            "multiplier": 0,
+            "reward": {
+              "experience": 50
+            }
+          }
+        ],
+        "liveOps_UPDATE_BANK_OFFER": [
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "slots": [
+              {
+                "id": 7,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 8,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 9,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 10,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "id": 11,
+                "firstBuyBonus": false,
+                "periodicalyBuyBonus": false,
+                "periodicalyBuyRefreshTime": 0
+              },
+              {
+                "_truncatedArrayItems": 3,
+                "_totalLength": 8
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_PERIODIC_HERO_OFFER": [
+          {
+            "id": 24,
+            "endTime": 0,
+            "refreshTime": 1793844000,
+            "heroId": 4,
+            "slots": [
+              {
+                "id": 1,
+                "bought": false,
+                "heroId": 4
+              },
+              {
+                "id": 2,
+                "bought": false,
+                "heroId": 4
+              },
+              {
+                "id": 3,
+                "bought": false,
+                "heroId": 4
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_OFFER": [
+          {
+            "id": 117,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 123,
+            "endTime": 2071954800,
+            "refreshTime": null,
+            "boughtCount": 0
+          },
+          {
+            "id": 1018,
+            "endTime": 1794189540,
+            "refreshTime": 1793777385,
+            "boughtCount": 0
+          }
+        ],
+        "liveOps_UPDATE_LADDER_OFFER": [
+          {
+            "id": 1088,
+            "endTime": 2071015200,
+            "slots": [
+              {
+                "slotId": 1031,
+                "itemId": 1134,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 1030,
+                "itemId": 1130,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 1029,
+                "itemId": 1126,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 1028,
+                "itemId": 1122,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 1027,
+                "itemId": 1118,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "_truncatedArrayItems": 27,
+                "_totalLength": 32
+              }
+            ]
+          },
+          {
+            "id": 1090,
+            "endTime": 0,
+            "slots": [
+              {
+                "slotId": 1032,
+                "itemId": 1138,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 120,
+                "itemId": 484,
+                "purchasesLeft": 1
+              },
+              {
+                "slotId": 121,
+                "itemId": 489,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 122,
+                "itemId": 494,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "slotId": 123,
+                "itemId": 499,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              },
+              {
+                "_truncatedArrayItems": 12,
+                "_totalLength": 17
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SINGLE_LADDER_OFFER": [
+          {
+            "id": 1004,
+            "endTime": 1793930399,
+            "slots": [
+              {
+                "slotId": 113,
+                "itemId": 449,
+                "purchasesLeft": 1,
+                "refreshTime": 1794016800
+              }
+            ]
+          },
+          {
+            "id": 1019,
+            "endTime": 1793930399,
+            "slots": [
+              {
+                "slotId": 1033,
+                "itemId": 1143,
+                "purchasesLeft": 1,
+                "refreshTime": 1794016800
+              }
+            ]
+          },
+          {
+            "id": 1082,
+            "endTime": 1793843940,
+            "slots": [
+              {
+                "slotId": 1023,
+                "itemId": 1096,
+                "purchasesLeft": 1,
+                "refreshTime": 1793844000
+              }
+            ]
+          },
+          {
+            "id": 1096,
+            "endTime": 1793930399,
+            "slots": [
+              {
+                "slotId": 115,
+                "itemId": 459,
+                "purchasesLeft": 1,
+                "refreshTime": 1794016800
+              }
+            ]
+          },
+          {
+            "id": 1115,
+            "endTime": 1793930399,
+            "slots": [
+              {
+                "slotId": 1034,
+                "itemId": 1148,
+                "purchasesLeft": 1,
+                "refreshTime": 1793930400
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_RETENTION_OFFER": [
+          {
+            "id": 2,
+            "isAcquired": false,
+            "endTime": 2071954800,
+            "rewards": [
+              {
+                "id": 8,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 9,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 10,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 11,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "id": 12,
+                "farmed": false,
+                "available": false,
+                "availableAt": null
+              },
+              {
+                "_truncatedArrayItems": 25,
+                "_totalLength": 30
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_SUBSCRIPTION": [
+          {
+            "id": 6,
+            "refreshDate": 1793851200,
+            "subscriptions": [
+              {
+                "id": 30,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "refreshDate": 1793851200,
+            "subscriptions": [
+              {
+                "id": 31,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 32,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 33,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 34,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "id": 35,
+                "status": "available",
+                "endDate": 2071954800,
+                "paidTill": null,
+                "availableRewards": false
+              },
+              {
+                "_truncatedArrayItems": 1,
+                "_totalLength": 6
+              }
+            ]
+          }
+        ],
+        "liveOps_UPDATE_OLD_BANK_OFFER": [
+          {
+            "id": 3,
+            "endTime": 2071954800
+          }
+        ],
+        "liveOps_UPDATE_ATTENTION_BONUS": [
+          {
+            "id": 1,
+            "endTime": 2071015200,
+            "refreshTime": 1793844000,
+            "collected": true
+          },
+          {
+            "id": 4,
+            "endTime": 2071015200,
+            "refreshTime": 1793844000,
+            "collected": true
+          },
+          {
+            "id": 13,
+            "endTime": 2071954800,
+            "refreshTime": 1793844001,
+            "collected": true
+          },
+          {
+            "id": 15,
+            "endTime": 2071015200,
+            "refreshTime": 1793844000,
+            "collected": true
+          }
+        ]
+      }
+    },
+    "heroWay_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "rune_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "heroesRunes": [
+          {
+            "heroId": 1,
+            "runes": [
+              {
+                "tier": 0,
+                "level": 10
+              },
+              {
+                "tier": 1,
+                "level": 10
+              }
+            ]
+          },
+          {
+            "heroId": 2,
+            "runes": [
+              {
+                "tier": 0,
+                "level": 40
+              },
+              {
+                "tier": 1,
+                "level": 20
+              },
+              {
+                "tier": 2,
+                "level": 20
+              },
+              {
+                "tier": 3,
+                "level": 20
+              },
+              {
+                "tier": 4,
+                "level": 0
+              }
+            ]
+          },
+          {
+            "heroId": 3,
+            "runes": [
+              {
+                "tier": 1,
+                "level": 6
+              }
+            ]
+          },
+          {
+            "heroId": 4,
+            "runes": [
+              {
+                "tier": 0,
+                "level": 20
+              },
+              {
+                "tier": 1,
+                "level": 20
+              },
+              {
+                "tier": 2,
+                "level": 20
+              },
+              {
+                "tier": 3,
+                "level": 17
+              }
+            ]
+          },
+          {
+            "heroId": 5,
+            "runes": [
+              {
+                "tier": 0,
+                "level": 5
+              },
+              {
+                "tier": 1,
+                "level": 5
+              }
+            ]
+          },
+          {
+            "_truncatedArrayItems": 12,
+            "_totalLength": 17
+          }
+        ],
+        "classRunes": []
+      }
+    },
+    "set_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": [
+        {
+          "id": 1,
+          "level": 2
+        },
+        {
+          "id": 3,
+          "level": 1
+        },
+        {
+          "id": 4,
+          "level": 1
+        },
+        {
+          "id": 6,
+          "level": 1
+        },
+        {
+          "id": 8,
+          "level": 2
+        },
+        {
+          "_truncatedArrayItems": 2,
+          "_totalLength": 7
+        }
+      ]
+    },
+    "skin_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "1": {
+          "currentSkin": 1,
+          "skins": {
+            "1": 11
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "2": {
+          "currentSkin": 307,
+          "skins": {
+            "2": 54,
+            "307": 20
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "3": {
+          "currentSkin": 3,
+          "skins": {
+            "3": 12
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "4": {
+          "currentSkin": 305,
+          "skins": {
+            "4": 32,
+            "305": 6
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "5": {
+          "currentSkin": 5,
+          "skins": {
+            "5": 10
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "6": {
+          "currentSkin": 202,
+          "skins": {
+            "202": 1
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "7": {
+          "currentSkin": 7,
+          "skins": {
+            "7": 15
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "8": {
+          "currentSkin": 0,
+          "skins": [],
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "9": {
+          "currentSkin": 0,
+          "skins": [],
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "10": {
+          "currentSkin": 10,
+          "skins": {
+            "10": 1
+          },
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "11": {
+          "currentSkin": 0,
+          "skins": [],
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "13": {
+          "currentSkin": 0,
+          "skins": [],
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "currentSkinColorId": 0
+        },
+        "_truncatedKeys": 67,
+        "_totalKeys": 79
+      }
+    },
+    "skin_upgrade": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-game-record-202611041431_new_tracking.json",
+        "capturedAt": "2026-11-04T07:29:53.640Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {
+        "unitId": 502,
+        "skinId": 1003
+      },
+      "response": {
+        "reward": []
+      }
+    },
+    "talisman_getAll": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": []
+    },
+    "talisman_getLastRolledTraits": {
+      "_meta": {
+        "sourceFile": "temp/tracking-data/archived/hwa-api-202611021137_guild_versus.json",
+        "capturedAt": "2026-11-02T04:36:17.919Z",
+        "status": 200,
+        "hasResponse": true,
+        "hasError": false,
+        "truncated": false
+      },
+      "args": {},
+      "response": {
+        "rollResults": []
+      }
+    }
+  }
+}

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.295 — 2026-11-25
+
+### Added
+
+- **Curated Sample Data Catalog & Knowns Documentation (`sample-data/`, `scripts/curate-sample-data.mjs`, `tests/sample-data-catalog.test.mjs`, `@doc/api/sample-data-catalog`)**:
+  - Distilled 144 raw tracking captures (`temp/tracking-data/**`, 42.80 MB) into 25 compact, deduplicated, redacted JSON fixtures (`sample-data/`, 708.8 KB — 98.4% reduction) across 12 functional domains covering 241 RPC methods (0 unclassified), 38 MQTT event types, 19 observed RPC errors, 8 verified Legends Draft stages (preserving pre-`JSON.parse()` raw-order hero IDs), and 6 exported snapshot previews, indexed by `sample-data/index.json`.
+  - Added reusable CLI `scripts/curate-sample-data.mjs` (`npm run sample-data:build`, `npm run sample-data:ingest`, `npm run sample-data:verify`) with automatic sensitive header/token/topic redaction and incremental log ingestion.
+  - Created Knowns documentation `api/sample-data-catalog` detailing each sample file's role, captured schemas, and standard SOP for ingesting future logs or adding new functional domains.
+
 ## 0.11.293 — 2026-11-25
 
 ### Fixed
