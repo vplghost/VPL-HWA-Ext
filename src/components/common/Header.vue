@@ -28,6 +28,7 @@ import { getBuildingName, getResearchName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
+import ActiveAutomationStrip from '@/src/components/common/ActiveAutomationStrip.vue';
 import { getResourceIcon } from '@/src/utils/itemResources';
 import { mail } from '@/src/utils/mail';
 import { getTeamLevelExpDelta } from '@/src/data/teamLevelData';
@@ -823,6 +824,9 @@ function toggleTheme() {
             </span>
           </button>
         </BaseTooltip>
+
+        <!-- Compact Icon-Only Active Automations (auto-hides when idle) -->
+        <ActiveAutomationStrip />
 
         <span
           v-if="isRpcQueueVisible"

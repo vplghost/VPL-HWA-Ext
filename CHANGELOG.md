@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.320 — 2026-11-26
+
+### Changed
+
+- **Compact Icon-Only Active Automation Strip in Header (`ActiveAutomationStrip.vue`, `Header.vue`, `App.vue`, `tests/active-automation-hub.test.mjs`)**:
+  - Removed the standalone full-width `<ActiveAutomationStrip />` banner row from `entrypoints/popup/App.vue` and mounted it inline directly to the right of `#game-connection-badge` in `src/components/common/Header.vue`, reclaiming ~56px of vertical height across all tabs.
+  - Redesigned `ActiveAutomationStrip.vue` into a compact `size-7` icon-only cluster with `<BaseTooltip>` status details, color & animation indicators (`emerald` + `animate-ping` dot for `active`, `amber` + static dot for `waiting`, `rose` + `animate-pulse` for `warning`), click-to-open, right-click/`Alt+Click` stop, and a hover micro-stop button (`#btn-stop-automation-*`).
+
 ## 0.11.318 — 2026-11-25
 
 ### Added

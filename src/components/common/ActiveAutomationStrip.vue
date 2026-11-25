@@ -1,17 +1,44 @@
 <script setup lang="ts">
 import { useActiveAutomations, type ActiveAutomationItem } from '@/src/composables/useActiveAutomations';
 import { useModals } from '@/src/composables/useModals';
+import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
 const { activeItems, stopAutomation } = useActiveAutomations();
 const { openModal } = useModals();
 
-function openItem(item: ActiveAutomationItem) {
+function openItem(item: ActiveAutomationItem, event?: MouseEvent) {
+  if (event?.altKey) {
+    event.preventDefault();
+    void stopAutomation(item);
+    return;
+  }
   openModal(item.modalName);
 }
 
 function stopItem(item: ActiveAutomationItem, event: Event) {
+  event.preventDefault();
   event.stopPropagation();
   void stopAutomation(item);
+}
+
+function formatTooltip(item: ActiveAutomationItem): string {
+  const statusLabel =
+    item.statusTone === 'warning'
+      ? 'Warning'
+      : item.statusTone === 'waiting'
+        ? 'Waiting'
+        : 'Running';
+  return `${item.label}\nStatus: ${statusLabel}\nClick to open · Right-click or Alt+Click to stop`;
+}
+
+function getToneClasses(tone: ActiveAutomationItem['statusTone']): string {
+  if (tone === 'warning') {
+    return 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:border-rose-700/80 dark:text-rose-200 animate-pulse';
+  }
+  if (tone === 'waiting') {
+    return 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-700/80 dark:text-amber-200';
+  }
+  return 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700/80 dark:text-emerald-200';
 }
 </script>
 
@@ -21,44 +48,56 @@ function stopItem(item: ActiveAutomationItem, event: Event) {
     id="active-automation-strip"
     role="region"
     aria-label="Active Automations"
-    class="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/30 text-xs"
+    class="inline-flex items-center gap-1 pl-1.5 border-l border-slate-200 dark:border-slate-700/70"
   >
-    <span class="font-bold text-[11px] uppercase tracking-wider text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
-      <span class="inline-block size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-      Active ({{ activeItems.length }})
-    </span>
-
-    <div class="flex flex-wrap items-center gap-1.5 flex-1">
+    <BaseTooltip
+      v-for="item in activeItems"
+      :key="item.id"
+      :content="formatTooltip(item)"
+    >
       <div
-        v-for="item in activeItems"
-        :key="item.id"
         :id="`automation-pill-${item.id}`"
         role="button"
         tabindex="0"
-        class="cursor-pointer inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-[11px] font-medium transition-colors"
-        :class="
-          item.statusTone === 'warning'
-            ? 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200'
-            : item.statusTone === 'waiting'
-              ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200'
-              : 'bg-white border-indigo-200 text-slate-800 hover:bg-indigo-100/60 dark:bg-slate-900 dark:border-indigo-800/80 dark:text-slate-100'
-        "
-        @click="openItem(item)"
+        :aria-label="item.label"
+        class="group relative cursor-pointer inline-flex items-center justify-center size-7 rounded-lg border text-sm leading-none transition-all shadow-2xs select-none"
+        :class="getToneClasses(item.statusTone)"
+        @click="openItem(item, $event)"
+        @contextmenu="stopItem(item, $event)"
         @keydown.enter="openItem(item)"
       >
-        <span>{{ item.icon }}</span>
-        <span>{{ item.label }}</span>
+        <span aria-hidden="true">{{ item.icon }}</span>
+
+        <!-- Status indicator dot -->
+        <span class="pointer-events-none absolute -top-0.5 -right-0.5 flex size-2">
+          <span
+            v-if="item.statusTone === 'active'"
+            class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"
+          />
+          <span
+            class="relative inline-flex size-2 rounded-full ring-1 ring-white dark:ring-slate-900"
+            :class="
+              item.statusTone === 'warning'
+                ? 'bg-rose-500'
+                : item.statusTone === 'waiting'
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500'
+            "
+          />
+        </span>
+
+        <!-- Hover micro-stop button -->
         <button
           :id="`btn-stop-automation-${item.id}`"
           type="button"
           :title="`Stop ${item.label}`"
           :aria-label="`Stop ${item.label}`"
-          class="cursor-pointer ml-0.5 size-4 rounded-full inline-flex items-center justify-center bg-slate-200/80 hover:bg-rose-500 hover:text-white dark:bg-slate-800 dark:hover:bg-rose-600 text-[9px] transition-colors"
+          class="cursor-pointer absolute -bottom-1 -right-1 size-3.5 rounded-full inline-flex items-center justify-center bg-slate-700 text-white hover:bg-rose-600 dark:bg-slate-600 dark:hover:bg-rose-500 text-[9px] font-bold leading-none opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shadow-xs"
           @click="stopItem(item, $event)"
         >
-          ⏹
+          ×
         </button>
       </div>
-    </div>
+    </BaseTooltip>
   </div>
 </template>

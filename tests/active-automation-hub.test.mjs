@@ -39,10 +39,25 @@ test('computeActiveAutomations returns empty list when idle and aggregates activ
   assert.equal(byId.tower.label, 'Tower Auto: Floor 25');
 });
 
-test('ActiveAutomationStrip is mounted in App.vue and shared dialog primitives exist', () => {
+test('ActiveAutomationStrip is mounted in Header.vue right after #game-connection-badge as compact icon-only cluster', () => {
   const appSrc = fs.readFileSync(path.join(ROOT, 'entrypoints', 'popup', 'App.vue'), 'utf8');
-  assert.match(appSrc, /import ActiveAutomationStrip from '@\/src\/components\/common\/ActiveAutomationStrip\.vue'/);
-  assert.match(appSrc, /<ActiveAutomationStrip \/>/);
+  assert.doesNotMatch(appSrc, /<ActiveAutomationStrip\s*\/>/, 'App.vue should no longer render standalone ActiveAutomationStrip banner');
+
+  const headerSrc = fs.readFileSync(path.join(ROOT, 'src', 'components', 'common', 'Header.vue'), 'utf8');
+  assert.match(headerSrc, /import ActiveAutomationStrip from '@\/src\/components\/common\/ActiveAutomationStrip\.vue'/);
+  const badgeIdx = headerSrc.indexOf('id="game-connection-badge"');
+  const stripIdx = headerSrc.indexOf('<ActiveAutomationStrip />');
+  assert.ok(badgeIdx > -1 && stripIdx > badgeIdx, 'Header.vue must mount <ActiveAutomationStrip /> right after #game-connection-badge');
+
+  const stripSrc = fs.readFileSync(path.join(ROOT, 'src', 'components', 'common', 'ActiveAutomationStrip.vue'), 'utf8');
+  assert.match(stripSrc, /<BaseTooltip/);
+  assert.doesNotMatch(stripSrc, /Active \(\{\{ activeItems\.length \}\}\)/, 'Compact strip must not render Active (N) banner text');
+  assert.match(stripSrc, /id="active-automation-strip"/);
+  assert.match(stripSrc, /automation-pill-\$\{item\.id\}/);
+  assert.match(stripSrc, /btn-stop-automation-\$\{item\.id\}/);
+  assert.match(stripSrc, /bg-emerald-/);
+  assert.match(stripSrc, /bg-amber-/);
+  assert.match(stripSrc, /bg-rose-/);
 
   for (const file of [
     'ActiveAutomationStrip.vue',
