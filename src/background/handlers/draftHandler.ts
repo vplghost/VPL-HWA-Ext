@@ -7,6 +7,7 @@ import {
   extractDraftSwapHeroIds,
   extractDraftHeroDetails,
   extractDraftEnemyHeroes,
+  normalizeDraftHeroIdList,
 } from '../../utils/draftHelper.ts';
 
 export const DRAFT_MESSAGE_KINDS = new Set([
@@ -44,8 +45,7 @@ function drainDraftQueue(): void {
 }
 
 function normalizeHeroIdList(arr: any): number[] {
-  if (!Array.isArray(arr)) return [];
-  return arr.map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0);
+  return normalizeDraftHeroIdList(arr);
 }
 
 export function handleDraftMessage(message: any, cr: any): boolean {
@@ -77,20 +77,26 @@ export function handleDraftMessage(message: any, cr: any): boolean {
             const enemyHeroes = extractDraftEnemyHeroes(message.data?.enemyDraft, rawEnemyText);
             const hasCandidates = heroSteps.length > 0;
             const hasEnemy = enemyHeroes.length > 0;
+            const isNewMatch = message.data?.matchId != null && session.matchId != null && Number(message.data.matchId) !== Number(session.matchId);
+            const prevDef = isNewMatch ? [] : normalizeDraftHeroIdList(session.chosenDefenceHeroes);
+            const prevAtk = isNewMatch ? [] : normalizeDraftHeroIdList(session.chosenAttackHeroes);
+            const nextDef = normalizeDraftHeroIdList(dto?.chosenDefenceHeroes);
+            const nextAtk = normalizeDraftHeroIdList(dto?.chosenAttackHeroes);
+            const prevDetails = isNewMatch ? {} : (session.heroDetails || {});
             session = {
               ...session,
               ...(message.data?.matchId != null ? { matchId: Number(message.data.matchId) } : {}),
               ...(message.data?.stageId != null ? { stageId: Number(message.data.stageId) } : {}),
-              heroSteps: hasCandidates ? heroSteps : (session.heroSteps || []),
+              heroSteps: hasCandidates ? heroSteps : (isNewMatch ? [] : (session.heroSteps || [])),
               swapHeroIds: hasCandidates
                 ? swapHeroIds
-                : (session.swapHeroIds || []),
+                : (isNewMatch ? [] : (session.swapHeroIds || [])),
               heroDetails: Object.keys(heroDetails).length > 0
-                ? { ...(session.heroDetails || {}), ...heroDetails }
-                : (session.heroDetails || {}),
-              enemyHeroes: hasEnemy ? enemyHeroes : (session.enemyHeroes || []),
-              chosenDefenceHeroes: Array.isArray(dto?.chosenDefenceHeroes) ? dto.chosenDefenceHeroes : (session.chosenDefenceHeroes || []),
-              chosenAttackHeroes: Array.isArray(dto?.chosenAttackHeroes) ? dto.chosenAttackHeroes : (session.chosenAttackHeroes || []),
+                ? { ...prevDetails, ...heroDetails }
+                : prevDetails,
+              enemyHeroes: hasEnemy ? enemyHeroes : (isNewMatch ? [] : (session.enemyHeroes || [])),
+              chosenDefenceHeroes: nextDef.length > 0 ? nextDef : prevDef,
+              chosenAttackHeroes: nextAtk.length > 0 ? nextAtk : prevAtk,
               stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
               gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
               rawDecrypted: (hasCandidates || !session.rawDecrypted) ? (rawText || session.rawDecrypted || null) : session.rawDecrypted,

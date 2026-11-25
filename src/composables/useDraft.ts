@@ -7,6 +7,7 @@ import {
   extractDraftSwapHeroIds,
   extractDraftHeroDetails,
   extractDraftEnemyHeroes,
+  normalizeDraftHeroIdList,
 } from '../utils/draftHelper.ts';
 import { useModals } from './useModals.ts';
 
@@ -43,6 +44,29 @@ let listenersInstalled = false;
 export function useDraft() {
   const { openModal } = useModals();
 
+  function applySessionSnapshot(incoming: any) {
+    if (!incoming || typeof incoming !== 'object') return;
+    const isNewMatch =
+      incoming.matchId != null &&
+      draftSession.matchId != null &&
+      Number(incoming.matchId) !== Number(draftSession.matchId);
+    const mergedDetails =
+      !isNewMatch && incoming.heroDetails && typeof incoming.heroDetails === 'object'
+        ? { ...(draftSession.heroDetails || {}), ...incoming.heroDetails }
+        : (incoming.heroDetails && typeof incoming.heroDetails === 'object' ? { ...incoming.heroDetails } : (isNewMatch ? {} : draftSession.heroDetails));
+
+    Object.assign(draftSession, incoming);
+    draftSession.chosenDefenceHeroes = normalizeDraftHeroIdList(incoming.chosenDefenceHeroes);
+    draftSession.chosenAttackHeroes = normalizeDraftHeroIdList(incoming.chosenAttackHeroes);
+    draftSession.swapHeroIds = normalizeDraftHeroIdList(incoming.swapHeroIds);
+    draftSession.heroDetails = mergedDetails || {};
+    if (incoming.stageId != null) {
+      const phaseInfo = formatDraftPhase(Number(incoming.stageId));
+      draftSession.phase = phaseInfo.phase;
+      draftSession.phaseLabel = phaseInfo.label;
+    }
+  }
+
   async function loadSettings() {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
       try {
@@ -51,7 +75,7 @@ export function useDraft() {
           autoOpenDraft.value = stored.autoOpenDraftDialog;
         }
         if (stored.legendsDraftSession && typeof stored.legendsDraftSession === 'object') {
-          Object.assign(draftSession, stored.legendsDraftSession);
+          applySessionSnapshot(stored.legendsDraftSession);
         }
       } catch (_) {}
     }
@@ -68,7 +92,16 @@ export function useDraft() {
 
   function persistSession() {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-      chrome.storage.local.set({ legendsDraftSession: { ...draftSession } }).catch?.(() => {});
+      try {
+        // Deep-clone to strip Vue reactive Proxy wrappers so arrays never serialize as indexed objects
+        const plainSnapshot = JSON.parse(JSON.stringify({
+          ...draftSession,
+          chosenDefenceHeroes: normalizeDraftHeroIdList(draftSession.chosenDefenceHeroes),
+          chosenAttackHeroes: normalizeDraftHeroIdList(draftSession.chosenAttackHeroes),
+          swapHeroIds: normalizeDraftHeroIdList(draftSession.swapHeroIds),
+        }));
+        chrome.storage.local.set({ legendsDraftSession: plainSnapshot }).catch?.(() => {});
+      } catch (_) {}
     }
   }
 
@@ -97,11 +130,13 @@ export function useDraft() {
     if (hasEnemy) {
       draftSession.enemyHeroes = extractedEnemy;
     }
-    if (Array.isArray(dto.chosenDefenceHeroes)) {
-      draftSession.chosenDefenceHeroes = [...dto.chosenDefenceHeroes];
+    const defPicked = normalizeDraftHeroIdList(dto.chosenDefenceHeroes);
+    if (defPicked.length > 0) {
+      draftSession.chosenDefenceHeroes = defPicked;
     }
-    if (Array.isArray(dto.chosenAttackHeroes)) {
-      draftSession.chosenAttackHeroes = [...dto.chosenAttackHeroes];
+    const atkPicked = normalizeDraftHeroIdList(dto.chosenAttackHeroes);
+    if (atkPicked.length > 0) {
+      draftSession.chosenAttackHeroes = atkPicked;
     }
     if (dto.stageFinishTs) {
       draftSession.stageFinishTs = dto.stageFinishTs;
@@ -144,11 +179,11 @@ export function useDraft() {
       draftSession.phaseLabel = phaseInfo.label;
       draftSession.error = null;
       draftSession.errorDetail = null;
-    } else if (action === 'randomDraft_saveDefence' && Array.isArray(args?.heroes)) {
-      const picked = args.heroes.map((v: any) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0);
+    } else if (action === 'randomDraft_saveDefence') {
+      const picked = normalizeDraftHeroIdList(args?.heroes);
       if (picked.length > 0) draftSession.chosenDefenceHeroes = picked;
-    } else if (action === 'randomDraft_saveAttack' && Array.isArray(args?.heroes)) {
-      const picked = args.heroes.map((v: any) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0);
+    } else if (action === 'randomDraft_saveAttack') {
+      const picked = normalizeDraftHeroIdList(args?.heroes);
       if (picked.length > 0) draftSession.chosenAttackHeroes = picked;
     }
 
@@ -263,12 +298,7 @@ export function useDraft() {
       if (changes.legendsDraftSession?.newValue) {
         const prevNonce = (changes.legendsDraftSession.oldValue as any)?.autoOpenNonce;
         const nextVal = changes.legendsDraftSession.newValue as any;
-        Object.assign(draftSession, nextVal);
-        if (nextVal.stageId != null) {
-          const phaseInfo = formatDraftPhase(Number(nextVal.stageId));
-          draftSession.phase = phaseInfo.phase;
-          draftSession.phaseLabel = phaseInfo.label;
-        }
+        applySessionSnapshot(nextVal);
         if (autoOpenDraft.value && nextVal.autoOpenNonce && nextVal.autoOpenNonce !== prevNonce) {
           openModal('legendsDraft');
         }
@@ -279,12 +309,7 @@ export function useDraft() {
     chrome.runtime?.onMessage?.addListener?.((message: any) => {
       if (message?.kind === 'open-draft-dialog') {
         if (message.session) {
-          Object.assign(draftSession, message.session);
-          if (message.session.stageId != null) {
-            const phaseInfo = formatDraftPhase(Number(message.session.stageId));
-            draftSession.phase = phaseInfo.phase;
-            draftSession.phaseLabel = phaseInfo.label;
-          }
+          applySessionSnapshot(message.session);
         }
         openModal('legendsDraft');
       } else if (message?.kind === 'draft-decrypted') {

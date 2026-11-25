@@ -512,6 +512,31 @@ export function buildDraftHeroCandidate(
 }
 
 /**
+ * Normalizes a hero ID list that may arrive as an Array (`[7, 503, ...]`),
+ * an indexed plain object (`{"0": 7, "1": 503, ...}` from Vue Proxy / storage serialization),
+ * or an empty object (`{}`). Always returns a clean `number[]` of positive integer hero IDs.
+ */
+export function normalizeDraftHeroIdList(raw: unknown): number[] {
+  if (Array.isArray(raw)) {
+    return raw.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0);
+  }
+  if (raw && typeof raw === 'object') {
+    const entries = Object.entries(raw as Record<string, unknown>);
+    if (entries.length === 0) return [];
+    entries.sort(([a], [b]) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+    return entries
+      .map(([, v]) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  }
+  return [];
+}
+
+/**
  * Transform columns (rounds) of candidate IDs into a matrix of DraftHeroCandidate objects
  */
 export function buildCandidateMatrix(
@@ -523,7 +548,7 @@ export function buildCandidateMatrix(
     return [];
   }
 
-  const pickedSet = new Set(pickedIds.filter((id) => Number.isFinite(id) && id > 0));
+  const pickedSet = new Set(normalizeDraftHeroIdList(pickedIds));
 
   return heroSteps.map((step) => {
     if (!Array.isArray(step)) return [];

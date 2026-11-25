@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.310 — 2026-11-25
+
+### Fixed
+
+- **Legends Draft Player Heroes Normalization & Display (`draftHelper.ts`, `draftHandler.ts`, `useDraft.ts`, `LegendsDraftModal.vue`, `tests/legends-draft-modal.test.mjs`)**:
+  - Added `normalizeDraftHeroIdList()` in `src/utils/draftHelper.ts` to safely normalize `chosenDefenceHeroes` and `chosenAttackHeroes` whether received as arrays (`[7, 503, ...]`), indexed plain objects (`{"0": 7, "1": 503, ...}`), or empty objects (`{}`), eliminating `.filter is not a function` rendering crashes in `LegendsDraftModal.vue`.
+  - Fixed Vue `Proxy` array serialization in `useDraft.ts` (`persistSession` now deep-clones to plain JSON before `chrome.storage.local.set`) and added `applySessionSnapshot()` to normalize stored/live sessions and merge `heroDetails` within the same `matchId`.
+  - Updated `LegendsDraftModal.vue` to highlight `chosenAttackHeroes` on the 5×3 Attack Pool across Stages 4–7 (`attack`/`battle`/`result`), display total Defense & Attack team power badges (`playerDefensePower` / `playerAttackPower`), and show a `Picking Attack Team (0/5)...` placeholder during Stage 4.
+
 ## 0.11.308 — 2026-11-25
 
 ### Changed

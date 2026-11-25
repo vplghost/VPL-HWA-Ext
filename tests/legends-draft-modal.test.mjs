@@ -610,3 +610,72 @@ test('P1-09: Stage 5/6/7 empty payloads preserve rawDecrypted, rawEnemyDecrypted
   assert.ok(modalSrc.includes('id="btn-toggle-draft-full-raw"'), 'Must include full raw JSON toggle in diagnostics');
   assert.ok(modalSrc.includes('rawEnemyDecrypted'), 'Diagnostics must include rawEnemyDecrypted');
 });
+
+test('P1-12: normalizeDraftHeroIdList handles empty objects, indexed objects, and arrays from live diagnostics and merges heroDetails within same match', async () => {
+  const { normalizeDraftHeroIdList } = await import('../src/utils/draftHelper.ts');
+  const { handleDraftMessage, flushDraftMessageQueue } = await import('../src/background/handlers/draftHandler.ts');
+
+  // Exact live diagnostic shapes from match 365226640 (Stage 4 & Stage 7)
+  assert.deepEqual(normalizeDraftHeroIdList({}), []);
+  assert.deepEqual(
+    normalizeDraftHeroIdList({ '0': 7, '1': 503, '2': 37, '3': 75, '4': 67 }),
+    [7, 503, 37, 75, 67]
+  );
+  assert.deepEqual(normalizeDraftHeroIdList([55, 36, 11, 32, 29]), [55, 36, 11, 32, 29]);
+  assert.deepEqual(normalizeDraftHeroIdList(null), []);
+
+  // Verify draftHandler preserves merged heroDetails and normalizes object-shaped chosen teams within same matchId
+  const store = {
+    autoOpenDraftDialog: false,
+    legendsDraftSession: {
+      matchId: 365226640,
+      stageId: 2,
+      heroDetails: {
+        7: { id: 7, power: 190000, star: 5, level: 120 },
+        503: { id: 503, power: 185000, star: 4, level: 120 },
+      },
+      chosenDefenceHeroes: { '0': 7, '1': 503, '2': 37, '3': 75, '4': 67 },
+      chosenAttackHeroes: {},
+    },
+  };
+  const mockChrome = {
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ ...store }),
+        set: (obj, cb) => {
+          Object.assign(store, obj);
+          cb?.();
+        },
+      },
+    },
+    runtime: { sendMessage: () => Promise.resolve() },
+  };
+
+  handleDraftMessage({
+    kind: 'draft-decrypted',
+    data: {
+      matchId: 365226640,
+      stageId: 4,
+      draft: {
+        base: {
+          '55': { id: 55, power: 205447, star: 5, level: 120 },
+          '36': { id: 36, power: 183014, star: 4, level: 120 },
+        },
+        swap: null,
+        chosenAttackHeroes: [55, 36, 11, 32, 29],
+      },
+      raw: '{"base":{"55":{"id":55,"power":205447},"36":{"id":36,"power":183014}},"swap":null}',
+    },
+  }, mockChrome);
+
+  await flushDraftMessageQueue();
+
+  assert.deepEqual(store.legendsDraftSession.chosenDefenceHeroes, [7, 503, 37, 75, 67]);
+  assert.deepEqual(store.legendsDraftSession.chosenAttackHeroes, [55, 36, 11, 32, 29]);
+  assert.equal(store.legendsDraftSession.heroDetails[7]?.power, 190000, 'Must preserve Defense hero stats in same match');
+  assert.equal(store.legendsDraftSession.heroDetails[55]?.power, 205447, 'Must merge Attack hero stats in same match');
+
+  const modalSrc = await readFile(resolve(root, 'src/components/dialogs/LegendsDraftModal.vue'), 'utf8');
+  assert.ok(modalSrc.includes('normalizeDraftHeroIdList('), 'LegendsDraftModal must normalize chosen hero ID lists');
+  assert.ok(modalSrc.includes('playerDefensePower') && modalSrc.includes('playerAttackPower'), 'LegendsDraftModal must compute Defense & Attack team power');
+});

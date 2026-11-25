@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useDraft } from '@/src/composables/useDraft';
-import { buildCandidateMatrix, buildDraftHeroCandidate, formatDraftPhase } from '@/src/utils/draftHelper';
+import { buildCandidateMatrix, buildDraftHeroCandidate, formatDraftPhase, normalizeDraftHeroIdList } from '@/src/utils/draftHelper';
 import type { DraftHeroCandidate } from '@/src/types/game/draft';
 
 const props = defineProps<{
@@ -51,14 +51,27 @@ const phaseInfo = computed(() => {
   return formatDraftPhase(draftSession.stageId);
 });
 
+// Normalized Defense & Attack hero ID lists (resilient to Array or indexed Object shapes)
+const normalizedDefenceHeroIds = computed<number[]>(() =>
+  normalizeDraftHeroIdList(draftSession.chosenDefenceHeroes)
+);
+const normalizedAttackHeroIds = computed<number[]>(() =>
+  normalizeDraftHeroIdList(draftSession.chosenAttackHeroes)
+);
+
 // Current picked hero IDs according to stage (Defense or Attack)
 const activePickedIds = computed<number[]>(() => {
-  if (draftSession.stageId === 4 || draftSession.phase === 'attack') {
-    return draftSession.chosenAttackHeroes.length > 0
-      ? draftSession.chosenAttackHeroes
-      : draftSession.chosenDefenceHeroes;
+  const isAttackOrLater =
+    (draftSession.stageId != null && draftSession.stageId >= 4) ||
+    draftSession.phase === 'attack' ||
+    draftSession.phase === 'battle' ||
+    draftSession.phase === 'result';
+  if (isAttackOrLater) {
+    return normalizedAttackHeroIds.value.length > 0
+      ? normalizedAttackHeroIds.value
+      : normalizedDefenceHeroIds.value;
   }
-  return draftSession.chosenDefenceHeroes;
+  return normalizedDefenceHeroIds.value;
 });
 
 // Matrix of candidate heroes: columns (rounds) x choices
@@ -100,16 +113,23 @@ const enemyCandidateColumns = computed<DraftHeroCandidate[][]>(() => {
 });
 
 const playerDefenseTeam = computed<DraftHeroCandidate[]>(() => {
-  const ids = (draftSession.chosenDefenceHeroes || []).filter((id) => Number.isFinite(id) && id > 0);
+  const ids = normalizedDefenceHeroIds.value;
   const pickedSet = new Set(ids);
   return ids.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
 });
 
 const playerAttackTeam = computed<DraftHeroCandidate[]>(() => {
-  const ids = (draftSession.chosenAttackHeroes || []).filter((id) => Number.isFinite(id) && id > 0);
+  const ids = normalizedAttackHeroIds.value;
   const pickedSet = new Set(ids);
   return ids.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
 });
+
+const playerDefensePower = computed(() =>
+  playerDefenseTeam.value.reduce((sum, h) => sum + (h.power || 0), 0)
+);
+const playerAttackPower = computed(() =>
+  playerAttackTeam.value.reduce((sum, h) => sum + (h.power || 0), 0)
+);
 
 const poolHeadingLabel = computed(() => {
   if (draftSession.stageId === 2) {
@@ -538,7 +558,10 @@ function close() {
           >
             <div class="flex items-center justify-between pb-1 border-b border-blue-500/20">
               <span class="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400">
-                🛡️ Your Defense Team ({{ playerDefenseTeam.length }})
+                🛡️ Your Defense Team ({{ playerDefenseTeam.length }}/5)
+              </span>
+              <span v-if="playerDefensePower > 0" class="text-[11px] font-mono font-semibold text-blue-500/80 dark:text-blue-300/80">
+                ⚡ {{ formatHeroPower(playerDefensePower) }}
               </span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
@@ -570,15 +593,21 @@ function close() {
           </div>
 
           <div
-            v-if="playerAttackTeam.length > 0"
+            v-if="playerAttackTeam.length > 0 || (draftSession.stageId != null && draftSession.stageId >= 4)"
             class="flex flex-col gap-2 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20"
           >
             <div class="flex items-center justify-between pb-1 border-b border-emerald-500/20">
               <span class="text-xs font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
-                ⚔️ Your Attack Team ({{ playerAttackTeam.length }})
+                ⚔️ Your Attack Team ({{ playerAttackTeam.length }}/5)
+              </span>
+              <span v-if="playerAttackPower > 0" class="text-[11px] font-mono font-semibold text-emerald-500/80 dark:text-emerald-300/80">
+                ⚡ {{ formatHeroPower(playerAttackPower) }}
               </span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+            <div v-if="playerAttackTeam.length === 0" class="text-[11px] text-slate-400 italic py-2 text-center">
+              Picking Attack Team (0/5)...
+            </div>
+            <div v-else class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
               <div
                 v-for="hero in playerAttackTeam"
                 :key="'my-atk-' + hero.id"
