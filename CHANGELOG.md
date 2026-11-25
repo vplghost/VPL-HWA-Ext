@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.299 — 2026-11-25
+
+### Fixed
+
+- **Building & Research Queue Stale Occupancy Loop (`backgroundRuntime.ts`, `queueDispatcher.ts`, `tests/building-queue.test.mjs`)**:
+  - Forwarded `ctx.liveCache` from `queueDispatcher.ts` into `advanceBuildingQueue` / `advanceResearchQueue` (`runCityQueue`) and fell back to in-memory `pendingRpcCacheToSave` so passive `getSummary:building` responses queued for debounced storage flush are seen immediately instead of reading stale `chrome.storage.local` and looping on `"Cached occupancy is missing, stale, or estimated. Requested current server summary."`.
+  - Added `speedUpConstructionWithResources` / `speedUpResearchWithResources` to `validMethods`, widened freshness TTL to `90s` (with `15s` clock-skew tolerance) to prevent 60s wakeup boundary races, auto-persisted `queue.maxSlots` when multiple concurrent building slots are observed, and attached diagnostic metadata (`hasStatus`, `statusMethod`, `ageSec`, `dispatchMode`, `observedCount`, `maxSlots`) to `verify` queue logs.
+
 ## 0.11.297 — 2026-11-25
 
 ### Fixed

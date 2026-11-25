@@ -460,3 +460,136 @@ test('dashboardQueues returns 2 slots for building queue with idle placeholder w
   assert.equal(res.slots[1].state, 'idle');
   assert.equal(res.slots[1].timerText, 'Idle');
 });
+
+test('P1-10: advanceBuildingQueue uses liveCache over debounced stale storage.local and dispatches startConstruction', async () => {
+  const { advanceBuildingQueue } = await import('../src/background/backgroundRuntime.ts');
+  const now = Date.now();
+  const staleIso = new Date(now - 300_000).toISOString();
+  const freshIso = new Date(now - 1_000).toISOString();
+
+  const dispatched = [];
+  const store = {
+    popupRpcEnabled: true,
+    socketRefreshMode: 'direct',
+    buildingQueue: {
+      enabled: true,
+      maxSlots: 2,
+      items: [{ buildingId: 187, currentLevel: 8, nextLevel: 9, durationMs: 60000, queueItemId: 'b-187-9' }],
+    },
+    // Stale storage.local snapshot (simulating debounced flush not yet written)
+    rpcCache: {
+      buildingStatus: {
+        method: 'getSummary',
+        updatedAt: staleIso,
+        data: { queues: [], buildings: [] },
+      },
+    },
+  };
+
+  const mockChrome = {
+    storage: {
+      local: {
+        get: async (keys) => {
+          const out = {};
+          for (const k of Array.isArray(keys) ? keys : [keys]) out[k] = store[k];
+          return out;
+        },
+        set: async (patch) => {
+          Object.assign(store, patch);
+        },
+      },
+    },
+    tabs: {
+      sendMessage: async (tabId, msg) => {
+        dispatched.push({ tabId, msg });
+        return { ok: true };
+      },
+    },
+    alarms: { create: () => {}, clear: () => {} },
+  };
+
+  // Fresh liveCache (as forwarded by queueDispatcher.ts from api-record-batch)
+  const liveCache = {
+    buildingStatus: {
+      method: 'getSummary',
+      updatedAt: freshIso,
+      data: {
+        queues: [{ buildingId: 163, level: 15, startDate: now - 10_000, durationMs: 37_584_000, queueNumber: 0 }],
+        buildings: [
+          { buildingId: 20, level: 22 },
+          { buildingId: 187, level: 8 },
+        ],
+      },
+    },
+  };
+
+  await advanceBuildingQueue(77, null, mockChrome, liveCache);
+
+  assert.equal(dispatched.length, 1, 'Should dispatch startConstruction immediately using fresh liveCache');
+  assert.equal(dispatched[0].msg.group, 'building-queue');
+  assert.ok(
+    dispatched[0].msg.calls.some((c) => c.name === 'startConstruction' && c.args.buildingId === 187 && c.args.nextLevel === 9),
+    'Should dispatch startConstruction for building 187 level 9 in free 2nd slot'
+  );
+});
+
+test('P1-10: advanceBuildingQueue persists observed maxSlots=2 and logs detailed verify diagnostics when stale', async () => {
+  const { advanceBuildingQueue } = await import('../src/background/backgroundRuntime.ts');
+  const now = Date.now();
+  const dispatched = [];
+  const store = {
+    popupRpcEnabled: true,
+    socketRefreshMode: 'direct',
+    buildingQueue: {
+      enabled: true,
+      items: [{ buildingId: 187, currentLevel: 8, nextLevel: 9, durationMs: 60000 }],
+    },
+    rpcCache: {
+      buildingStatus: {
+        method: 'getSummary',
+        updatedAt: new Date(now - 180_000).toISOString(),
+        data: {
+          queues: [
+            { buildingId: 163, level: 15, startDate: now - 10_000, durationMs: 300_000, queueNumber: 0 },
+            { buildingId: 164, level: 10, startDate: now - 10_000, durationMs: 300_000, queueNumber: 1 },
+          ],
+          buildings: [{ buildingId: 20, level: 22 }],
+        },
+      },
+    },
+  };
+
+  const mockChrome = {
+    storage: {
+      local: {
+        get: async (keys) => {
+          const out = {};
+          for (const k of Array.isArray(keys) ? keys : [keys]) out[k] = store[k];
+          return out;
+        },
+        set: async (patch) => {
+          Object.assign(store, patch);
+        },
+      },
+    },
+    tabs: {
+      sendMessage: async (tabId, msg) => {
+        dispatched.push({ tabId, msg });
+        return { ok: true };
+      },
+    },
+    alarms: { create: () => {}, clear: () => {} },
+  };
+
+  await advanceBuildingQueue(88, null, mockChrome);
+
+  assert.equal(store.buildingQueue.maxSlots, 2, 'Should auto-persist maxSlots=2 when 2 active queues are observed');
+  assert.equal(dispatched.length, 1);
+  assert.equal(dispatched[0].msg.group, 'building-queue-check');
+  const verifyLog = (store.buildingQueueLogs || []).find((l) => l.action === 'verify');
+  assert.ok(verifyLog, 'Should record verify log entry');
+  assert.equal(verifyLog.hasStatus, true);
+  assert.equal(verifyLog.statusMethod, 'getSummary');
+  assert.equal(verifyLog.maxSlots, 2);
+  assert.ok(verifyLog.ageSec >= 179, 'Should include stale ageSec diagnostic');
+});

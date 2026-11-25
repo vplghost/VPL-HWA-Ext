@@ -10,8 +10,8 @@ export interface QueueDispatchTargets {
   updateMonsterQueue: (record: any, tabId: number, cr: any, liveCache?: Record<string, any>) => Promise<any>;
   updateTowerRun: (record: any, tabId: number, cr: any) => Promise<any>;
   updateDungeonRun: (record: any, tabId: number, cr: any) => Promise<any>;
-  advanceBuildingQueue: (tabId: number, record: any, cr: any) => Promise<any>;
-  advanceResearchQueue: (tabId: number, record: any, cr: any) => Promise<any>;
+  advanceBuildingQueue: (tabId: number, record: any, cr: any, liveCache?: Record<string, any>) => Promise<any>;
+  advanceResearchQueue: (tabId: number, record: any, cr: any, liveCache?: Record<string, any>) => Promise<any>;
 }
 
 export function registerQueueListeners(
@@ -24,7 +24,7 @@ export function registerQueueListeners(
     await targets.updateMonsterQueue(record, ctx.tabId, ctx.chrome, ctx.liveCache);
     await targets.updateTowerRun(record, ctx.tabId, ctx.chrome);
     await targets.updateDungeonRun(record, ctx.tabId, ctx.chrome);
-    await targets.advanceBuildingQueue(ctx.tabId, record, ctx.chrome);
-    await targets.advanceResearchQueue(ctx.tabId, record, ctx.chrome);
+    await targets.advanceBuildingQueue(ctx.tabId, record, ctx.chrome, ctx.liveCache);
+    await targets.advanceResearchQueue(ctx.tabId, record, ctx.chrome, ctx.liveCache);
   });
 }

@@ -639,12 +639,12 @@ export function scheduleCityQueueRecovery(type: string, when: number, customChro
   }
 }
 
-export function advanceBuildingQueue(tabId?: number, record?: any, customChrome?: any) {
-  return advanceCityQueue('building', tabId, record, customChrome);
+export function advanceBuildingQueue(tabId?: number, record?: any, customChrome?: any, liveCache?: Record<string, any>) {
+  return advanceCityQueue('building', tabId, record, customChrome, liveCache);
 }
 
-export function advanceResearchQueue(tabId?: number, record?: any, customChrome?: any) {
-  return advanceCityQueue('research', tabId, record, customChrome);
+export function advanceResearchQueue(tabId?: number, record?: any, customChrome?: any, liveCache?: Record<string, any>) {
+  return advanceCityQueue('research', tabId, record, customChrome, liveCache);
 }
 
 let troopTrainInFlight = false;
@@ -810,11 +810,17 @@ export async function advanceTroopTraining(tabId?: number, customChrome?: any, o
   }
 }
 
-export function advanceCityQueue(type: string, tabId?: number, record?: any, customChrome?: any) {
+export function advanceCityQueue(
+  type: string,
+  tabId?: number,
+  record?: any,
+  customChrome?: any,
+  liveCache?: Record<string, any>
+) {
   const cr = getActiveChrome(customChrome);
   return inCityQueueLane(type, async () => {
     try {
-      return await runCityQueue(type, tabId, record, cr);
+      return await runCityQueue(type, tabId, record, cr, liveCache);
     } catch (error: any) {
       await appendQueueLog(
         type,
@@ -831,7 +837,13 @@ export function advanceCityQueue(type: string, tabId?: number, record?: any, cus
   });
 }
 
-export async function runCityQueue(type: string, tabId?: number, record?: any, customChrome?: any) {
+export async function runCityQueue(
+  type: string,
+  tabId?: number,
+  record?: any,
+  customChrome?: any,
+  liveCache?: Record<string, any>
+) {
   const cr = getActiveChrome(customChrome);
   const now = Date.now();
   if (!tabId) tabId = (await findActiveGameTab(cr))?.id;
@@ -845,13 +857,26 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
     return queue;
   }
   const feature = type === 'building' ? 'building' : 'personalResearch';
-  const status = stored.rpcCache?.[type + 'Status'];
-  const validMethods = ['getSummary', 'startResearch', 'completeResearch', 'startConstruction', 'completeConstruction'];
+  const effectiveRpcCache =
+    liveCache ||
+    (!customChrome && pendingRpcCacheToSave ? pendingRpcCacheToSave : null) ||
+    stored.rpcCache ||
+    {};
+  const status = effectiveRpcCache?.[type + 'Status'];
+  const validMethods = [
+    'getSummary',
+    'startResearch',
+    'completeResearch',
+    'startConstruction',
+    'completeConstruction',
+    'speedUpConstructionWithResources',
+    'speedUpResearchWithResources',
+  ];
   const summaryTime =
     status?.updatedAt && (validMethods.includes(status?.method) || status?.data?.action)
       ? Date.parse(status.updatedAt)
       : NaN;
-  const fresh = Number.isFinite(summaryTime) && summaryTime <= now + 5000 && now - summaryTime <= 60000;
+  const fresh = Number.isFinite(summaryTime) && summaryTime <= now + 15000 && now - summaryTime <= 90000;
   const save = async () => {
     queue.updatedAt = Math.max(Date.now(), (Number(queue.updatedAt) || 0) + 1);
     await cr?.storage?.local?.set({ [key]: queue });
@@ -874,7 +899,12 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
   const rawQueues = status?.data?.queues;
   const observed: any[] = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});
 
-  const remainingTargets = fresh ? helper.planNextStep(queue, stored.rpcCache, now).remainingItemsAfterSkip : queue.items;
+  if (type === 'building' && observed.length > (Number(queue.maxSlots) || 1)) {
+    queue.maxSlots = observed.length;
+    await save();
+  }
+
+  const remainingTargets = fresh ? helper.planNextStep(queue, effectiveRpcCache, now).remainingItemsAfterSkip : queue.items;
   const ends = observed
     .map((item: any) => {
       const dur = Number.isFinite(item.durationMs) ? item.durationMs : Number.isFinite(item.duration) ? item.duration : 0;
@@ -968,7 +998,14 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
     try {
       const reply = await cr?.tabs?.sendMessage(tabId, { ...dispatch, group: type + '-queue-check', expiresAt: now + 120000 });
       if (reply?.error || reply?.ok === false) throw new Error(reply.error || 'Game tab rejected summary request.');
-      await log('verify', reason + ' Requested current server summary.');
+      await log('verify', reason + ' Requested current server summary.', 'info', {
+        hasStatus: Boolean(status),
+        statusMethod: status?.method || null,
+        ageSec: Number.isFinite(summaryTime) ? Math.round((now - summaryTime) / 1000) : null,
+        dispatchMode: stored.socketRefreshMode || 'direct',
+        observedCount: observed.length,
+        maxSlots: Number(queue.maxSlots) || 1,
+      });
     } catch (error: any) {
       await log('error', 'Could not verify queue: ' + (error?.message || String(error)), 'error');
     }
@@ -1062,7 +1099,7 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
     return queue;
   }
 
-  const plan = helper.planNextStep(queue, stored.rpcCache, now);
+  const plan = helper.planNextStep(queue, effectiveRpcCache, now);
   if (plan.skippedItems?.length) {
     queue.items = plan.remainingItemsAfterSkip;
     await save();
