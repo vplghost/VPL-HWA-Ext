@@ -46,7 +46,7 @@ export function isTitanAlive(titanState: any): boolean {
 export function getEffectiveTitanStates(
   cache: any,
   now = Date.now()
-): Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean }> {
+): Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean; hasKnownMaxHp: boolean }> {
   const dungeonEntry = cache?.dungeonStatus;
   const dungeonData = dungeonEntry?.data || cache?.dungeonGetInfo?.data || {};
   const nextReset = cache?.questResetStatus?.data?.nextDayAt;
@@ -55,14 +55,20 @@ export function getEffectiveTitanStates(
 
   const roster = cache?.titanGetAll?.data || {};
   const states = dungeonData?.states?.titans || {};
-  const effective: Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean }> = {};
+  const knownMaxHp: Record<string, number> = dungeonData?.knownMaxHp || {};
+  const effective: Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean; hasKnownMaxHp: boolean }> = {};
 
   const allIds = new Set<string>([...Object.keys(states), ...Object.keys(roster)]);
 
   for (const id of allIds) {
     const rosterTitan = roster[id];
     const rawState = states[id];
-    const maxHp = Number(rawState?.maxHp) || Number(rosterTitan?.hp) || 1000000;
+    const resolvedMaxHp =
+      (Number(rawState?.maxHp) > 0 ? Number(rawState.maxHp) : 0) ||
+      (Number(knownMaxHp[id]) > 0 ? Number(knownMaxHp[id]) : 0) ||
+      (Number(rosterTitan?.hp) > 0 ? Number(rosterTitan.hp) : 0);
+    const hasKnownMaxHp = resolvedMaxHp > 0;
+    const maxHp = hasKnownMaxHp ? resolvedMaxHp : 100;
 
     if (!isToday) {
       // Start of a new day: all titans are fully healed, energy reset to 0, alive
@@ -71,6 +77,7 @@ export function getEffectiveTitanStates(
         maxHp,
         energy: 0,
         isDead: false,
+        hasKnownMaxHp,
       };
     } else {
       // Current day
@@ -83,6 +90,7 @@ export function getEffectiveTitanStates(
           maxHp,
           energy,
           isDead,
+          hasKnownMaxHp,
         };
       } else {
         // Not yet deployed today -> fresh at 100% HP, 0 energy, alive
@@ -91,6 +99,7 @@ export function getEffectiveTitanStates(
           maxHp,
           energy: 0,
           isDead: false,
+          hasKnownMaxHp,
         };
       }
     }
@@ -429,7 +438,7 @@ export interface SmartSquadPickResult {
 function getTitanHpPct(id: number, titanStates: Record<string, any>): number {
   const st = titanStates?.[String(id)] ?? titanStates?.[Number(id)];
   if (!st) return 100;
-  const maxHp = Math.max(1, Number(st.maxHp) || 1000000);
+  const maxHp = Math.max(1, Number(st.maxHp) || 100);
   const hp = Math.max(0, st.hp != null ? Number(st.hp) : maxHp);
   return (hp / maxHp) * 100;
 }

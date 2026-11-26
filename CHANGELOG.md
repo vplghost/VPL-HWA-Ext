@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.344 — 2026-11-26
+
+### Fixed
+
+- **Titan Dungeon Fresh-Day HP Accuracy — Real `knownMaxHp` Persistence & Removal of Fake `1,000,000 / 1,000,000` Placeholder (`rpcCache.ts`, `dungeonAutomation.ts`, `DungeonModal.vue`, `DungeonSimModal.vue`, `tests/dungeon-daily-titan-reset.test.mjs`)**:
+  - Updated `rpcCache.ts` `dungeonStatus` merge to persist real titan `maxHp` values from `dungeonStartBattle` (`attackers[id].hp`), `dungeonGetInfo`, and `dungeonEndBattle` (`states.titans[id].maxHp`) into `dungeonStatus.data.knownMaxHp`, preserving them across daily resets even when `states.titans` resets to `{}`.
+  - Updated `getEffectiveTitanStates()` in `dungeonAutomation.ts` to resolve `rawState.maxHp` -> `knownMaxHp[id]` -> `rosterTitan.hp` and expose `hasKnownMaxHp: boolean` instead of fabricating `1,000,000` for undeployed titans.
+  - Updated `DungeonModal.vue` (`#dungeon-titan-roster`) to render `Full (100%)` when `!t.hasKnownMaxHp` and real `hp / maxHp (hpPct%)` when known, and aligned `DungeonSimModal.vue` to use `knownMaxHp`.
+
 ## 0.11.342 — 2026-11-26
 
 ### Fixed

@@ -270,8 +270,13 @@ const availableTitans = computed<SimTitanItem[]>(() => {
 
     const state = states[idStr] || {};
     const rosterData = titanRoster[idStr] || {};
+    const knownMaxHp = cache.value.dungeonStatus?.data?.knownMaxHp || {};
 
-    const maxHp = Number(state.maxHp) || Number(rosterData.hp) || 1000000;
+    const resolvedMaxHp =
+      (Number(state.maxHp) > 0 ? Number(state.maxHp) : 0) ||
+      (Number(knownMaxHp[idStr]) > 0 ? Number(knownMaxHp[idStr]) : 0) ||
+      (Number(rosterData.hp) > 0 ? Number(rosterData.hp) : 0);
+    const maxHp = resolvedMaxHp > 0 ? resolvedMaxHp : 100;
     const hp = Math.max(0, state.hp != null ? Number(state.hp) : maxHp);
     const hpPct = Math.min(100, Math.round((hp / maxHp) * 100));
     const energy = Math.max(0, Number(state.energy) || 0);

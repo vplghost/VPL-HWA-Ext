@@ -5654,6 +5654,28 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           const isNewDay = isDateDiff || isResetDiff;
           const isGetInfo = entry.method === 'dungeonGetInfo';
 
+          // Persist real titan maxHp values learned from dungeonStartBattle / dungeonGetInfo / dungeonEndBattle
+          // across daily resets so fresh-day UI does not fall back to fake placeholder HP.
+          const knownMaxHp: Record<string, number> = {};
+          const collectKnownMaxHp = (source: any, preferHpField = false) => {
+            if (!source || typeof source !== 'object') return;
+            for (const [id, item] of Object.entries(source) as [string, any][]) {
+              const val = typeof item === 'number'
+                ? item
+                : preferHpField
+                  ? (Number(item?.maxHp) || Number(item?.hp))
+                  : Number(item?.maxHp);
+              if (Number.isFinite(val) && val > 0) {
+                knownMaxHp[String(id)] = val;
+              }
+            }
+          };
+          collectKnownMaxHp(previous.knownMaxHp);
+          collectKnownMaxHp(previous.states?.titans);
+          collectKnownMaxHp(entry.data.knownMaxHp);
+          collectKnownMaxHp(entry.data.activeBattle?.attackers, true);
+          collectKnownMaxHp(entry.data.states?.titans);
+
           let mergedTitans;
           if (isNewDay) {
             // Daily rest reset: clear fallen titan states and restore fresh HP/energy
@@ -5661,14 +5683,16 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               const rawTitans = entry.data.states?.titans || {};
               mergedTitans = {};
               for (const [id, state] of Object.entries(rawTitans) as [string, any][]) {
-                const maxHp = Number(state?.maxHp) || Number(state?.hp) || 1000000;
-                mergedTitans[id] = {
-                  ...state,
-                  hp: maxHp,
-                  maxHp,
-                  energy: 0,
-                  isDead: false,
-                };
+                const maxHp = Number(state?.maxHp) || Number(knownMaxHp[id]) || Number(state?.hp) || 0;
+                if (maxHp > 0) {
+                  mergedTitans[id] = {
+                    ...state,
+                    hp: maxHp,
+                    maxHp,
+                    energy: 0,
+                    isDead: false,
+                  };
+                }
               }
             } else if (entry.method === 'dungeonEndBattle') {
               mergedTitans = { ...(entry.data.states?.titans || {}) };
@@ -5764,6 +5788,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             data: {
               ...cleanPrevious,
               ...entry.data,
+              ...(Object.keys(knownMaxHp).length > 0 ? { knownMaxHp } : {}),
               todayTitanite: dailyCombatLog.todayTitanite,
               dailyCombatLog,
               ...(lastEncounter ? { lastEncounter } : {}),

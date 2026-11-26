@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   getEffectiveTitanStates,
   resetTitanStates,
   getLineupForDoor,
   evaluateDoor
 } from '../src/services/queues/dungeonAutomation.ts';
-import * as cacheModule from '../src/core/cache/index.ts';
+import { rpcCacheService } from '../src/core/cache/rpcCache.ts';
 
 test('getEffectiveTitanStates fully heals titans and resets energy to 0 on a new day', () => {
   const now = new Date('2026-11-22T10:00:00.000Z').getTime();
@@ -196,4 +197,124 @@ test('getLineupForDoor and evaluateDoor pick revived titans on new day', () => {
   assert.equal(evalResult.canAttack, true);
   assert.equal(evalResult.intactness.isIntact, true);
   assert.equal(evalResult.deadCount, 0);
+});
+
+test('rpcCacheService persists real knownMaxHp from dungeonStartBattle/dungeonEndBattle across fresh-day reset', () => {
+  const day1Start = '2026-11-25T10:00:00.000Z';
+  const day1End = '2026-11-25T10:02:00.000Z';
+  const day2Reload = '2026-11-26T06:58:00.000Z';
+  const makeRpcRecord = (timestamp, calls, results) => ({
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp,
+    requestBody: JSON.stringify({ calls }),
+    responseBody: JSON.stringify({ results }),
+  });
+
+  let cache = {};
+
+  // 1. Day 1 dungeonStartBattle provides real titan HP in attackers[id].hp
+  const startRecord = makeRpcRecord(
+    day1Start,
+    [{ ident: 'c1', name: 'dungeonStartBattle', args: { teamNum: 0, heroes: [4000, 4001] } }],
+    [{
+      ident: 'c1',
+      result: {
+        response: {
+          seed: 12345,
+          attackers: {
+            '4000': { id: 4000, hp: 3845120, level: 120, star: 6 },
+            '4001': { id: 4001, hp: 1620400, level: 120, star: 6 }
+          },
+          defenders: {}
+        }
+      }
+    }]
+  );
+  cache = rpcCacheService.merge(cache, [startRecord]).cache;
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4000'], 3845120);
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4001'], 1620400);
+
+  // 2. Day 1 dungeonEndBattle updates states.titans with maxHp
+  const endRecord = makeRpcRecord(
+    day1End,
+    [{ ident: 'c2', name: 'dungeonEndBattle', args: { result: { win: true, stars: 3 } } }],
+    [{
+      ident: 'c2',
+      result: {
+        response: {
+          dungeon: {
+            floorNumber: 550,
+            states: {
+              titans: {
+                '4000': { hp: 2900000, maxHp: 3845120, energy: 700, isDead: false },
+                '4004': { hp: 1400000, maxHp: 2150000, energy: 400, isDead: false }
+              }
+            }
+          }
+        }
+      }
+    }]
+  );
+  cache = rpcCacheService.merge(cache, [endRecord]).cache;
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4004'], 2150000);
+
+  // 3. Day 2 fresh reload: dungeonGetInfo returns empty states.titans = {}
+  const reloadRecord = makeRpcRecord(
+    day2Reload,
+    [{ ident: 'c3', name: 'dungeonGetInfo', args: {} }],
+    [{
+      ident: 'c3',
+      result: {
+        response: {
+          floorNumber: 551,
+          states: { titans: {} }
+        }
+      }
+    }]
+  );
+  cache = rpcCacheService.merge(cache, [reloadRecord]).cache;
+  assert.deepEqual(cache.dungeonStatus.data.states.titans, {});
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4000'], 3845120, 'knownMaxHp must survive daily reset');
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4001'], 1620400);
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4004'], 2150000);
+
+  // 4. Fresh-day titanGetAll (real server payload without hp field)
+  cache.titanGetAll = {
+    data: {
+      '4000': { id: 4000, level: 120, star: 6, power: 150000 },
+      '4001': { id: 4001, level: 120, star: 6, power: 140000 },
+      '4020': { id: 4020, level: 100, star: 5, power: 95000 } // Never fought yet -> unknown maxHp
+    }
+  };
+
+  const effective = getEffectiveTitanStates(cache, new Date(day2Reload).getTime());
+
+  // Previously seen titan uses real knownMaxHp
+  assert.equal(effective['4000'].hasKnownMaxHp, true);
+  assert.equal(effective['4000'].maxHp, 3845120);
+  assert.equal(effective['4000'].hp, 3845120);
+  assert.equal(effective['4000'].isDead, false);
+
+  // Unseen titan does NOT fabricate 1,000,000
+  assert.equal(effective['4020'].hasKnownMaxHp, false);
+  assert.notEqual(effective['4020'].maxHp, 1000000);
+  assert.equal(effective['4020'].hp, effective['4020'].maxHp);
+  assert.equal(effective['4020'].isDead, false);
+
+  // resetTitanStates preserves knownMaxHp
+  resetTitanStates(cache);
+  assert.equal(cache.dungeonStatus.data.knownMaxHp['4000'], 3845120);
+});
+
+test('DungeonModal.vue renders Full (100%) fallback instead of fake 1,000,000 when maxHp is unknown', () => {
+  const modalSource = fs.readFileSync(
+    new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url),
+    'utf8'
+  );
+  assert.match(modalSource, /hasKnownMaxHp:\s*state\.hasKnownMaxHp !== false/);
+  assert.match(modalSource, /t\.hasKnownMaxHp/);
+  assert.match(modalSource, /Full \(\$\{t\.hpPct\}%\)/);
 });

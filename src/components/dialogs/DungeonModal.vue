@@ -148,6 +148,7 @@ const titanEntries = computed(() => {
       hp,
       maxHp,
       hpPct,
+      hasKnownMaxHp: state.hasKnownMaxHp !== false,
       energy,
       energyPct,
       isDead,
@@ -1325,7 +1326,13 @@ function handleImgError(e: Event) {
                     <div class="flex justify-between text-[9px] text-slate-500 dark:text-slate-400 mb-0.5">
                       <span>HP</span>
                       <span class="tabular-nums font-semibold text-slate-700 dark:text-slate-300">
-                        {{ formatNumber(t.hp) }} / {{ formatNumber(t.maxHp) }} ({{ t.hpPct }}%)
+                        {{
+                          t.hasKnownMaxHp
+                            ? `${formatNumber(t.hp)} / ${formatNumber(t.maxHp)} (${t.hpPct}%)`
+                            : t.isDead
+                              ? '0 (0%)'
+                              : `Full (${t.hpPct}%)`
+                        }}
                       </span>
                     </div>
                     <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
