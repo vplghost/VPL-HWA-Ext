@@ -713,10 +713,12 @@ test('extractEventGoals mines specialQuestStatus and questGetAll into goals and 
   assert.equal(claimGoal.needed, 1);
   assert.ok(claimGoal.isLimited);
 
-  // Login quest extracted
+  // Login quest extracted and classified as passive / completed today
   const loginGoal = goals.activities.find(a => a.key === 'act:login');
   assert.ok(loginGoal);
-  assert.ok(loginGoal.isLimited);
+  assert.equal(loginGoal.isUnavailable, true);
+  assert.equal(loginGoal.isLimited, false);
+  assert.ok(goals.unavailable.some(u => u.key === 'act:login'));
 });
 
 test('getChallengeResourceStock resolves emerald and starmoney balances', () => {
@@ -1160,4 +1162,98 @@ test('extractEventGoals marks tower chest activities as unavailable when tower i
   assert.equal(towerChestGoal.isUnavailable, true);
   assert.equal(towerChestGoal.isLimited, false);
   assert.match(towerChestGoal.hint, /Tower cleared today/);
+});
+
+test('extractEventGoals separates equip-item color tiers and never creates false same-event 6x synergy', () => {
+  const cache = {
+    clanVersusStatus: {
+      data: {
+        battle: { rounds: [{ index: 4, theme: 'Hero Advancement & Equipment', status: 'inProgress' }] },
+        info: {
+          roundNumber: 4,
+          challenges: [
+            { id: 41, progress: 0 }, // Equip 1 Red Item
+            { id: 42, progress: 0 }, // Equip 1 Orange Item
+            { id: 43, progress: 0 }, // Equip 1 Violet Item
+            { id: 44, progress: 0 }, // Equip 1 Blue Item
+            { id: 45, progress: 0 }, // Equip 1 Green Item
+            { id: 46, progress: 0 }, // Equip 1 White Item
+          ]
+        }
+      }
+    }
+  };
+
+  const goals = extractEventGoals(cache);
+  const equipGoals = goals.actionableActivities.filter((g) => g.key.startsWith('act:equip_item_'));
+  assert.equal(equipGoals.length, 6, 'All 6 color tiers must stay distinct');
+  for (const g of equipGoals) {
+    assert.equal(g.overlapCount, 1, `Equip tier ${g.key} must not report false synergy`);
+  }
+  assert.equal(goals.metrics.synergiesCount, 0, 'Same-event equip tiers must not inflate synergiesCount');
+});
+
+test('extractEventGoals detects daily exhaustion for Arena, Grand Arena, Expedition, Daily Quests, Guild War, Daily Sign In and sorts unavailable last', () => {
+  const now = new Date('2026-11-26T10:00:00.000Z').getTime();
+  const todayIso = '2026-11-26T08:00:00.000Z';
+  const cache = {
+    questResetStatus: { data: { nextDayAt: new Date('2026-11-27T05:00:00.000Z').getTime() } },
+    towerStatus: { updatedAt: todayIso, data: { isCleared: true, state: 'win' } },
+    'resource:refillable:6': { updatedAt: todayIso, data: { amount: 0 } },   // Arena 0 free left
+    'resource:refillable:21': { updatedAt: todayIso, data: { amount: 0 } },  // Grand Arena 0 free left
+    expeditionGet: {
+      updatedAt: todayIso,
+      data: [
+        { slotId: 1, status: 3, attemptsLeft: 0 },
+        { slotId: 2, status: 3, attemptsLeft: 0 },
+        { slotId: 6, status: 0, attemptsLeft: 0 }, // locked
+      ]
+    },
+    clanWarChampStatus: { updatedAt: todayIso, data: { tries: 0 } },
+    'getDailyQuests:quest': { updatedAt: todayIso, data: { quests: [] } },
+    questGetAll: { updatedAt: todayIso, data: [{ id: 1, state: 3, progress: 1 }] },
+    clanVersusStatus: {
+      data: {
+        battle: { rounds: [{ index: 1, status: 'inProgress' }] },
+        info: {
+          challenges: [
+            { id: 31, progress: 15 }, // Open 1 Tower Chest
+            { id: 13, progress: 1 },  // Defeat 1 Map Boss (still actionable!)
+          ]
+        }
+      }
+    },
+    specialQuestStatus: {
+      updatedAt: todayIso,
+      data: {
+        events: [
+          {
+            id: 100347, viewId: 127, start: 0, end: now + 86400000,
+            groups: [
+              { id: 1, localeKey: 'QUEST_TAB_NAME_TOWER_CHESTS', repeatType: 'chain', quests: [{ id: 1, state: 'inProgress', progress: 5 }] },
+              { id: 2, localeKey: 'QUEST_TAB_NAME_ARENA', repeatType: 'daily', quests: [{ id: 2, state: 'inProgress', progress: 5 }] },
+              { id: 3, localeKey: 'QUEST_TAB_NAME_GRAND_ARENA', repeatType: 'daily', quests: [{ id: 3, state: 'inProgress', progress: 5 }] },
+              { id: 4, localeKey: 'QUEST_TAB_NAME_EXPEDITION', repeatType: 'daily', quests: [{ id: 4, state: 'inProgress', progress: 3 }] },
+              { id: 5, localeKey: 'QUEST_TAB_NAME_DAILY_QUESTS', repeatType: 'daily', quests: [{ id: 5, state: 'inProgress', progress: 10 }] },
+              { id: 6, localeKey: 'QUEST_TAB_NAME_LOGIN', repeatType: 'daily', quests: [{ id: 6, state: 'inProgress', progress: 1 }] },
+            ]
+          }
+        ]
+      }
+    }
+  };
+
+  const goals = extractEventGoals(cache, now);
+  const unavailableKeys = new Set(goals.unavailable.map((g) => g.key));
+
+  for (const key of ['act:tower', 'act:arena', 'act:grand_arena', 'act:expedition', 'act:daily_quest', 'act:login', 'act:guild_war']) {
+    assert.ok(unavailableKeys.has(key), `Expected ${key} to be classified as unavailable today`);
+  }
+
+  // Actionable boss rally must remain in actionableActivities and sort BEFORE unavailable 2x tower chest!
+  assert.ok(goals.actionableActivities.some((g) => g.key === 'act:map_boss'));
+  assert.equal(goals.all[0].key, 'act:map_boss', 'Actionable goal must sort ahead of unavailable synergy goals');
+  assert.equal(goals.metrics.totalGoals, goals.actionableActivities.length + goals.resources.length);
+  assert.equal(goals.metrics.unavailableCount, goals.unavailable.length);
+  assert.equal(goals.metrics.synergiesCount, 0, 'Unavailable 2x Tower synergy must not count toward actionable synergies');
 });

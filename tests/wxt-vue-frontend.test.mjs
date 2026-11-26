@@ -357,6 +357,9 @@ test('EventsTab and GoalsTab have 1:1 parity with HTML events and goals renderin
   assert.match(goals, /readyCount/, 'GoalsTab must display readyCount KPI');
   assert.match(goals, /Activities & Quests/, 'GoalsTab must render Activities group');
   assert.match(goals, /Resources to Spend/, 'GoalsTab must render Resources group');
+  assert.match(goals, /id="goals-actionable-activities"/, 'GoalsTab must render dedicated actionable activities section');
+  assert.match(goals, /id="goals-unavailable-section"/, 'GoalsTab must render dedicated completed/unavailable bottom section');
+  assert.match(goals, /id="goals-toggle-unavailable-btn"/, 'GoalsTab must provide toggle for unavailable section');
 
   const app = await readFile(join(root, 'entrypoints/popup/App.vue'), 'utf8');
   assert.match(app, /EventsTab/, 'App.vue must wire EventsTab');

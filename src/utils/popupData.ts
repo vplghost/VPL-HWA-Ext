@@ -21,6 +21,12 @@ import {
 import { getAttentionBonusAvailability } from './freeChestHelper.ts';
 import { freeAlchemyAvailability } from '../services/freeAlchemy.ts';
 import { getGold, getStarMoney, getEnergy } from './resourceData.ts';
+import {
+  towerActivityState,
+  arenaActivityState,
+  dungeonActivityState,
+} from '../composables/activityState.ts';
+import { expeditionActivity } from './expeditions.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.294.0 (client 1.294.1020) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -340,7 +346,7 @@ export function getChallengeResourceStock(cache: any, target: string | number): 
 }
 
 export function normalizeGoalKey(target: any): string {
-  const s = String(target || '').toLowerCase();
+  const s = String(target || '').toLowerCase().replace(/_/g, ' ');
   if (s.includes('titan skin stone')) return 'res:titan_skin_stones';
   if (s.includes('hero skin stone')) return 'res:hero_skin_stones';
   if (s.includes('titan potion')) return 'res:titan_potions';
@@ -382,14 +388,28 @@ export function normalizeGoalKey(target: any): string {
   if (s.includes('hero level') || s.includes('hero_level')) return 'act:hero_level';
   if (s.includes('altar')) return 'act:clan_altar';
   if (s.includes('battle pass') || s.includes('bp_daily')) return 'act:battle_pass_daily';
-  if (s.includes('gather') || s.includes('food') || s.includes('wood') || s.includes('stone') || s.includes('iron')) return 'act:gathering';
+  if (s.includes('gather') || s.includes('food') || s.includes('wood') || s.includes('stone') || s.includes('iron')) {
+    if (s.includes('food')) return 'act:gather_food';
+    if (s.includes('wood')) return 'act:gather_wood';
+    if (s.includes('stone')) return 'act:gather_stone';
+    if (s.includes('iron')) return 'act:gather_iron';
+    return 'act:gathering';
+  }
   if (s.includes('titan power')) return 'act:titan_power';
   if (s.includes('hero power')) return 'act:hero_power';
   if (s.includes('building power')) return 'act:building_power';
   if (s.includes('research power')) return 'act:research_power';
   if (s.includes('train') && s.includes('troop')) return 'act:train_troops';
   if (s.includes('unit in pvp') || s.includes('loseunits') || s.includes('pvp unit')) return 'act:pvp_clash';
-  if (s.includes('equip') && s.includes('item')) return 'act:equip_items';
+  if (s.includes('equip') && s.includes('item')) {
+    if (s.includes('red')) return 'act:equip_item_red';
+    if (s.includes('orange')) return 'act:equip_item_orange';
+    if (s.includes('violet') || s.includes('purple')) return 'act:equip_item_violet';
+    if (s.includes('blue')) return 'act:equip_item_blue';
+    if (s.includes('green')) return 'act:equip_item_green';
+    if (s.includes('white')) return 'act:equip_item_white';
+    return 'act:equip_items';
+  }
   if (s.includes('dungeon')) return 'act:dungeon';
   if (s.includes('guild war')) return 'act:guild_war';
 
@@ -428,6 +448,10 @@ export const goalIconMap: Record<string, string> = {
   'act:arena': '⚔️',
   'act:grand_arena': '🛡️',
   'act:gathering': '🌾',
+  'act:gather_food': '🌾',
+  'act:gather_wood': '🪵',
+  'act:gather_stone': '🪨',
+  'act:gather_iron': '⛏️',
   'act:titan_power': '💪',
   'act:hero_power': '⭐',
   'act:building_power': '🏛️',
@@ -435,6 +459,12 @@ export const goalIconMap: Record<string, string> = {
   'act:train_troops': '🛡️',
   'act:pvp_clash': '⚔️',
   'act:equip_items': '🗡️',
+  'act:equip_item_red': '🔴',
+  'act:equip_item_orange': '🟠',
+  'act:equip_item_violet': '🟣',
+  'act:equip_item_blue': '🔵',
+  'act:equip_item_green': '🟢',
+  'act:equip_item_white': '⚪',
   'act:dungeon': '🏰',
   'act:guild_war': '🏆',
   'act:login': '📅',
@@ -489,14 +519,141 @@ export function isTowerCleared(cache: any): boolean {
   return false;
 }
 
+function isExpeditionExhaustedToday(cache: any, now = Date.now()): boolean {
+  const act = expeditionActivity(cache || {}, now);
+  if (act.state === 'done') return true;
+  // Fallback when raw expeditionGet array is present without scoped expeditionStatus
+  const raw = cache?.expeditionGet?.data;
+  if (Array.isArray(raw) && raw.length > 0) {
+    const unlocked = raw.filter((row: any) => row && row.status !== 0);
+    if (unlocked.length > 0 && unlocked.every((row: any) => row.status === 3 || row.attemptsLeft === 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function evaluateGoalAvailability(
+  key: string,
+  title: string,
+  cache: any,
+  now = Date.now(),
+  towerClearedOverride?: boolean
+): { isUnavailable: boolean; reason: string; badge: string } {
+  const towerCleared = towerClearedOverride ?? (isTowerCleared(cache) || towerActivityState(cache || {}, now).state === 'done');
+
+  const isTowerChest = key === 'act:tower' ||
+    (typeof key === 'string' && key.startsWith('act:daily_quest_') && (
+      [10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
+      (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title))
+    )) ||
+    (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title));
+
+  if (isTowerChest && towerCleared) {
+    return {
+      isUnavailable: true,
+      reason: 'Tower cleared today • No more chests available until daily reset',
+      badge: 'Tower Cleared',
+    };
+  }
+
+  if (key === 'act:login') {
+    return {
+      isUnavailable: true,
+      reason: 'Already signed in today • Resets tomorrow',
+      badge: 'Signed In Today',
+    };
+  }
+
+  if (key === 'act:arena' && arenaActivityState(cache || {}, false, now).state === 'done') {
+    return {
+      isUnavailable: true,
+      reason: '0 free Arena battles left today',
+      badge: '0 Free Left',
+    };
+  }
+
+  if (key === 'act:grand_arena' && arenaActivityState(cache || {}, true, now).state === 'done') {
+    return {
+      isUnavailable: true,
+      reason: '0 free Grand Arena battles left today',
+      badge: '0 Free Left',
+    };
+  }
+
+  if (key === 'act:expedition' && isExpeditionExhaustedToday(cache, now)) {
+    return {
+      isUnavailable: true,
+      reason: 'All expeditions completed today',
+      badge: 'Cleared Today',
+    };
+  }
+
+  if (key === 'act:daily_quest') {
+    const hasDailySnapshot = Boolean(
+      cache?.['getDailyQuests:quest']?.data ||
+      cache?.questGetAll?.data ||
+      Array.isArray(cache?.questGetAll)
+    );
+    if (hasDailySnapshot) {
+      const dailyList = questData?.dailyQuests?.(cache, now) || [];
+      const activeDaily = dailyList.filter((q: any) => {
+        if (q.state !== 'inProgress' && q.state !== 1) return false;
+        const qTitle = questData?.dailyTitle ? questData.dailyTitle(q) : '';
+        if (towerCleared && (/tower/i.test(qTitle) && /chest/i.test(qTitle))) return false;
+        return true;
+      });
+      const allQuests = Array.isArray(cache?.questGetAll?.data)
+        ? cache.questGetAll.data
+        : (Array.isArray(cache?.questGetAll) ? cache.questGetAll : []);
+      const readyQuests = allQuests.filter((q: any) => q.state === 2);
+      if (activeDaily.length === 0 && readyQuests.length === 0) {
+        return {
+          isUnavailable: true,
+          reason: 'All daily quests completed today',
+          badge: 'No Quests Left',
+        };
+      }
+    }
+  }
+
+  if (key === 'act:guild_war' && cache?.clanWarChampStatus?.data && Number(cache.clanWarChampStatus.data.tries) === 0) {
+    return {
+      isUnavailable: true,
+      reason: '0 Guild War attacks remaining today',
+      badge: '0 Attacks Left',
+    };
+  }
+
+  if (key === 'act:dungeon' && dungeonActivityState(cache || {}, now).state === 'done') {
+    return {
+      isUnavailable: true,
+      reason: 'All eligible Titans exhausted today',
+      badge: 'Cleared Today',
+    };
+  }
+
+  return { isUnavailable: false, reason: '', badge: '' };
+}
+
+function normalizeEventSourceKey(eventName: string): string {
+  return String(eventName || '')
+    .replace(/\s*\((Daily|Chain)\)\s*$/i, '')
+    .trim()
+    .toLowerCase();
+}
+
 export function extractEventGoals(cache: any, now = Date.now()): {
   all: any[];
   activities: any[];
+  actionableActivities: any[];
   resources: any[];
-  metrics: { totalGoals: number; synergiesCount: number; readyCount: number };
+  unavailable: any[];
+  metrics: { totalGoals: number; synergiesCount: number; readyCount: number; unavailableCount: number };
 } {
   const goalsMap = new Map<string, any>();
-  const towerCleared = isTowerCleared(cache);
+  const eventSourcesMap = new Map<string, Set<string>>();
+  const towerCleared = isTowerCleared(cache) || towerActivityState(cache || {}, now).state === 'done';
 
   const challengeNames = clanVersusChallengeNames || {};
   const challengePoints = clanVersusChallengePoints || {};
@@ -504,22 +661,18 @@ export function extractEventGoals(cache: any, now = Date.now()): {
   const roundQuestsMap = clanVersusRoundQuests || {};
 
   function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }: any) {
-    const isTowerChest = key === 'act:tower' ||
-      (typeof key === 'string' && key.startsWith('act:daily_quest_') && (
-        [10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
-        (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title))
-      )) ||
-      (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title));
-
-    const isUnavailable = isTowerChest && towerCleared;
-    const finalHint = (isTowerChest && towerCleared)
-      ? 'Tower cleared today • No more chests available until daily reset'
-      : hint;
-    const isLimited = (isTowerChest && towerCleared) ? false :
-      dailyLimitedKeys.has(key) || key.startsWith('act:daily_quest_');
+    const availability = evaluateGoalAvailability(key, title, cache, now, towerCleared);
+    const isUnavailable = availability.isUnavailable;
+    const finalHint = isUnavailable && availability.reason ? availability.reason : hint;
+    const isLimited = isUnavailable
+      ? false
+      : dailyLimitedKeys.has(key) || key.startsWith('act:daily_quest_');
+    const sourceKey = normalizeEventSourceKey(eventName);
 
     if (!goalsMap.has(key)) {
       const icon = goalIconMap[key] || (category === 'Resources' ? '💎' : '🎯');
+      const sources = new Set<string>(sourceKey ? [sourceKey] : []);
+      eventSourcesMap.set(key, sources);
       goalsMap.set(key, {
         key,
         title,
@@ -531,22 +684,29 @@ export function extractEventGoals(cache: any, now = Date.now()): {
         inStock: stock != null ? stock >= amount : null,
         isLimited,
         isUnavailable,
+        unavailableReason: availability.reason || '',
+        unavailableBadge: availability.badge || (isUnavailable ? 'Cleared Today' : ''),
         totalPoints: points,
-        overlapCount: 1,
+        overlapCount: Math.max(1, sources.size),
         events: [{ name: eventName, amount, points, unit }],
         hint: finalHint
       });
     } else {
       const existing = goalsMap.get(key);
-      existing.overlapCount += 1;
+      const sources = eventSourcesMap.get(key) || new Set<string>();
+      if (sourceKey) sources.add(sourceKey);
+      eventSourcesMap.set(key, sources);
+      existing.overlapCount = Math.max(1, sources.size);
       existing.totalPoints += points;
       if (amount > existing.needed) existing.needed = amount;
       if (existing.stock != null && existing.needed != null) {
         existing.inStock = existing.stock >= existing.needed;
       }
-      if (isTowerChest && towerCleared) {
+      if (isUnavailable) {
         existing.isLimited = false;
         existing.isUnavailable = true;
+        existing.unavailableReason = availability.reason || existing.unavailableReason;
+        existing.unavailableBadge = availability.badge || existing.unavailableBadge || 'Cleared Today';
         existing.hint = finalHint;
       }
       existing.events.push({ name: eventName, amount, points, unit });
@@ -764,6 +924,10 @@ export function extractEventGoals(cache: any, now = Date.now()): {
   }
 
   function compareGoals(a: any, b: any) {
+    const aDead = Boolean(a.isUnavailable || a.isCompleted);
+    const bDead = Boolean(b.isUnavailable || b.isCompleted);
+    if (aDead !== bDead) return aDead ? 1 : -1;
+
     const aOverlap = a.overlapCount > 1 ? a.overlapCount : 0;
     const bOverlap = b.overlapCount > 1 ? b.overlapCount : 0;
     if (aOverlap !== bOverlap) return bOverlap - aOverlap;
@@ -783,21 +947,27 @@ export function extractEventGoals(cache: any, now = Date.now()): {
     return a.title.localeCompare(b.title);
   }
 
-  const allGoals = Array.from(goalsMap.values());
-  const activities = allGoals.filter((g) => g.category === 'Activities').sort(compareGoals);
-  const resources = allGoals.filter((g) => g.category === 'Resources').sort(compareGoals);
+  const allGoals = Array.from(goalsMap.values()).sort(compareGoals);
+  const activities = allGoals.filter((g) => g.category === 'Activities');
+  const actionableActivities = activities.filter((g) => !g.isUnavailable && !g.isCompleted);
+  const resources = allGoals.filter((g) => g.category === 'Resources' && !g.isUnavailable && !g.isCompleted);
+  const unavailable = allGoals.filter((g) => Boolean(g.isUnavailable || g.isCompleted));
+  const actionableGoals = allGoals.filter((g) => !g.isUnavailable && !g.isCompleted);
 
   return {
-    all: allGoals.sort(compareGoals),
+    all: allGoals,
     activities,
+    actionableActivities,
     resources,
+    unavailable,
     metrics: {
-      totalGoals: allGoals.length,
-      synergiesCount: allGoals.filter((g) => g.overlapCount > 1).length,
-      readyCount: allGoals.filter((g) =>
+      totalGoals: actionableGoals.length,
+      synergiesCount: actionableGoals.filter((g) => g.overlapCount > 1).length,
+      readyCount: actionableGoals.filter((g) =>
         (g.category === 'Resources' && g.inStock) ||
-        (g.category === 'Activities' && g.isLimited && !g.isUnavailable && !g.isCompleted)
-      ).length
+        (g.category === 'Activities' && g.isLimited)
+      ).length,
+      unavailableCount: unavailable.length,
     }
   };
 }

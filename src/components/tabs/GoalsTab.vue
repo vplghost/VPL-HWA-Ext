@@ -7,14 +7,26 @@ import { extractEventGoals } from '@/src/utils/popupData';
 const { cache, dispatchRpc } = useRpcCache();
 
 const search = ref('');
-const activeFilter = ref<'all' | 'activities' | 'resources' | 'synergies' | 'ready'>('all');
+const activeFilter = ref<'all' | 'activities' | 'resources' | 'synergies' | 'ready' | 'unavailable'>('all');
+const showUnavailable = ref(false);
 const isRefreshing = ref(false);
 
 const goalsData = computed(() => {
   return extractEventGoals(cache.value);
 });
 
-function matchGoal(g: any): boolean {
+function matchSearch(g: any): boolean {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return true;
+  const inTitle = g.title.toLowerCase().includes(q);
+  const inCat = g.category.toLowerCase().includes(q);
+  const inEvents = (g.events || []).some((e: any) => e.name.toLowerCase().includes(q));
+  const inReason = String(g.unavailableReason || g.hint || '').toLowerCase().includes(q);
+  return inTitle || inCat || inEvents || inReason;
+}
+
+function matchActionableGoal(g: any): boolean {
+  if (activeFilter.value === 'unavailable') return false;
   if (activeFilter.value === 'activities' && g.category !== 'Activities') return false;
   if (activeFilter.value === 'resources' && g.category !== 'Resources') return false;
   if (activeFilter.value === 'synergies' && g.overlapCount <= 1) return false;
@@ -24,22 +36,31 @@ function matchGoal(g: any): boolean {
   )
     return false;
 
-  const q = search.value.trim().toLowerCase();
-  if (q) {
-    const inTitle = g.title.toLowerCase().includes(q);
-    const inCat = g.category.toLowerCase().includes(q);
-    const inEvents = (g.events || []).some((e: any) => e.name.toLowerCase().includes(q));
-    if (!inTitle && !inCat && !inEvents) return false;
-  }
-  return true;
+  return matchSearch(g);
 }
 
-const visibleActivities = computed(() => {
-  return (goalsData.value.activities || []).filter(matchGoal);
+const visibleActionableActivities = computed(() => {
+  const list = goalsData.value.actionableActivities ||
+    (goalsData.value.activities || []).filter((g: any) => !g.isUnavailable && !g.isCompleted);
+  return list.filter(matchActionableGoal);
 });
 
 const visibleResources = computed(() => {
-  return (goalsData.value.resources || []).filter(matchGoal);
+  return (goalsData.value.resources || []).filter(matchActionableGoal);
+});
+
+const visibleUnavailable = computed(() => {
+  if (activeFilter.value === 'resources' || activeFilter.value === 'ready') return [];
+  const list = goalsData.value.unavailable ||
+    (goalsData.value.all || []).filter((g: any) => g.isUnavailable || g.isCompleted);
+  return list.filter((g: any) => {
+    if (activeFilter.value === 'synergies' && g.overlapCount <= 1) return false;
+    return matchSearch(g);
+  });
+});
+
+const isUnavailableExpanded = computed(() => {
+  return activeFilter.value === 'unavailable' || showUnavailable.value || search.value.trim().length > 0;
 });
 
 async function refreshGoals() {
@@ -73,7 +94,10 @@ async function refreshGoals() {
             </span>
           </div>
           <p class="text-xs text-slate-400">
-            {{ goalsData.metrics.totalGoals }} active goals • {{ goalsData.metrics.synergiesCount }} synergies • {{ goalsData.metrics.readyCount }} ready
+            {{ goalsData.metrics.totalGoals }} actionable • {{ goalsData.metrics.synergiesCount }} synergies • {{ goalsData.metrics.readyCount }} ready
+            <template v-if="goalsData.metrics.unavailableCount > 0">
+              • {{ goalsData.metrics.unavailableCount }} done / unavailable
+            </template>
           </p>
         </div>
       </div>
@@ -160,7 +184,7 @@ async function refreshGoals() {
           "
           @click="activeFilter = 'all'"
         >
-          All ({{ goalsData.all.length }})
+          All ({{ goalsData.metrics.totalGoals }})
         </button>
 
         <button
@@ -173,7 +197,7 @@ async function refreshGoals() {
           "
           @click="activeFilter = 'activities'"
         >
-          ⚡ Activities ({{ goalsData.activities.length }})
+          ⚡ Activities ({{ goalsData.actionableActivities.length }})
         </button>
 
         <button
@@ -214,36 +238,49 @@ async function refreshGoals() {
         >
           ✓ Ready ({{ goalsData.metrics.readyCount }})
         </button>
+
+        <button
+          v-if="goalsData.metrics.unavailableCount > 0"
+          id="goals-filter-unavailable-btn"
+          type="button"
+          class="cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+          :class="
+            activeFilter === 'unavailable'
+              ? 'bg-slate-700 text-white shadow-xs dark:bg-slate-200 dark:text-slate-900'
+              : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+          "
+          @click="activeFilter = 'unavailable'"
+        >
+          🔒 Completed / Unavailable ({{ goalsData.metrics.unavailableCount }})
+        </button>
       </div>
 
       <!-- No Filter Results -->
       <div
-        v-if="visibleActivities.length === 0 && visibleResources.length === 0"
+        v-if="visibleActionableActivities.length === 0 && visibleResources.length === 0 && visibleUnavailable.length === 0"
         class="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-xs text-slate-500"
       >
         No event goals match current filter or search criteria.
       </div>
 
-      <!-- 3. Activities Group -->
-      <div v-if="visibleActivities.length > 0" class="space-y-2.5">
+      <!-- 3. Actionable Activities Group -->
+      <div v-if="visibleActionableActivities.length > 0" id="goals-actionable-activities" class="space-y-2.5">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-            <span>⚡</span> Activities & Quests ({{ visibleActivities.length }})
+            <span>⚡</span> Activities & Quests ({{ visibleActionableActivities.length }})
           </h3>
           <span class="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-            Daily-Limited & Battle Tasks
+            Actionable Today
           </span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <div
-            v-for="act in visibleActivities"
+            v-for="act in visibleActionableActivities"
             :key="act.key"
             class="rounded-xl border p-3 text-xs space-y-2 transition-colors"
             :class="[
-              act.isUnavailable || act.isCompleted
-                ? 'border-slate-200 bg-slate-50/70 opacity-80 dark:border-slate-800 dark:bg-slate-900/60'
-                : act.overlapCount > 1
+              act.overlapCount > 1
                 ? 'border-amber-300 bg-amber-50/40 shadow-xs dark:border-amber-900/60 dark:bg-amber-950/20'
                 : act.isLimited
                 ? 'border-blue-200 bg-blue-50/30 dark:border-blue-900/40 dark:bg-blue-950/20'
@@ -264,13 +301,7 @@ async function refreshGoals() {
                   🔥 {{ act.overlapCount }}x Synergy
                 </span>
                 <span
-                  v-if="act.isUnavailable || act.isCompleted"
-                  class="rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-[10px] font-semibold px-2 py-0.5 border border-slate-300 dark:border-slate-700"
-                >
-                  🔒 Cleared Today
-                </span>
-                <span
-                  v-else-if="act.isLimited"
+                  v-if="act.isLimited"
                   class="rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 text-[10px] font-semibold px-2 py-0.5 border border-blue-200 dark:border-blue-800"
                 >
                   ⚡ Daily Limited
@@ -315,7 +346,7 @@ async function refreshGoals() {
       </div>
 
       <!-- 4. Resources Group -->
-      <div v-if="visibleResources.length > 0" class="space-y-2.5">
+      <div v-if="visibleResources.length > 0" id="goals-resources" class="space-y-2.5">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
             <span>💎</span> Resources to Spend ({{ visibleResources.length }})
@@ -403,6 +434,63 @@ async function refreshGoals() {
               <span v-if="res.totalPoints > 0" class="font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                 +{{ formatNumber(res.totalPoints) }} total pts
               </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Completed / Unavailable Today (Bottom Section) -->
+      <div v-if="visibleUnavailable.length > 0" id="goals-unavailable-section" class="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span>🔒</span> Completed / Unavailable Today ({{ visibleUnavailable.length }})
+          </h3>
+          <button
+            id="goals-toggle-unavailable-btn"
+            type="button"
+            class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            @click="showUnavailable = !showUnavailable"
+          >
+            {{ isUnavailableExpanded ? 'Hide' : 'Show' }} ({{ visibleUnavailable.length }})
+          </button>
+        </div>
+
+        <div v-if="isUnavailableExpanded" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          <div
+            v-for="item in visibleUnavailable"
+            :key="item.key"
+            class="rounded-xl border border-slate-200 bg-slate-50/70 opacity-75 dark:border-slate-800 dark:bg-slate-900/50 p-3 text-xs space-y-2"
+          >
+            <div class="flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1.5 font-bold text-slate-600 dark:text-slate-300 truncate">
+                <span class="shrink-0 text-sm">{{ item.icon }}</span>
+                <span class="truncate" :title="item.title">{{ item.title }}</span>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <span
+                  class="rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-[10px] font-semibold px-2 py-0.5 border border-slate-300 dark:border-slate-700"
+                >
+                  🔒 {{ item.unavailableBadge || 'Cleared Today' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="(ev, eIdx) in item.events"
+                :key="eIdx"
+                class="inline-flex items-center rounded-md bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 text-[11px] font-medium border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+              >
+                <strong class="text-slate-700 dark:text-slate-300 mr-1">{{ ev.name }}:</strong>
+                {{ ev.amount ? `${formatNumber(ev.amount)} ${ev.unit || ''}` : '' }}
+                <span v-if="ev.points > 0" class="ml-1 text-slate-500 dark:text-slate-400 font-semibold tabular-nums">
+                  (+{{ formatNumber(ev.points) }} pts)
+                </span>
+              </span>
+            </div>
+
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/70 dark:border-slate-800 flex items-center justify-between flex-wrap gap-1">
+              <span>{{ item.unavailableReason || item.hint || 'Unavailable until daily reset' }}</span>
             </div>
           </div>
         </div>

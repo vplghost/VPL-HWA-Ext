@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.346 — 2026-11-26
+
+### Changed
+
+- **Goals Tab Actionability & True Cross-Event Synergy (`popupData.ts`, `GoalsTab.vue`, `tests/popup-data.test.mjs`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Separated non-combinable item equipment color tiers (`act:equip_item_red`..`white`) and gathering resources (`act:gather_food`..`iron`) in `normalizeGoalKey()` and computed `overlapCount` from distinct event sources so same-event tiers never inflate into false `6x Synergy`.
+  - Added `evaluateGoalAvailability()` in `popupData.ts` to detect daily exhaustion/completion across Tower Chests, Arena, Grand Arena, Expeditions, Complete Daily Quests, Daily Sign In, Guild War attacks, and Titan Dungeon.
+  - Updated `compareGoals()` to sort all actionable goals ahead of unavailable/completed goals even when unavailable goals span multiple events, excluded unavailable items from actionable KPI counts (`totalGoals`, `synergiesCount`, `readyCount`), and added a dedicated collapsible `#goals-unavailable-section` (`Completed / Unavailable Today`) at the bottom of `GoalsTab.vue`.
+
 ## 0.11.344 — 2026-11-26
 
 ### Fixed
