@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.356 — 2026-11-26
+
+### Changed
+
+- **Hero Hover Card Compact Single-Line Artifacts (`HeroHoverCard.vue`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Removed fixed `Wpn:` / `Book:` / `Ring:` prefixes from artifact pills in `HeroHoverCard.vue` (keeping compact `★ Lv.N` with `flex-nowrap` & `whitespace-nowrap` plus full `title` tooltips) so all 3 artifacts stay cleanly on a single line without wrapping.
+
 ## 0.11.354 — 2026-11-26
 
 ### Changed

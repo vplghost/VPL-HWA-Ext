@@ -403,6 +403,9 @@ test('HeroesTab and HeroHoverCard provide full HTML parity: table view, favorite
   assert.match(hoverCard, /skinsList/, 'HeroHoverCard must show skins');
   assert.match(hoverCard, /glyphsList/, 'HeroHoverCard must show glyphs');
   assert.match(hoverCard, /artifactsList/, 'HeroHoverCard must show artifacts');
+  assert.match(hoverCard, /data-section="artifacts"/, 'HeroHoverCard must tag artifacts section');
+  assert.doesNotMatch(hoverCard, /\{\{\s*art\.name\s*\}\}:/, 'HeroHoverCard must not render fixed Wpn/Book/Ring prefix on artifact pills');
+  assert.match(hoverCard, /whitespace-nowrap/, 'HeroHoverCard artifact pills must prevent line wrapping');
   assert.match(hoverCard, /equipmentSlots/, 'HeroHoverCard must show 6 equipment slots');
 
   const nav = await readFile(join(root, 'src/components/common/TabNav.vue'), 'utf8');

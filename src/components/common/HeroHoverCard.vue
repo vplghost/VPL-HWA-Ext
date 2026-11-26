@@ -194,13 +194,14 @@ const glyphsList = computed(() => {
 const artifactsList = computed(() => {
   const arts = props.hero?.artifacts;
   if (!Array.isArray(arts) || arts.length === 0) return [];
-  const typeAbbr: Record<string, string> = { weapon: 'Wpn', book: 'Book', ring: 'Ring' };
-  return arts.map((art: any) => {
+  const typeTitles: Record<string, string> = { weapon: 'Weapon', book: 'Book', ring: 'Ring' };
+  return arts.map((art: any, idx: number) => {
     const artLvl = Number(art.level) || 0;
     const tierStyle = getHeroArtifactTierStyle(artLvl);
-    const name = typeAbbr[art.artifactType] || art.artifactType || 'Art';
+    const fullName = typeTitles[art.artifactType] || art.artifactType || `Artifact ${idx + 1}`;
     return {
-      name,
+      key: art.artifactType || idx,
+      fullName,
       star: Number(art.star) || 0,
       level: artLvl,
       badgeClass: tierStyle.badge,
@@ -443,17 +444,22 @@ const artifactsList = computed(() => {
           </div>
         </div>
 
-        <!-- Artifacts: inline compact layout -->
-        <div v-if="artifactsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+        <!-- Artifacts: compact single-line layout (fixed order: Weapon, Book, Ring) -->
+        <div
+          v-if="artifactsList.length > 0"
+          data-section="artifacts"
+          class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5"
+        >
           <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Artifacts</span>
-          <div class="flex items-center gap-1 flex-wrap justify-end">
+          <div class="flex items-center gap-1 flex-nowrap justify-end">
             <span
               v-for="art in artifactsList"
-              :key="art.name"
-              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :key="art.key"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums whitespace-nowrap"
               :class="art.badgeClass"
+              :title="`${art.fullName}: ${art.star}★ Lv.${art.level}`"
             >
-              {{ art.name }}: {{ art.star }}★ Lv.{{ art.level }}
+              {{ art.star }}★ Lv.{{ art.level }}
             </span>
           </div>
         </div>
