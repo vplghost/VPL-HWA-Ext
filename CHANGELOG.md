@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.350 — 2026-11-26
+
+### Changed
+
+- **Research Dialog Overhaul — Honor Marks Filter, Pinned Queue Summary Footer (Research & Building) & Personal Research Directory Cleanup (`ResearchModal.vue`, `BuildingModal.vue`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Added `#next-research-honor-filter` (`All` / `No Honor Marks` / `Honor Marks Only`) to Next Research Candidates in `ResearchModal.vue` filtering by `requiresSpecialResource(r.id, r.nextLevel)`.
+  - Moved `Total time` and `Completion` summary footers (`#research-queue-summary-footer` and `#building-queue-summary-footer`) outside the `max-h-[220px] overflow-y-auto` queue lists so they remain permanently visible without scrolling.
+  - Refactored Personal Research Directory tabs into `All` → `Researched` (researched, non-max techs replacing legacy `In Progress`) → `Unavailable` (replacing misleading `Available`) → `Completed` (maxed techs only, placed last), and sorted maxed techs to the bottom of the directory list.
+
 ## 0.11.348 — 2026-11-26
 
 ### Added

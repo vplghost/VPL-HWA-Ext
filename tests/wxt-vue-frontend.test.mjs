@@ -246,6 +246,7 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(bContent, /Auto-Build Queue/, 'Must have Auto-Build Queue');
   assert.match(bContent, /Execution Logs/, 'Must have Execution Logs');
   assert.match(bContent, /clearLogs/, 'Must have clearLogs in BuildingModal');
+  assert.match(bContent, /id="building-queue-summary-footer"/, 'Must pin building queue summary footer outside scrollable container');
 
   const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
   assert.match(rContent, /id="research-dialog"/, 'Must have #research-dialog');
@@ -254,11 +255,22 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(rContent, /id="research-dialog-body"/, 'Must have #research-dialog-body');
   assert.match(rContent, /id="next-research-count-badge"/, 'Must have #next-research-count-badge');
   assert.match(rContent, /id="next-research-search-input"/, 'Must have #next-research-search-input');
+  assert.match(rContent, /id="next-research-honor-filter"/, 'Must have #next-research-honor-filter');
   assert.match(rContent, /id="next-research-sort-select"/, 'Must have #next-research-sort-select');
   assert.match(rContent, /id="next-research-grid"/, 'Must have #next-research-grid');
+  assert.match(rContent, /id="research-queue-summary-footer"/, 'Must pin research queue summary footer outside scrollable container');
   assert.match(rContent, /id="research-count-subtitle"/, 'Must have #research-count-subtitle');
   assert.match(rContent, /id="research-search-input"/, 'Must have #research-search-input');
   assert.match(rContent, /id="research-filter-tabs"/, 'Must have #research-filter-tabs');
+  assert.match(rContent, /id="research-tab-all"/, 'Must have All tab');
+  assert.match(rContent, /id="research-tab-researched"/, 'Must have Researched (non-max) tab');
+  assert.match(rContent, /id="research-tab-unavailable"/, 'Must have Unavailable tab');
+  assert.match(rContent, /id="research-tab-completed"/, 'Must have Completed (maxed) tab');
+  assert.ok(
+    rContent.indexOf('id="research-tab-unavailable"') < rContent.indexOf('id="research-tab-completed"'),
+    'Completed tab must be placed last in #research-filter-tabs'
+  );
+  assert.doesNotMatch(rContent, /In Progress \(/, 'Must remove legacy In Progress tab from Research Directory');
   assert.match(rContent, /id="research-grid-list"/, 'Must have #research-grid-list');
   assert.match(rContent, /completeResearch/, 'Must have completeResearch RPC');
   assert.match(rContent, /startResearch/, 'Must have startResearch RPC');

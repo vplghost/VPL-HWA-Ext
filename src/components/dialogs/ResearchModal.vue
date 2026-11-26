@@ -51,9 +51,10 @@ let timer: number | null = null;
 
 // Search and sort filters
 const nextResearchFilterQuery = ref('');
+const nextResearchHonorFilter = ref<'all' | 'no' | 'yes'>('all');
 const nextResearchSortOrder = ref<'level-desc' | 'level-asc' | 'time-asc' | 'time-desc' | 'name-asc'>('level-desc');
 const researchSearchQuery = ref('');
-const researchFilterTab = ref<'all' | 'completed' | 'in_progress' | 'available'>('all');
+const researchFilterTab = ref<'all' | 'researched' | 'unavailable' | 'completed'>('all');
 
 // Storage-backed auto-queue
 interface ResearchQueueItem {
@@ -378,12 +379,21 @@ const allResearchesList = computed(() => {
   return Array.from(researchMap.values());
 });
 
-const completedResearchesCount = computed(() => {
-  return allResearchesList.value.filter((r) => r.isCompleted).length;
+const upgradeCandidateIds = computed(() => {
+  return new Set(upgradeCandidates.value.map((r: any) => Number(r.id)));
 });
 
-const availableResearchesCount = computed(() => {
-  return allResearchesList.value.filter((r) => !r.isCompleted && !r.isResearching).length;
+const researchedNotMaxCount = computed(() => {
+  return allResearchesList.value.filter((r) => (r.isCompleted || r.isResearching) && !r.isMaxLevel).length;
+});
+
+const maxedResearchesCount = computed(() => {
+  return allResearchesList.value.filter((r) => r.isMaxLevel).length;
+});
+
+const unavailableResearchesCount = computed(() => {
+  const readyIds = upgradeCandidateIds.value;
+  return allResearchesList.value.filter((r) => !r.isCompleted && !r.isResearching && !readyIds.has(Number(r.id))).length;
 });
 
 // Research Center building level (ID 43 / 165)
@@ -483,8 +493,14 @@ const upgradeCandidates = computed(() => {
 
 const filteredNextResearch = computed(() => {
   const query = nextResearchFilterQuery.value.toLowerCase().trim();
+  const honorMode = nextResearchHonorFilter.value;
   return upgradeCandidates.value
     .filter((r: any) => {
+      if (honorMode !== 'all') {
+        const usesHonor = requiresSpecialResource(r.id, r.nextLevel);
+        if (honorMode === 'yes' && !usesHonor) return false;
+        if (honorMode === 'no' && usesHonor) return false;
+      }
       if (!query) return true;
       const name = (r.name || getResearchName(r.id)).toLowerCase();
       const idStr = String(r.id);
@@ -590,22 +606,26 @@ async function startResearchUpgrade(candidate: any) {
 // Section 3: Directory filter
 const filteredResearchDirectory = computed(() => {
   const query = researchSearchQuery.value.toLowerCase().trim();
+  const readyIds = upgradeCandidateIds.value;
   return allResearchesList.value
     .filter((r: any) => {
-      if (researchFilterTab.value === 'completed' && !r.isCompleted) return false;
-      if (researchFilterTab.value === 'in_progress' && !r.isResearching) return false;
-      if (researchFilterTab.value === 'available' && (r.isCompleted || r.isResearching)) return false;
-      if (!query) {
-        if (researchFilterTab.value === 'all') return r.isCompleted || r.isResearching;
-        return true;
-      }
+      if (researchFilterTab.value === 'researched' && !((r.isCompleted || r.isResearching) && !r.isMaxLevel)) return false;
+      if (researchFilterTab.value === 'unavailable' && (r.isCompleted || r.isResearching || readyIds.has(Number(r.id)))) return false;
+      if (researchFilterTab.value === 'completed' && !r.isMaxLevel) return false;
+      if (!query) return true;
       const name = getResearchName(r.id).toLowerCase();
       const idStr = String(r.id);
       return name.includes(query) || idStr.includes(query);
     })
     .sort((a: any, b: any) => {
-      if (a.isResearching !== b.isResearching) return a.isResearching ? -1 : 1;
-      if (a.isCompleted !== b.isCompleted) return a.isCompleted ? -1 : 1;
+      const tier = (item: any) => {
+        if (item.isMaxLevel) return 3;
+        if (item.isResearching) return 0;
+        if (item.isCompleted) return 1;
+        return 2;
+      };
+      const tDiff = tier(a) - tier(b);
+      if (tDiff !== 0) return tDiff;
       return (b.level - a.level) || (a.id - b.id);
     });
 });
@@ -860,7 +880,8 @@ async function refreshResearch() {
 
             <p v-if="queueError" role="alert" class="text-xs text-rose-600 dark:text-rose-400">{{ queueError }}</p>
             <!-- Queue list -->
-            <div v-if="queueTimeline.items.length > 0" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+            <template v-if="queueTimeline.items.length > 0">
+              <div class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
               <div
                 v-for="(item, idx) in queueTimeline.items"
                 :key="`rqueue-${idx}-${item.researchId}`"
@@ -951,9 +972,13 @@ async function refreshResearch() {
                   </button>
                 </div>
               </div>
+              </div>
 
-              <!-- Queue footer -->
-              <div class="mt-2 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center">
+              <!-- Pinned Queue Summary Footer (outside scrollable list) -->
+              <div
+                id="research-queue-summary-footer"
+                class="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center"
+              >
                 <span>
                   Total time:
                   <strong class="font-semibold text-slate-600 dark:text-slate-300">
@@ -967,7 +992,7 @@ async function refreshResearch() {
                   </strong>
                 </span>
               </div>
-            </div>
+            </template>
 
             <p v-else class="text-2xs text-slate-400 italic py-1">
               Queue is empty. Click "+ Queue" on candidates below to automate next upgrades.
@@ -1065,7 +1090,7 @@ async function refreshResearch() {
               <span>⚡</span> Next Research Candidates
             </h3>
             <span id="next-research-count-badge" class="text-2xs font-normal text-slate-400">
-              {{ nextResearchFilterQuery ? `${filteredNextResearch.length} / ${upgradeCandidates.length} available` : `${upgradeCandidates.length} available` }}
+              {{ (nextResearchFilterQuery || nextResearchHonorFilter !== 'all') ? `${filteredNextResearch.length} / ${upgradeCandidates.length} available` : `${upgradeCandidates.length} available` }}
             </span>
           </div>
 
@@ -1073,7 +1098,7 @@ async function refreshResearch() {
             {{ activeQueues.length > 0 ? 'Academy queue is currently occupied. Once complete, the following technologies can be researched or upgraded next:' : 'Academy queue is available. The following technologies can be researched or upgraded next:' }}
           </p>
 
-          <!-- Search & Sort Controls -->
+          <!-- Search, Honor Marks Filter & Sort Controls -->
           <div class="flex items-center gap-2 flex-wrap">
             <div class="flex-1 min-w-[140px]">
               <input
@@ -1083,6 +1108,18 @@ async function refreshResearch() {
                 placeholder="Filter research or ID..."
                 class="h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-900 placeholder-slate-400 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
               />
+            </div>
+            <div class="shrink-0 flex items-center gap-1.5">
+              <span class="text-2xs text-slate-400" title="Filter by Honor Marks requirement">🎖️ Honor:</span>
+              <select
+                id="next-research-honor-filter"
+                v-model="nextResearchHonorFilter"
+                class="h-7 rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-700 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                <option value="all">All</option>
+                <option value="no">No Honor Marks</option>
+                <option value="yes">Honor Marks Only</option>
+              </select>
             </div>
             <div class="shrink-0 flex items-center gap-1.5">
               <span class="text-2xs text-slate-400">Sort:</span>
@@ -1101,7 +1138,7 @@ async function refreshResearch() {
           </div>
 
           <div v-if="filteredNextResearch.length === 0" class="text-center py-4 text-xs text-slate-400 italic">
-            {{ nextResearchFilterQuery ? 'No matching research found.' : 'No research candidates found.' }}
+            {{ (nextResearchFilterQuery || nextResearchHonorFilter !== 'all') ? 'No matching research found.' : 'No research candidates found.' }}
           </div>
 
           <div v-else id="next-research-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
@@ -1191,7 +1228,7 @@ async function refreshResearch() {
                 <span>📚</span> Personal Research Directory
               </h3>
               <p id="research-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">
-                {{ researchSearchQuery ? `${filteredResearchDirectory.length} matching "${researchSearchQuery}" (${completedResearchesCount} completed)` : `${completedResearchesCount} completed technologies` }}
+                {{ researchSearchQuery ? `${filteredResearchDirectory.length} matching "${researchSearchQuery}" (${maxedResearchesCount} maxed · ${researchedNotMaxCount} researched)` : `${researchedNotMaxCount} researched · ${maxedResearchesCount} completed (max)` }}
               </p>
             </div>
 
@@ -1206,9 +1243,10 @@ async function refreshResearch() {
             </div>
           </div>
 
-          <!-- Filter Tabs -->
+          <!-- Filter Tabs (Completed / Maxed placed last) -->
           <div id="research-filter-tabs" class="flex items-center gap-1.5 flex-wrap">
             <button
+              id="research-tab-all"
               type="button"
               class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
               :class="researchFilterTab === 'all' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
@@ -1217,28 +1255,31 @@ async function refreshResearch() {
               All ({{ allResearchesList.length }})
             </button>
             <button
+              id="research-tab-researched"
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'researched' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'researched'"
+            >
+              Researched ({{ researchedNotMaxCount }})
+            </button>
+            <button
+              id="research-tab-unavailable"
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'unavailable' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'unavailable'"
+            >
+              Unavailable ({{ unavailableResearchesCount }})
+            </button>
+            <button
+              id="research-tab-completed"
               type="button"
               class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
               :class="researchFilterTab === 'completed' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
               @click="researchFilterTab = 'completed'"
             >
-              Completed ({{ completedResearchesCount }})
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
-              :class="researchFilterTab === 'in_progress' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
-              @click="researchFilterTab = 'in_progress'"
-            >
-              In Progress ({{ activeQueues.length }})
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
-              :class="researchFilterTab === 'available' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
-              @click="researchFilterTab = 'available'"
-            >
-              Available ({{ availableResearchesCount }})
+              Completed ({{ maxedResearchesCount }})
             </button>
           </div>
 
@@ -1254,9 +1295,11 @@ async function refreshResearch() {
               :class="
                 r.isResearching
                   ? 'border-purple-300 bg-purple-50/70 dark:border-purple-800 dark:bg-purple-950/30'
-                  : r.isCompleted
-                    ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
-                    : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
+                  : r.isMaxLevel
+                    ? 'border-slate-200/80 bg-slate-50/70 opacity-75 dark:border-slate-800 dark:bg-slate-900/50'
+                    : r.isCompleted
+                      ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                      : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
               "
             >
               <div class="min-w-0">
@@ -1295,17 +1338,28 @@ async function refreshResearch() {
                     <span class="size-1 rounded-full bg-purple-500 animate-pulse"></span>Researching
                   </span>
                   <span
-                    v-else-if="r.isCompleted"
-                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold"
-                    :class="r.isMaxLevel ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'"
+                    v-else-if="r.isMaxLevel"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300"
                   >
-                    {{ r.isMaxLevel ? 'Max Level' : 'Completed' }}
+                    Max Level
+                  </span>
+                  <span
+                    v-else-if="r.isCompleted"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    Researched
+                  </span>
+                  <span
+                    v-else-if="upgradeCandidateIds.has(Number(r.id))"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                  >
+                    Ready
                   </span>
                   <span
                     v-else
                     class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   >
-                    Available
+                    Unavailable
                   </span>
                 </div>
               </div>

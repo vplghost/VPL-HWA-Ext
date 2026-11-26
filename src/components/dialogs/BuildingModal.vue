@@ -792,7 +792,8 @@ async function refreshBuildings() {
 
             <p v-if="queueError" role="alert" class="text-xs text-rose-600 dark:text-rose-400">{{ queueError }}</p>
             <!-- Queue list -->
-            <div v-if="queueTimeline.items.length > 0" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+            <template v-if="queueTimeline.items.length > 0">
+              <div class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
               <div
                 v-for="(item, idx) in queueTimeline.items"
                 :key="`queue-${idx}-${item.buildingId}`"
@@ -875,9 +876,13 @@ async function refreshBuildings() {
                   </button>
                 </div>
               </div>
+              </div>
 
-              <!-- Queue footer -->
-              <div class="mt-2 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center">
+              <!-- Pinned Queue Summary Footer (outside scrollable list) -->
+              <div
+                id="building-queue-summary-footer"
+                class="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center"
+              >
                 <span>
                   Total time:
                   <strong class="font-semibold text-slate-600 dark:text-slate-300">
@@ -891,7 +896,7 @@ async function refreshBuildings() {
                   </strong>
                 </span>
               </div>
-            </div>
+            </template>
 
             <p v-else class="text-2xs text-slate-400 italic py-1">
               Queue is empty. Click "+ Queue" on candidates below to automate next upgrades.
