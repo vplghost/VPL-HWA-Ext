@@ -42,6 +42,23 @@ export function gathering(march: any): boolean {
   return Boolean(march?.mineId) && ['interactionWithTarget', 'gathering'].includes(march.stage);
 }
 
+export function isReturningMarch(march: any): boolean {
+  return Boolean(march && (march.stage === 'returnToOutpost' || march.kind === 'return'));
+}
+
+export function resolveOutpostCenter(cache: any, fallbackCenter?: any): { x: number; y: number } | null {
+  const ctx = context(cache).center;
+  if (finite(ctx?.x) && finite(ctx?.y)) return ctx;
+  if (finite(fallbackCenter?.x) && finite(fallbackCenter?.y)) return fallbackCenter;
+  const marches = list(cache?.marchStatus?.data?.marches);
+  for (const m of marches) {
+    if (!isReturningMarch(m)) continue;
+    const to = m?.route?.to?.coordinates || m?.toCoordinates;
+    if (finite(to?.x) && finite(to?.y)) return to;
+  }
+  return null;
+}
+
 export function typeOf(march: any, cache: any): string | undefined {
   const data = getSmartGatherData();
   const configId = march?.mineConfigId ?? cache?.mineMap?.[march?.mineId]?.mineConfigId;
@@ -58,10 +75,10 @@ export function fresh(entry: any, now: number): boolean {
   return finite(at) && at <= now && now - at <= 60000;
 }
 
-export function returnMs(march: any, cache: any): number | null {
+export function returnMs(march: any, cache: any, fallbackCenter?: any): number | null {
   const speeds = getRouteSpeeds();
   const from = march?.targetCoordinates || cache?.mineMap?.[march?.mineId]?.coordinates;
-  const to = context(cache).center;
+  const to = resolveOutpostCenter(cache, fallbackCenter);
   const speed = speeds?.returnToOutpost;
   return finite(from?.x) && finite(from?.y) && finite(to?.x) && finite(to?.y) && speed > 0
     ? Math.ceil((Math.hypot(to.x - from.x, to.y - from.y) * 10000) / speed)
@@ -144,18 +161,67 @@ export function recallForQueue(cache: any, settings: any, options: any, now: num
   const available = data.availableHeroIds(cache?.heroGetAll?.data, summary, marches);
   const needed = options?.teamId === 'weakest' ? [] : (options?.heroIds || []).filter((id: any) => !available.includes(id));
   if (marches.length < settings?.maxMarches && !needed.length) return null;
-  const eligible = marches
-    .filter(gathering)
+
+  const gatheringMarches = marches.filter(gathering);
+  const nonGatheringMarches = marches.filter((m: any) => !gathering(m));
+  const hasReturning = marches.some(isReturningMarch);
+
+  // If only a free slot is needed and a squad is already returning to outpost,
+  // let the queue wait naturally instead of interrupting an active gathering squad.
+  if (needed.length === 0 && hasReturning) {
+    return null;
+  }
+
+  // Determine which needed heroes are occupied by non-gathering marches (e.g. returning raid/combat squad).
+  // Stopping a mine gather cannot release heroes on a non-gathering march.
+  const nonGatheringHeroIds = new Set<number>();
+  for (const m of nonGatheringMarches) {
+    const squad = list(summary?.squads).find((s: any) => (s.id ?? s.squadId) === m.squadId);
+    for (const h of list(squad?.heroes)) {
+      const hid = Number(h.id ?? h.heroId);
+      if (Number.isFinite(hid)) nonGatheringHeroIds.add(hid);
+    }
+  }
+  const neededFromGathering = needed.filter((id: any) => !nonGatheringHeroIds.has(Number(id)));
+
+  // All needed heroes are already on non-gathering marches (e.g. returnToOutpost):
+  // let raidQueue / monsterQueue start in its normal wait state until they return.
+  if (needed.length > 0 && neededFromGathering.length === 0) {
+    return null;
+  }
+
+  const eligible = gatheringMarches
     .filter((m: any) => {
+      if (neededFromGathering.length === 0) return true;
       const squad = list(summary?.squads).find((s: any) => (s.id ?? s.squadId) === m.squadId);
-      const ids = list(squad?.heroes).map((h: any) => h.id ?? h.heroId);
-      return needed.every((id: any) => ids.includes(id));
+      const ids = list(squad?.heroes).map((h: any) => Number(h.id ?? h.heroId));
+      return neededFromGathering.every((id: any) => ids.includes(Number(id)));
     })
-    .map((march: any) => ({ march, ms: returnMs(march, cache) }))
-    .filter((row: any) => finite(row.ms))
-    .sort((a: any, b: any) => a.ms - b.ms);
+    .map((march: any) => ({
+      march,
+      ms: returnMs(march, cache, options?.center),
+      hasCoords: Boolean(march?.targetCoordinates || cache?.mineMap?.[march?.mineId]?.coordinates),
+    }))
+    .filter((row: any) => finite(row.ms) || row.hasCoords)
+    .sort((a: any, b: any) => {
+      const aMs = finite(a.ms) ? a.ms : Number.MAX_SAFE_INTEGER;
+      const bMs = finite(b.ms) ? b.ms : Number.MAX_SAFE_INTEGER;
+      return aMs - bMs;
+    });
+
+  if (eligible[0]?.march) {
+    return {
+      march: eligible[0].march,
+      reason: 'No gathering squad with known coordinates can release the required slot/heroes',
+    };
+  }
+
+  if (hasReturning) {
+    return null;
+  }
+
   return {
-    march: eligible[0]?.march || null,
+    march: null,
     reason: 'No gathering squad with known coordinates can release the required slot/heroes',
   };
 }

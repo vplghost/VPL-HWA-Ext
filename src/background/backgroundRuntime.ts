@@ -1518,8 +1518,21 @@ export async function advanceGatherQueue(type: string, record: any, stored: any,
   if (runtime.error || !rpcMessageForSettings(stored, []))
     return save({ state: controller.stop(queue, runtime.error || 'RPC disabled while waiting for gathering squad.') }, stored, cr);
   if (runtime.pending) {
-    const calls = now >= queue.wakeAt ? [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }] : [];
-    return save({ state: { ...queue, wakeAt: calls.length ? now + 5000 : queue.wakeAt }, calls }, stored, cr);
+    const recallSquadId = runtime.pending?.call?.args?.squadId;
+    const stillGathering = recallSquadId
+      ? smartGatherService.list(stored.rpcCache?.marchStatus?.data?.marches).some(
+          (m: any) => m?.squadId === recallSquadId && smartGatherService.gathering(m)
+        )
+      : false;
+    const timedOut = Number.isFinite(queue.sentAt) && now - queue.sentAt > 45000;
+    if (timedOut && !stillGathering) {
+      runtime.pending = null;
+      runtime.reservation = null;
+      await cr?.storage?.local?.set({ smartGatherState: runtime });
+    } else {
+      const calls = now >= queue.wakeAt ? [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }] : [];
+      return save({ state: { ...queue, wakeAt: calls.length ? now + 5000 : queue.wakeAt }, calls }, stored, cr);
+    }
   }
   runtime.reservation = null;
   await cr?.storage?.local?.set({ smartGatherState: runtime });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.352 — 2026-11-26
+
+### Fixed
+
+- **Raid/Monster Queue Stuck on `"No gathering squad with known coordinates can release the required slot/heroes"` (`smartGather.ts`, `backgroundRuntime.ts`, `tests/raid-queue.test.mjs`)**:
+  - Updated `recallForQueue()` in `smartGather.ts` to return `null` (allowing `raidQueue` / `monsterQueue` to start and wait naturally) when required heroes are already on a non-gathering march (such as `returnToOutpost` returning from a rally) or when a slot is already returning to outpost.
+  - Added `resolveOutpostCenter()` fallback in `returnMs()` so gathering squad return times resolve from `options.center` or returning march destination coordinates even when `experimentalMapContext` has not yet cached own outpost coordinates.
+  - Added a 45-second timeout recovery guard in `advanceGatherQueue()` (`backgroundRuntime.ts`) so `waiting_gather` never hangs indefinitely if a recalled squad has already left gathering state.
+
 ## 0.11.350 — 2026-11-26
 
 ### Changed

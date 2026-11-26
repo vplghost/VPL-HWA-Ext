@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { experimentalDataHelper as data } from '../src/utils/experimentalData.ts';
 import { raidQueueService as queue } from '../src/services/queues/raidQueue.ts';
+import { recallForQueue, returnMs } from '../src/services/queues/smartGather.ts';
 const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { level: 30, star: 2, power: id * 100 }]));
 const capacities = Object.fromEntries(Object.entries(heroes).map(([id, hero]) => [id, { signature: data.capacitySignature(hero), count: 600 }]));
 const options = { mapId: 'map', center: { x: 10, y: 20 }, level: 5, heroIds: [1, 2, 3, 4, 5],
@@ -660,4 +661,98 @@ test('createRally response with result.response.errorCode MobNotFound recovers i
   );
   assert.equal(monsterRes.state.phase, 'stopped');
   assert.match(monsterRes.state.reason || '', /MobNotFound/);
+});
+
+test('recallForQueue returns null instead of false error when needed heroes are already returning from raid/combat', () => {
+  const now = 1_795_701_070_000;
+  const cache = {
+    accountStatus: { data: { id: 1216438103 } },
+    heroGetAll: {
+      data: {
+        51: { id: 51, power: 50000 },
+        71: { id: 71, power: 48000 },
+        60: { id: 60, power: 46000 },
+        7: { id: 7, power: 45000 },
+        37: { id: 37, power: 44000 },
+        38: { id: 38, power: 30000 },
+        41: { id: 41, power: 29000 },
+        46: { id: 46, power: 28000 },
+        10: { id: 10, power: 25000 },
+        11: { id: 11, power: 24000 },
+      },
+    },
+    'getUnitSummary:unit': {
+      data: {
+        squads: [
+          { id: 'raid-ret', heroes: [{ id: 51 }, { id: 71 }, { id: 60 }, { id: 7 }, { id: 37 }] },
+          { id: 'gather-1', heroes: [{ id: 38 }, { id: 41 }, { id: 46 }] },
+          { id: 'gather-2', heroes: [{ id: 10 }, { id: 11 }] },
+        ],
+      },
+    },
+    marchStatus: {
+      data: {
+        marches: [
+          {
+            squadId: 'gather-1',
+            mineId: 'mine-1',
+            stage: 'interactionWithTarget',
+            targetCoordinates: { x: 545, y: 352 },
+          },
+          {
+            squadId: 'gather-2',
+            mineId: 'mine-2',
+            stage: 'interactionWithTarget',
+            targetCoordinates: { x: 542, y: 386 },
+          },
+          {
+            squadId: 'raid-ret',
+            stage: 'returnToOutpost',
+            route: { to: { coordinates: { x: 606, y: 376 } } },
+          },
+        ],
+      },
+    },
+  };
+
+  // AC1: Raid heroes [51, 71, 60, 7, 37] are on returnToOutpost -> must return null (wait naturally), NOT hard error
+  const demandReturning = recallForQueue(
+    cache,
+    { maxMarches: 3 },
+    { heroIds: [51, 71, 60, 7, 37], center: { x: 606, y: 376 } },
+    now
+  );
+  assert.equal(demandReturning, null);
+
+  // AC3: Weakest team (needed = []) with a march already returning -> must return null (do not interrupt gatherers)
+  const demandWeakest = recallForQueue(
+    cache,
+    { maxMarches: 3 },
+    { teamId: 'weakest', heroIds: [], center: { x: 606, y: 376 } },
+    now
+  );
+  assert.equal(demandWeakest, null);
+
+  // AC2: When all 3 slots are gathering and experimentalMapContext lacks outpost center,
+  // returnMs & recallForQueue fall back to options.center and pick the nearest gatherer
+  const allGatheringCache = {
+    ...cache,
+    marchStatus: {
+      data: {
+        marches: [
+          { squadId: 'gather-1', mineId: 'mine-1', stage: 'interactionWithTarget', targetCoordinates: { x: 545, y: 352 } },
+          { squadId: 'gather-2', mineId: 'mine-2', stage: 'interactionWithTarget', targetCoordinates: { x: 600, y: 370 } },
+          { squadId: 'gather-3', mineId: 'mine-3', stage: 'interactionWithTarget', targetCoordinates: { x: 400, y: 200 } },
+        ],
+      },
+    },
+  };
+  assert.ok(Number.isFinite(returnMs(allGatheringCache.marchStatus.data.marches[1], allGatheringCache, { x: 606, y: 376 })));
+  const demandAllGather = recallForQueue(
+    allGatheringCache,
+    { maxMarches: 3 },
+    { teamId: 'weakest', heroIds: [], center: { x: 606, y: 376 } },
+    now
+  );
+  assert.equal(demandAllGather?.march?.squadId, 'gather-2', 'Must pick nearest gathering squad using options.center fallback');
 });
