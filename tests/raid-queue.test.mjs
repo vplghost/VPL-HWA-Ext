@@ -550,3 +550,114 @@ test('active rally recognizes returnToOutpostFromMob and enters waiting_rally if
   assert.equal(next.state.completed, 1);
   assert.equal(next.state.phase, 'refreshing');
 });
+
+test('createRally response with result.response.errorCode MobNotFound recovers immediately by searching new bosses instead of hanging', async () => {
+  const { extractRpcResultError } = await import('../src/services/queues/raidQueue.ts');
+  const { monsterQueueService } = await import('../src/services/queues/monsterQueue.ts');
+
+  // Verify errorCode extraction ignores success codes (0, '', null) and captures MobNotFound
+  assert.equal(extractRpcResultError({ response: { errorCode: 0 } }), null);
+  assert.equal(extractRpcResultError({ response: { errorCode: '' } }), null);
+  assert.equal(extractRpcResultError({ response: { errorCode: 'MobNotFound' } }), 'MobNotFound');
+
+  const expectedCall = {
+    name: 'createRally',
+    feature: 'mob',
+    args: {
+      mapId: '5929afff-c3a6-495d-8f2c-37e7c509a4dc',
+      mobId: '6a19d071-6357-4057-af63-ceedc7f7ffdc',
+      squad: { heroes: [{ heroId: 60 }], units: [{ unitId: 8, count: 1602 }] },
+      startDelay: 60000,
+    },
+  };
+
+  const creatingState = {
+    id: '2000:1',
+    tabId: 1,
+    accountId: 10,
+    options: { ...options, mapId: '5929afff-c3a6-495d-8f2c-37e7c509a4dc', count: 2 },
+    started: 0,
+    completed: 0,
+    retriedCount: 0,
+    consecutiveCreateErrors: 0,
+    sessionEvents: [],
+    bossQueue: { remain_raid_count: 2, queue: [{ mobId: '6a19d071-6357-4057-af63-ceedc7f7ffdc' }, { mobId: 'stale-2' }] },
+    failedBossIds: [],
+    wonBossIds: [],
+    phase: 'creating',
+    sentAt: 2000,
+    wakeAt: 122000,
+    expected: [expectedCall],
+    current: { mobId: '6a19d071-6357-4057-af63-ceedc7f7ffdc', mapId: '5929afff-c3a6-495d-8f2c-37e7c509a4dc' },
+  };
+
+  // Exact payload captured in temp/tracking-data/raid-error.md
+  const mobNotFoundRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(2500).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ ...expectedCall, ident: '00aacf66ec160b280008983dc302356f' }],
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: '00aacf66ec160b280008983dc302356f',
+          result: { response: { errorCode: 'MobNotFound' } },
+        },
+      ],
+    }),
+  };
+
+  const recovered = queue.advance(creatingState, mobNotFoundRecord, {}, 2500);
+  assert.equal(recovered.state.phase, 'searching', 'Must immediately transition to searching instead of hanging in creating');
+  assert.equal(recovered.calls?.[0]?.name, 'searchMob');
+  assert.ok(recovered.state.failedBossIds.includes('6a19d071-6357-4057-af63-ceedc7f7ffdc'));
+  assert.equal(recovered.state.retriedCount, 1);
+  assert.equal(recovered.state.consecutiveCreateErrors, 1);
+
+  // Guard: 5 consecutive createRally MobNotFound errors stop the queue safely instead of looping forever
+  const fifthError = queue.advance(
+    { ...creatingState, consecutiveCreateErrors: 4 },
+    mobNotFoundRecord,
+    {},
+    3000
+  );
+  assert.equal(fifthError.state.phase, 'stopped');
+  assert.match(fifthError.state.reason || '', /5 times in a row \(MobNotFound\)/);
+
+  // Monster queue parity: result.response.errorCode stops cleanly instead of hanging
+  const monsterExpected = { name: 'attackMob', feature: 'mob', args: { mapId: 'm1', mobId: 'mob-gone' } };
+  const monsterRes = monsterQueueService.advance(
+    {
+      id: '3000:1',
+      tabId: 1,
+      accountId: 10,
+      options: { mapId: 'm1', center: { x: 1, y: 1 }, level: 1, count: 1, heroIds: [1, 2, 3, 4, 5] },
+      phase: 'attacking',
+      sentAt: 3000,
+      wakeAt: 123000,
+      expected: [monsterExpected],
+      current: { mobId: 'mob-gone', mapId: 'm1' },
+      targets: [],
+      attackedMobIds: [],
+      started: 0,
+      completed: 0,
+    },
+    {
+      method: 'POST',
+      status: 200,
+      endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+      timestamp: new Date(3500).toISOString(),
+      requestBody: JSON.stringify({ calls: [{ ...monsterExpected, ident: 'm-err-1' }] }),
+      responseBody: JSON.stringify({
+        results: [{ ident: 'm-err-1', result: { response: { errorCode: 'MobNotFound' } } }],
+      }),
+    },
+    {},
+    3500
+  );
+  assert.equal(monsterRes.state.phase, 'stopped');
+  assert.match(monsterRes.state.reason || '', /MobNotFound/);
+});

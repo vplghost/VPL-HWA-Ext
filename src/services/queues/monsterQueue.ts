@@ -301,8 +301,18 @@ export function advance(
   const fresh = record && Date.parse(record.timestamp) >= (state.sentAt || 0);
   const respList = fresh ? replies(record) : [];
   for (const { call, result } of respList) {
-    if (result?.error && state.expected?.some((expected) => sameCall(call, expected))) {
-      return { state: stop(state, `Game rejected ${call.name}. Queue stopped.`) };
+    const code = result?.response?.errorCode ?? result?.errorCode;
+    const error =
+      result?.error ||
+      result?.response?.error ||
+      (code != null && code !== 0 && code !== '0' && code !== '' ? code : null);
+    if (error && state.expected?.some((expected) => sameCall(call, expected))) {
+      const detail =
+        typeof error === 'string'
+          ? error
+          : error.message || error.description || error.code || '';
+      const suffix = detail && !result?.error ? ` (${String(detail).slice(0, 120)})` : '';
+      return { state: stop(state, `Game rejected ${call.name}${suffix}. Queue stopped.`) };
     }
   }
 

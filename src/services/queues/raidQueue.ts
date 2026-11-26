@@ -407,6 +407,15 @@ export function sameCall(a: any, b: any): boolean {
   );
 }
 
+export function extractRpcResultError(result: any): any {
+  const code = result?.response?.errorCode ?? result?.errorCode;
+  return (
+    result?.error ||
+    result?.response?.error ||
+    (code != null && code !== 0 && code !== '0' && code !== '' ? code : null)
+  );
+}
+
 export function advance(
   previous: RaidQueueState,
   record?: any,
@@ -434,7 +443,7 @@ export function advance(
   const replies = fresh ? responses(record) : [];
 
   for (const { call, result } of replies) {
-    const error = result?.error || result?.response?.error;
+    const error = extractRpcResultError(result);
     if (error && state.expected?.some((expected) => sameCall(call, expected))) {
       const detail =
         typeof error === 'string'
@@ -444,7 +453,24 @@ export function advance(
         if (/energy|stamina|refillable|resource/i.test(JSON.stringify(error))) {
           return { state: stop(state, `Not enough World Energy: ${String(detail).slice(0, 160)}.`) };
         }
+        const failedMobId = state.current?.mobId;
+        state.consecutiveCreateErrors = (Number(state.consecutiveCreateErrors) || 0) + 1;
+        state.retriedCount = (Number(state.retriedCount) || 0) + 1;
+        state.sessionEvents = appendSessionEvent(state.sessionEvents, {
+          at: now,
+          type: 'retried',
+          mobId: failedMobId,
+          detail: String(detail),
+        });
         consumeBoss(state, true);
+        if (state.consecutiveCreateErrors >= 5) {
+          return {
+            state: stop(
+              state,
+              `createRally failed ${state.consecutiveCreateErrors} times in a row (${String(detail).slice(0, 120)}). Queue stopped.`
+            ),
+          };
+        }
         if (/unit|troop|soldier|squad/i.test(JSON.stringify(error))) {
           return issue(state, 'refreshing', rosterCalls(), now);
         }
@@ -576,6 +602,7 @@ export function advance(
         return { state: stop(state, 'Incomplete rally confirmation.') };
       }
       state.started++;
+      state.consecutiveCreateErrors = 0;
       state.createdRallyIds = [...(state.createdRallyIds || []), response.rally.rallyId];
       state.phase = 'active';
       state.expected = [];

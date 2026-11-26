@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.338 — 2026-11-26
+
+### Fixed
+
+- **Rally Raid Queue Hang on `createRally` `errorCode: "MobNotFound"` & `monsterQueue` Error Parity (`raidQueue.ts`, `monsterQueue.ts`, `tests/raid-queue.test.mjs`)**:
+  - Added `extractRpcResultError()` in `raidQueue.ts` (and aligned `monsterQueue.ts`) to detect server business errors returned under `result.response.errorCode` / `result.errorCode` (ignoring non-error codes `0` / `''`).
+  - When `createRally` returns `errorCode: "MobNotFound"`, `raidQueue` now immediately marks the missing `mobId` as failed, increments `retriedCount`, and triggers a fresh `searchMob` instead of hanging in `phase: 'creating'` until timeout.
+  - Added a consecutive error guard (`consecutiveCreateErrors >= 5`, reset on successful rally creation) to prevent infinite search/create retry loops.
+
 ## 0.11.336 — 2026-11-26
 
 ### Changed
