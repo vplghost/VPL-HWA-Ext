@@ -18,7 +18,7 @@ import {
   getGearCraftData,
   starGlowClass,
 } from '@/src/utils/metadata';
-import { formatNumber } from '@/src/utils/formatters';
+import { formatNumber, formatCompactMillion } from '@/src/utils/formatters';
 import { getSkillPoints, getSkillPointsCap, getGold } from '@/src/utils/resourceData';
 import pickerData from '@/src/data/campaign-picker.json';
 import { getHeroSoulMissions } from '@/src/data/campaignData';
@@ -1327,7 +1327,7 @@ function handleSoulStoneFarm() {
                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-2xs font-medium text-sky-700 dark:text-sky-300"
                     :title="`XP Potions in bag: ${xpPotionInventory.totalPotions} (${formatNumber(xpPotionInventory.totalAvailableXp)} XP). +1 Lv needs ~${formatNumber(nextLevelXpPlan.xpNeeded)} XP; Max Lv.${maxLevelXpPlan.targetLevel} needs ~${formatNumber(maxLevelXpPlan.xpNeeded)} XP.`"
                   >
-                    🧪 {{ formatNumber(xpPotionInventory.totalAvailableXp) }} XP
+                    🧪 {{ formatCompactMillion(xpPotionInventory.totalAvailableXp) }} XP
                   </span>
                   <button
                     v-if="(activeHero.level || 1) < teamLevelCap"
@@ -1684,7 +1684,7 @@ function handleSoulStoneFarm() {
                   :title="`${res.name}: ${formatNumber(res.owned)}`"
                 >
                   <img :src="getAssetUrl(res.icon)" :alt="res.name" class="size-4 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(res.owned) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(res.owned) }}</span>
                 </div>
 
                 <template v-if="artifactHeaderChests.length > 0">
@@ -1696,7 +1696,7 @@ function handleSoulStoneFarm() {
                     :title="`${ch.name}: ${formatNumber(ch.owned)}`"
                   >
                     <img :src="getAssetUrl(ch.icon)" :alt="ch.name" class="size-4 object-contain" />
-                    <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ch.owned) }}</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ch.owned) }}</span>
                   </div>
                 </template>
               </div>
@@ -1760,32 +1760,6 @@ function handleSoulStoneFarm() {
                       :style="{ width: `${art.plan.isMax ? 100 : Math.min(100, (art.level / (art.plan.targetLevel || 100)) * 100)}%` }"
                     ></div>
                   </div>
-
-                  <!-- Compact Next-Level Material Cost Pill -->
-                  <div
-                    v-if="!art.plan.isMax"
-                    class="text-3xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 bg-slate-100/60 dark:bg-slate-900/50 px-2 py-1 rounded"
-                    :title="`${art.plan.resourceName}: ${art.plan.ownedAmount.toLocaleString()} owned (next Lv cost: ${art.plan.costForNextOne.toLocaleString()})`"
-                  >
-                    <span class="inline-flex items-center gap-1">
-                      <img
-                        :src="getAssetUrl(`assets/items/consumable/${art.plan.consumableId}.png`)"
-                        :alt="art.plan.shortName"
-                        class="size-3.5 object-contain shrink-0"
-                      />
-                      <span>Next</span>
-                    </span>
-                    <span
-                      class="font-bold font-mono"
-                      :class="
-                        art.plan.ownedAmount >= art.plan.costForNextOne
-                          ? 'text-emerald-700 dark:text-emerald-300'
-                          : 'text-rose-500 dark:text-rose-400'
-                      "
-                    >
-                      {{ art.plan.costForNextOne.toLocaleString() }}
-                    </span>
-                  </div>
                 </div>
 
                 <!-- Bottom: Action Buttons -->
@@ -1806,7 +1780,7 @@ function handleSoulStoneFarm() {
                       isUpgradingArtifact ? 'pointer-events-none' : '',
                       upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single' ? 'ring-2 ring-emerald-400 opacity-90' : ''
                     ]"
-                    :title="`Upgrade +1 Level. Cost: ${art.plan.costForNextOne} ${art.plan.shortName} (Owned: ${art.plan.ownedAmount})`"
+                    :title="`Upgrade +1 Level. Cost: ${formatNumber(art.plan.costForNextOne)} ${art.plan.shortName} (Owned: ${formatNumber(art.plan.ownedAmount)})`"
                     @click="upgradeArtifactSingle(art.slotId)"
                   >
                     <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
@@ -1890,7 +1864,7 @@ function handleSoulStoneFarm() {
                 <!-- Direct Skin Stones -->
                 <div class="flex items-center gap-1.5" :title="`${skinStoneInfo.name}: ${formatNumber(ownedSkinStones)}`">
                   <img :src="getAssetUrl(skinStoneInfo.icon)" :alt="skinStoneInfo.name" class="size-4.5 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSkinStones) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ownedSkinStones) }}</span>
                 </div>
 
                 <span class="text-slate-300 dark:text-slate-600">|</span>
@@ -1898,13 +1872,13 @@ function handleSoulStoneFarm() {
                 <!-- Large Skin Stone Chest (65) -->
                 <div class="flex items-center gap-1" :title="`Large Skin Stone Chest (150 stones each): ${formatNumber(ownedLargeSkinChests)}`">
                   <img :src="getAssetUrl('assets/items/consumable/65.png')" alt="Large Skin Stone Chest" class="size-4.5 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedLargeSkinChests) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ownedLargeSkinChests) }}</span>
                 </div>
 
                 <!-- Skin Stone Chest (51) -->
                 <div class="flex items-center gap-1" :title="`Skin Stone Chest (10 stones each): ${formatNumber(ownedSmallSkinChests)}`">
                   <img :src="getAssetUrl('assets/items/consumable/51.png')" alt="Skin Stone Chest" class="size-4.5 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSmallSkinChests) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ownedSmallSkinChests) }}</span>
                 </div>
               </div>
             </div>
@@ -2230,17 +2204,17 @@ function handleSoulStoneFarm() {
               >
                 <div class="flex items-center gap-1.5" :title="`Rune Stones: ${formatNumber(ownedRuneStones)}`">
                   <img :src="getAssetUrl('assets/items/coin/40077.png')" alt="Rune Stones" class="size-4 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedRuneStones) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ownedRuneStones) }}</span>
                 </div>
                 <span class="text-slate-300 dark:text-slate-600">|</span>
                 <div class="flex items-center gap-1.5" :title="`Sparks of Power: ${formatNumber(ownedSparksOfPower)}`">
                   <img :src="getAssetUrl('assets/items/consumable/24.png')" alt="Sparks of Power" class="size-4 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSparksOfPower) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(ownedSparksOfPower) }}</span>
                 </div>
                 <span class="text-slate-300 dark:text-slate-600">|</span>
                 <div class="flex items-center gap-1.5" :title="`Gold: ${formatNumber(currentGold)}`">
                   <img :src="getAssetUrl('assets/items/gold/0.png')" alt="Gold" class="size-4 object-contain" />
-                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(currentGold) }}</span>
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatCompactMillion(currentGold) }}</span>
                 </div>
               </div>
             </div>

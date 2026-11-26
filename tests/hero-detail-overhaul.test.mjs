@@ -12,6 +12,7 @@ import {
   getArtifactEvolveStatus,
   extractHeroGlyphsAndTalisman,
 } from '../src/services/heroUpgradeService.ts';
+import { formatCompactMillion } from '../src/utils/formatters.ts';
 
 const root = resolve(process.cwd());
 
@@ -129,4 +130,19 @@ test('HeroDetailModal wires 1-click heroEvolve, artifact_evolve, XP level-up, Gl
   assert.ok(modalSrc.includes('id="hero-glyphs-resource-bar"'));
   const upgradesTabMatches = modalSrc.match(/v-show="activeSubTab === 'upgrades'"/g) || [];
   assert.equal(upgradesTabMatches.length, 3, 'Artifacts, Skins, and Glyphs/Sparks must all render inside the unified Upgrades tab');
+  // P2-18: redundant Artifact Next pill removed & compact million+ resource counts in Glyphs/Artifacts/Skins
+  assert.ok(!modalSrc.includes('Compact Next-Level Material Cost Pill'), 'Redundant Artifact Next pill must be removed');
+  assert.ok(modalSrc.includes('formatCompactMillion(ownedRuneStones)'));
+  assert.ok(modalSrc.includes('formatCompactMillion(ownedSparksOfPower)'));
+  assert.ok(modalSrc.includes('formatCompactMillion(currentGold)'));
+});
+
+test('formatCompactMillion preserves exact numbers below 1M and compacts >= 1M into M/B notation', () => {
+  assert.equal(formatCompactMillion(0), '0');
+  assert.equal(formatCompactMillion(450), '450');
+  assert.equal(formatCompactMillion(999_999), (999_999).toLocaleString());
+  assert.equal(formatCompactMillion(1_000_000), '1M');
+  assert.equal(formatCompactMillion(1_250_000), '1.3M');
+  assert.equal(formatCompactMillion(125_430_200), '125.4M');
+  assert.equal(formatCompactMillion(2_000_000_000), '2B');
 });

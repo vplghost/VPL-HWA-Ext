@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.332 — 2026-11-26
+
+### Changed
+
+- **Hero Detail Dialog UI Polish (`HeroDetailModal.vue`, `formatters.ts`, `tests/hero-detail-overhaul.test.mjs`)**:
+  - Removed the redundant per-card `Next` material cost pill from Artifact cards (the `+1` button tooltip already displays exact cost and owned amount, aligning Artifact cards with Skin cards).
+  - Added `formatCompactMillion()` in `src/utils/formatters.ts` and applied it across `#hero-glyphs-resource-bar` (Rune Stones, Sparks of Power, Gold) as well as Artifact, Skin, and XP resource displays so counts `>= 1,000,000` render compactly (`1.3M`, `125.4M`, `2B`) while hover tooltips retain exact numbers.
+
 ## 0.11.330 — 2026-11-26
 
 ### Added

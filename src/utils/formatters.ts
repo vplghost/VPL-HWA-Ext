@@ -35,3 +35,16 @@ export function formatCompact(num: number | string | null | undefined): string {
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
   return n.toLocaleString();
 }
+
+/**
+ * Formats resource counts with full precision below 1,000,000 and compact M/B notation
+ * at or above 1,000,000 (e.g. 999,999 -> "999,999", 1,250,000 -> "1.3M", 125,430,200 -> "125.4M").
+ */
+export function formatCompactMillion(num: number | string | null | undefined): string {
+  const n = Number(num);
+  if (!Number.isFinite(n)) return '0';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (abs >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  return n.toLocaleString();
+}
