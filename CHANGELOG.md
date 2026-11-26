@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.358 — 2026-11-26
+
+### Changed
+
+- **Settings UI Polish — Balanced 2-Column Heights & Draggable Navigation Tab Pills (`SettingsTab.vue`, `listReorder.ts`, `tests/list-reorder.test.mjs`)**:
+  - Added pure immutable helper `moveItemToIndex()` in `src/utils/listReorder.ts` for drag-and-drop list reordering.
+  - Replaced bulky 3-button Navigation Tabs list rows in `SettingsTab.vue` with compact HTML5 draggable pills (`#settings-tab-pills`, `draggable="true"`, grip handle `⋮⋮` + inline visibility checkbox).
+  - Rebalanced all 2-column rows in `SettingsTab.vue` with `items-stretch` and height-matched card pairings (`Appearance + Legends Draft + Priority Rally` ↔ `Network & RPC`, `Daily Autopilot` ↔ `Auto Collectors + Auto Troop Training`, `Engine Diagnostics + Session Recording` ↔ `Storage Telemetry + City Trees Sync`).
+
 ## 0.11.356 — 2026-11-26
 
 ### Changed

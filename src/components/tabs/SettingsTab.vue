@@ -11,6 +11,7 @@ import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
+import { moveItemToIndex } from '@/src/utils/listReorder';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import { DEFAULT_WASM_PROFILE_VERSION } from '@/src/data/wasmSymbols';
@@ -583,19 +584,34 @@ async function saveTabs() {
   }
 }
 
-function moveTab(index: number, direction: 'up' | 'down' | 'first') {
-  if (direction === 'first') {
-    if (index <= 0 || index >= tabSettings.value.length) return;
-    const item = tabSettings.value.splice(index, 1)[0];
-    if (item) tabSettings.value.unshift(item);
-    saveTabs();
-    return;
+const draggedTabIdx = ref<number | null>(null);
+const dragOverTabIdx = ref<number | null>(null);
+
+function onTabDragStart(index: number, event: DragEvent) {
+  draggedTabIdx.value = index;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
   }
-  const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= tabSettings.value.length) return;
-  const item = tabSettings.value.splice(index, 1)[0];
-  if (item) tabSettings.value.splice(targetIndex, 0, item);
+}
+
+function onTabDragOver(index: number) {
+  if (draggedTabIdx.value === null || draggedTabIdx.value === index) return;
+  dragOverTabIdx.value = index;
+}
+
+function onTabDrop(targetIndex: number) {
+  const from = draggedTabIdx.value;
+  draggedTabIdx.value = null;
+  dragOverTabIdx.value = null;
+  if (from === null || from === targetIndex) return;
+  tabSettings.value = moveItemToIndex(tabSettings.value, from, targetIndex);
   saveTabs();
+}
+
+function onTabDragEnd() {
+  draggedTabIdx.value = null;
+  dragOverTabIdx.value = null;
 }
 
 function toggleTabVisible(index: number) {
@@ -702,10 +718,11 @@ async function toggleRecording() {
 
 <template>
   <div id="settings-grid-root" class="space-y-3.5 text-xs">
-    <!-- Row 1: Appearance & Navigation | Network & RPC Dispatch -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
-      <!-- Left: Appearance, Launch Mode & Customize Tabs -->
-      <div id="settings-appearance-card" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 shadow-2xs">
+    <!-- Row 1: (Appearance & Launch + Legends Draft + Priority Rally) | Network & RPC Dispatch -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+      <!-- Left Column -->
+      <div class="flex flex-col gap-3.5">
+      <div id="settings-appearance-card" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 shadow-2xs">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span>🎨</span> Appearance & Launch
@@ -737,75 +754,123 @@ async function toggleRecording() {
           </p>
         </div>
 
-        <!-- Customize Tabs (Compact 2-Column Grid) -->
-        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+        <!-- Customize Tabs (Compact Draggable Pills) -->
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
               <span>📑</span> Navigation Tabs
+              <span class="text-[10px] font-normal text-slate-400">Drag pills to reorder</span>
             </div>
             <button
               type="button"
-              class="cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              class="cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0"
               @click="resetDefaultTabs"
             >
               Reset Default
             </button>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-1.5">
+          <div
+            id="settings-tab-pills"
+            class="flex flex-wrap gap-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-2"
+          >
             <div
               v-for="(t, idx) in tabSettings"
               :key="t.id"
-              class="flex items-center justify-between px-2 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+              :id="`settings-tab-pill-${t.id}`"
+              draggable="true"
+              class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] font-medium select-none cursor-grab active:cursor-grabbing transition-all"
+              :class="[
+                t.visible
+                  ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs'
+                  : 'bg-slate-100/70 dark:bg-slate-900/40 border-dashed border-slate-300 dark:border-slate-700 text-slate-400 opacity-65',
+                draggedTabIdx === idx ? 'opacity-40 scale-95' : '',
+                dragOverTabIdx === idx ? 'ring-2 ring-blue-500 border-blue-400' : '',
+              ]"
+              title="Drag to reorder · click checkbox to show or hide"
+              @dragstart="onTabDragStart(idx, $event)"
+              @dragover.prevent="onTabDragOver(idx)"
+              @drop.prevent="onTabDrop(idx)"
+              @dragend="onTabDragEnd"
             >
-              <label class="flex items-center gap-1.5 cursor-pointer font-medium text-slate-800 dark:text-slate-200 truncate">
-                <input
-                  type="checkbox"
-                  :checked="t.visible"
-                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer shrink-0"
-                  @change="toggleTabVisible(idx)"
-                />
-                <span class="truncate">{{ t.label }}</span>
-              </label>
-
-              <div class="flex items-center gap-0.5 shrink-0">
-                <button
-                  :id="`settings-tab-move-first-${idx}`"
-                  type="button"
-                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                  :disabled="idx === 0"
-                  title="Move to first"
-                  aria-label="Move to first"
-                  @click="moveTab(idx, 'first')"
-                >
-                  ⤒
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                  :disabled="idx === 0"
-                  title="Move Up"
-                  @click="moveTab(idx, 'up')"
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                  :disabled="idx === tabSettings.length - 1"
-                  title="Move Down"
-                  @click="moveTab(idx, 'down')"
-                >
-                  ▼
-                </button>
-              </div>
+              <span class="text-[10px] text-slate-400 leading-none" aria-hidden="true">⋮⋮</span>
+              <input
+                type="checkbox"
+                :checked="t.visible"
+                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3 cursor-pointer"
+                @click.stop
+                @change="toggleTabVisible(idx)"
+              />
+              <span>{{ t.label }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Right: API & Network Automation -->
-      <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 shadow-2xs">
+      <!-- Legends Draft (Enable checkbox inline in title) -->
+      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <label for="setting-auto-open-draft" class="flex items-center gap-2 cursor-pointer">
+            <input
+              id="setting-auto-open-draft"
+              v-model="autoOpenDraft"
+              type="checkbox"
+              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
+              @change="saveDraftAutoOpen(autoOpenDraft)"
+            />
+            <h3 class="text-sm font-bold flex items-center gap-1.5">
+              <span>🏆</span> Legends Draft Auto-Open
+            </h3>
+          </label>
+          <span
+            v-if="autoOpenDraft"
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          >
+            Active
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-500 pl-5">
+          Automatically opens the 15-hero candidate dialog when a Legends Draft match starts or transitions rounds.
+        </p>
+      </section>
+
+      <!-- Priority Rally Auto Join (Enable checkbox inline in title) -->
+      <section class="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label for="setting-priority-autojoin-enabled" class="flex items-center gap-2 cursor-pointer">
+            <input
+              id="setting-priority-autojoin-enabled"
+              v-model="priorityAutoJoin.enabled"
+              type="checkbox"
+              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
+              @change="savePriorityJoin"
+            />
+            <h3 class="text-sm font-bold">⚡ Priority Rally Auto Join</h3>
+          </label>
+          <span
+            v-if="priorityAutoJoin.enabled"
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          >
+            Active
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 pl-5">
+          <label class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-500">Min Lv:</span>
+            <input id="setting-priority-autojoin-min-level" v-model.number="priorityAutoJoin.minLevel" type="number" min="1" max="30" @change="savePriorityJoin" class="w-16 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-1 dark:bg-slate-800" />
+          </label>
+          <label class="flex items-center gap-1.5 text-xs flex-1 min-w-[140px]">
+            <span class="text-slate-500">Team:</span>
+            <select id="setting-priority-autojoin-team" v-model="priorityAutoJoin.teamId" @change="savePriorityJoin" class="flex-1 rounded border border-slate-200 dark:border-slate-700 px-2 py-1 dark:bg-slate-800">
+              <option v-for="team in autoJoinTeams" :key="team.id" :value="team.id">{{ team.label }}</option>
+            </select>
+          </label>
+        </div>
+      </section>
+      </div>
+
+      <!-- Right Column: API & Network Automation -->
+      <div class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 shadow-2xs">
       <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
         <span>⚡</span> Network & RPC Dispatch
       </h3>
@@ -921,9 +986,9 @@ async function toggleRecording() {
     </div>
     </div>
 
-    <!-- Row 2: Daily Routine Autopilot | Auto Collectors, Legends Draft & Priority Rally -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
-    <section id="settings-daily-autopilot" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+    <!-- Row 2: Daily Routine Autopilot | (Auto Collectors + Auto Troop Training) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+    <section id="settings-daily-autopilot" class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <label for="setting-daily-autopilot-enabled" class="flex items-center gap-2 cursor-pointer">
           <input
@@ -1000,7 +1065,7 @@ async function toggleRecording() {
       </div>
     </section>
 
-    <div class="space-y-3.5">
+    <div class="flex flex-col gap-3.5">
     <section
       id="settings-auto-collectors-section"
       class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5"
@@ -1040,71 +1105,8 @@ async function toggleRecording() {
       </div>
     </section>
 
-    <!-- Legends Draft (Enable checkbox inline in title) -->
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1.5">
-      <div class="flex items-center justify-between gap-2">
-        <label for="setting-auto-open-draft" class="flex items-center gap-2 cursor-pointer">
-          <input
-            id="setting-auto-open-draft"
-            v-model="autoOpenDraft"
-            type="checkbox"
-            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
-            @change="saveDraftAutoOpen(autoOpenDraft)"
-          />
-          <h3 class="text-sm font-bold flex items-center gap-1.5">
-            <span>🏆</span> Legends Draft Auto-Open
-          </h3>
-        </label>
-        <span
-          v-if="autoOpenDraft"
-          class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-        >
-          Active
-        </span>
-      </div>
-      <p class="text-[11px] text-slate-500 pl-5">
-        Automatically opens the 15-hero candidate dialog when a Legends Draft match starts or transitions rounds.
-      </p>
-    </section>
-
-    <!-- Priority Rally Auto Join (Enable checkbox inline in title) -->
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
-      <div class="flex items-center justify-between gap-2">
-        <label for="setting-priority-autojoin-enabled" class="flex items-center gap-2 cursor-pointer">
-          <input
-            id="setting-priority-autojoin-enabled"
-            v-model="priorityAutoJoin.enabled"
-            type="checkbox"
-            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
-            @change="savePriorityJoin"
-          />
-          <h3 class="text-sm font-bold">⚡ Priority Rally Auto Join</h3>
-        </label>
-        <span
-          v-if="priorityAutoJoin.enabled"
-          class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-        >
-          Active
-        </span>
-      </div>
-      <div class="flex flex-wrap items-center gap-3 pl-5">
-        <label class="flex items-center gap-1.5 text-xs">
-          <span class="text-slate-500">Min Lv:</span>
-          <input id="setting-priority-autojoin-min-level" v-model.number="priorityAutoJoin.minLevel" type="number" min="1" max="30" @change="savePriorityJoin" class="w-16 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-1 dark:bg-slate-800" />
-        </label>
-        <label class="flex items-center gap-1.5 text-xs flex-1 min-w-[140px]">
-          <span class="text-slate-500">Team:</span>
-          <select id="setting-priority-autojoin-team" v-model="priorityAutoJoin.teamId" @change="savePriorityJoin" class="flex-1 rounded border border-slate-200 dark:border-slate-700 px-2 py-1 dark:bg-slate-800">
-            <option v-for="team in autoJoinTeams" :key="team.id" :value="team.id">{{ team.label }}</option>
-          </select>
-        </label>
-      </div>
-    </section>
-    </div>
-    </div>
-
     <!-- Auto Troop Training (Enable checkbox inline in title) -->
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
+    <section class="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer">
           <input
@@ -1187,8 +1189,10 @@ async function toggleRecording() {
         </div>
       </div>
     </section>
+    </div>
+    </div>
 
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Auto Claim Freebies & Rewards</h3>
@@ -1341,9 +1345,10 @@ async function toggleRecording() {
       </div>
     </section>
 
-    <!-- Row 4: Diagnostics | Storage, City Trees & Recording -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
+    <!-- Row 4: (Diagnostics + Session Recording) | (Storage Telemetry + City Trees Sync) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+    <div class="flex flex-col gap-3.5">
+    <section class="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
       <h3 class="text-sm font-bold">Game Engine Diagnostics</h3>
       <p id="engine-status-badge">{{ engine.badge }}</p>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1501,8 +1506,40 @@ async function toggleRecording() {
         </div>
       </div>
     </section>
-    <!-- Storage & Runtime Telemetry -->
-    <div class="space-y-3.5">
+
+    <!-- Session Profiling & Recording (Left column bottom to balance height) -->
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 shadow-2xs">
+      <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+        <span>📼</span> Session Profiling & API Recording
+      </h3>
+
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <div class="font-semibold text-slate-700 dark:text-slate-200">Session Recorder</div>
+          <div class="text-[11px] text-slate-400">
+            Capture full sequence of game requests, responses, and cache deltas for debugging and data analysis.
+          </div>
+        </div>
+        <button
+          type="button"
+          :disabled="isTogglingRecording"
+          class="cursor-pointer shrink-0 px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          :class="
+            recordingState?.active
+              ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+          "
+          @click="toggleRecording"
+        >
+          <span v-if="isTogglingRecording" class="inline-block animate-spin mr-1">⏳</span>
+          <span>{{ isTogglingRecording ? (recordingState?.active ? 'Stopping...' : 'Starting...') : (recordingState?.active ? '⏹ Stop Recording' : '🔴 Record API Session') }}</span>
+        </button>
+      </div>
+    </div>
+    </div>
+
+    <!-- Right Column: Storage & City Trees Sync -->
+    <div class="flex flex-col gap-3.5">
     <section
       id="storage-telemetry-card"
       class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3"
@@ -1618,7 +1655,7 @@ async function toggleRecording() {
     <!-- Building & Research Tree Data Sync -->
     <section
       id="city-tree-sync-card"
-      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs"
+      class="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 shadow-2xs"
     >
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -1677,36 +1714,6 @@ async function toggleRecording() {
         Active runtime overlay updated: {{ cityTreeOverlay.updatedAt }}
       </p>
     </section>
-
-    <!-- Session Profiling & Recording -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
-      <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-        <span>📼</span> Session Profiling & API Recording
-      </h3>
-
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="font-semibold text-slate-700 dark:text-slate-200">Session Recorder</div>
-          <div class="text-[11px] text-slate-400">
-            Capture full sequence of game requests, responses, and cache deltas for debugging and data analysis.
-          </div>
-        </div>
-        <button
-          type="button"
-          :disabled="isTogglingRecording"
-          class="cursor-pointer px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-          :class="
-            recordingState?.active
-              ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
-              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-          "
-          @click="toggleRecording"
-        >
-          <span v-if="isTogglingRecording" class="inline-block animate-spin mr-1">⏳</span>
-          <span>{{ isTogglingRecording ? (recordingState?.active ? 'Stopping...' : 'Starting...') : (recordingState?.active ? '⏹ Stop Recording' : '🔴 Record API Session') }}</span>
-        </button>
-      </div>
-    </div>
     </div>
     </div>
   </div>

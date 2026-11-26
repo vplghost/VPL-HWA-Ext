@@ -18,6 +18,29 @@ export function moveItemToFirst<T>(list: readonly T[], index: number): T[] {
 }
 
 /**
+ * Returns a new array with the item at `fromIndex` moved to `toIndex`,
+ * preserving relative order of all other items (used for drag-and-drop reordering).
+ */
+export function moveItemToIndex<T>(list: readonly T[], fromIndex: number, toIndex: number): T[] {
+  if (!Array.isArray(list)) return [];
+  const next = [...list];
+  if (
+    !Number.isInteger(fromIndex) ||
+    !Number.isInteger(toIndex) ||
+    fromIndex < 0 ||
+    fromIndex >= next.length ||
+    toIndex < 0 ||
+    toIndex >= next.length ||
+    fromIndex === toIndex
+  ) {
+    return next;
+  }
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item!);
+  return next;
+}
+
+/**
  * Computes the destination index for a queue move operation (`up`, `down`, `first`).
  */
 export function computeQueueMoveTarget(
