@@ -32,6 +32,16 @@ import {
 import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
+const openInPopup = ref(false);
+
+async function saveOpenInPopup() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ openInPopup: openInPopup.value });
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    await chrome.runtime.sendMessage({ kind: 'set-action-launch-mode', openInPopup: openInPopup.value }).catch(() => {});
+  }
+}
 const { recordingState, cache, updateRecordingState, dispatchRpc } = useRpcCache();
 const isTogglingRecording = ref(false);
 const { autoClaimSettings, priorityAutoJoin, teams: autoJoinTeams, pending: pendingClaims, selectedCount, busy: claimBusy, message: claimMessage, saveAutoClaim, savePriorityJoin, claimRewards } = usePopupAutomation(cache);
@@ -476,6 +486,7 @@ onMounted(async () => {
         'dispatchMode',
         'socketRefreshMode',
         'popupRpcEnabled',
+        'openInPopup',
         'mqttCaptureEnabled',
         'sanitizeTeamEnabled',
         'captureSettings',
@@ -498,6 +509,7 @@ onMounted(async () => {
       const rawMode = stored.socketRefreshMode || stored.dispatchMode;
       dispatchMode.value = rawMode === 'piggyback' ? 'piggyback' : 'direct';
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
+      openInPopup.value = stored.openInPopup === true;
       sanitizeTeamEnabled.value = stored.sanitizeTeamEnabled !== false;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
@@ -689,101 +701,111 @@ async function toggleRecording() {
 </script>
 
 <template>
-  <div class="space-y-4 text-xs">
-    <!-- UI & Display -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
-      <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-        <span>🎨</span> Appearance & Theme
-      </h3>
-
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="font-semibold text-slate-700 dark:text-slate-200">Theme Mode</div>
-          <div class="text-[11px] text-slate-400">Choose between dark gaming aesthetic, clean light mode, or system default.</div>
-        </div>
-        <select
-          :value="theme"
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-hidden"
-          @change="handleThemeChange"
-        >
-          <option value="dark">🌙 Dark Mode (Default)</option>
-          <option value="light">☀️ Light Mode</option>
-          <option value="system">💻 System Preference</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Customize Tabs -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
-      <div class="flex items-center justify-between">
-        <div>
+  <div id="settings-grid-root" class="space-y-3.5 text-xs">
+    <!-- Row 1: Appearance & Navigation | Network & RPC Dispatch -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+      <!-- Left: Appearance, Launch Mode & Customize Tabs -->
+      <div id="settings-appearance-card" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 shadow-2xs">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
           <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-            <span>📑</span> Customize Tabs
+            <span>🎨</span> Appearance & Launch
           </h3>
-          <div class="text-[11px] text-slate-400 mt-0.5">Show, hide, or reorder navigation tabs.</div>
+          <select
+            :value="theme"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
+            @change="handleThemeChange"
+          >
+            <option value="dark">🌙 Dark Mode (Default)</option>
+            <option value="light">☀️ Light Mode</option>
+            <option value="system">💻 System Preference</option>
+          </select>
         </div>
-        <button
-          type="button"
-          class="cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-          @click="resetDefaultTabs"
-        >
-          Reset Default
-        </button>
-      </div>
 
-      <div class="space-y-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-2">
-        <div
-          v-for="(t, idx) in tabSettings"
-          :key="t.id"
-          class="flex items-center justify-between p-2 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
-        >
-          <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-800 dark:text-slate-200">
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <label for="setting-open-in-popup" class="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-200">
             <input
+              id="setting-open-in-popup"
+              v-model="openInPopup"
               type="checkbox"
-              :checked="t.visible"
-              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-4 cursor-pointer"
-              @change="toggleTabVisible(idx)"
+              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
+              @change="saveOpenInPopup"
             />
-            <span>{{ t.label }}</span>
+            <span>Open in popup window when clicking extension icon</span>
           </label>
+          <p class="text-[11px] text-slate-400 pl-5 mt-0.5">
+            When unchecked (default), clicking the browser toolbar icon opens or focuses HWA Helper in a full tab.
+          </p>
+        </div>
 
-          <div class="flex items-center gap-1">
-            <button
-              :id="`settings-tab-move-first-${idx}`"
-              type="button"
-              class="cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-              :disabled="idx === 0"
-              title="Move to first"
-              aria-label="Move to first"
-              @click="moveTab(idx, 'first')"
-            >
-              ⤒
-            </button>
+        <!-- Customize Tabs (Compact 2-Column Grid) -->
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+              <span>📑</span> Navigation Tabs
+            </div>
             <button
               type="button"
-              class="cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-              :disabled="idx === 0"
-              title="Move Up"
-              @click="moveTab(idx, 'up')"
+              class="cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              @click="resetDefaultTabs"
             >
-              ▲
+              Reset Default
             </button>
-            <button
-              type="button"
-              class="cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-              :disabled="idx === tabSettings.length - 1"
-              title="Move Down"
-              @click="moveTab(idx, 'down')"
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-1.5">
+            <div
+              v-for="(t, idx) in tabSettings"
+              :key="t.id"
+              class="flex items-center justify-between px-2 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
             >
-              ▼
-            </button>
+              <label class="flex items-center gap-1.5 cursor-pointer font-medium text-slate-800 dark:text-slate-200 truncate">
+                <input
+                  type="checkbox"
+                  :checked="t.visible"
+                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer shrink-0"
+                  @change="toggleTabVisible(idx)"
+                />
+                <span class="truncate">{{ t.label }}</span>
+              </label>
+
+              <div class="flex items-center gap-0.5 shrink-0">
+                <button
+                  :id="`settings-tab-move-first-${idx}`"
+                  type="button"
+                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                  :disabled="idx === 0"
+                  title="Move to first"
+                  aria-label="Move to first"
+                  @click="moveTab(idx, 'first')"
+                >
+                  ⤒
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                  :disabled="idx === 0"
+                  title="Move Up"
+                  @click="moveTab(idx, 'up')"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                  :disabled="idx === tabSettings.length - 1"
+                  title="Move Down"
+                  @click="moveTab(idx, 'down')"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- API & Network Automation -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
+      <!-- Right: API & Network Automation -->
+      <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 shadow-2xs">
       <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
         <span>⚡</span> Network & RPC Dispatch
       </h3>
@@ -897,28 +919,30 @@ async function toggleRecording() {
         </button>
       </div>
     </div>
+    </div>
 
-    <section id="settings-daily-autopilot" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+    <!-- Row 2: Daily Routine Autopilot | Auto Collectors, Legends Draft & Priority Rally -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+    <section id="settings-daily-autopilot" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
       <div class="flex items-center justify-between gap-2 flex-wrap">
-        <h3 class="text-sm font-bold flex items-center gap-1.5">
-          <span>🤖</span> Daily Routine Autopilot
-        </h3>
-        <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-          Event reset anchor: {{ dailyResetAnchor.formattedLocal }} ({{ dailyResetAnchor.formattedUtc }} · {{ dailyResetAnchor.source }})
-        </span>
-      </div>
-
-      <div class="space-y-2 text-xs">
-        <label class="flex items-center gap-2 cursor-pointer">
+        <label for="setting-daily-autopilot-enabled" class="flex items-center gap-2 cursor-pointer">
           <input
             id="setting-daily-autopilot-enabled"
             type="checkbox"
             :checked="dailyAutopilotSettings.enabled"
+            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
             @change="saveDailyAutopilotSettings({ enabled: ($event.target as HTMLInputElement).checked })"
           />
-          <span>Auto-start daily routine after event daily quest reset (02:00 UTC / 09:00 UTC+7 with jitter)</span>
+          <h3 class="text-sm font-bold flex items-center gap-1.5">
+            <span>🤖</span> Daily Routine Autopilot
+          </h3>
         </label>
+        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+          Reset: {{ dailyResetAnchor.formattedLocal }} ({{ dailyResetAnchor.formattedUtc }})
+        </span>
+      </div>
 
+      <div class="space-y-2 text-xs">
         <label class="flex items-center gap-2 cursor-pointer">
           <input
             id="setting-daily-autopilot-skip-high-risk"
@@ -976,115 +1000,141 @@ async function toggleRecording() {
       </div>
     </section>
 
+    <div class="space-y-3.5">
     <section
       id="settings-auto-collectors-section"
-      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5"
     >
       <div>
         <h3 class="text-sm font-bold">Auto Freebies & Resource Collectors</h3>
-        <p class="text-xs text-slate-500 mt-0.5">
+        <p class="text-[11px] text-slate-500 mt-0.5">
           Runs automatically while the game is open, including when this popup is closed. Uses shared RPC settings and free claims only.
         </p>
       </div>
 
       <!-- 1. Auto Free Spin -->
-      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
         <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
           <input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" @change="saveAutoFreeSpin" />
           <span>Use free Alchemy spin when its timer expires</span>
         </label>
-        <p class="text-[11px] text-slate-500 pl-5">Claims free Alchemy Wheel spins only when cooldown reaches zero.</p>
         <p v-if="autoFreeSpinStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFreeSpinStatus }}</p>
       </div>
 
       <!-- 2. Auto Frontier Rewards -->
-      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
         <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
           <input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />
           <span>Auto claim Frontier chest hourly (every 60 minutes)</span>
         </label>
-        <p class="text-[11px] text-slate-500 pl-5">Collects accumulated Frontier (Eternal Story) chest rewards every 60 minutes while the game is open.</p>
         <p v-if="autoFrontierStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFrontierStatus }}</p>
       </div>
 
       <!-- 3. Auto Realm Resources -->
-      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
         <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
           <input id="setting-auto-realm-resources" v-model="autoRealmResourcesEnabled" type="checkbox" @change="saveAutoRealmResources" />
           <span>Auto collect Realm resources hourly (every 60 minutes)</span>
         </label>
-        <p class="text-[11px] text-slate-500 pl-5">Collects accumulated Realm offline production (Wood, Food, Stone, Iron, Gold) every 60 minutes while the game is open.</p>
         <p v-if="autoRealmResourcesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoRealmResourcesStatus }}</p>
       </div>
     </section>
 
-    <!-- Legends Draft -->
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold flex items-center gap-1.5">
-          <span>🏆</span> Legends Draft
-        </h3>
+    <!-- Legends Draft (Enable checkbox inline in title) -->
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-1.5">
+      <div class="flex items-center justify-between gap-2">
+        <label for="setting-auto-open-draft" class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-auto-open-draft"
+            v-model="autoOpenDraft"
+            type="checkbox"
+            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
+            @change="saveDraftAutoOpen(autoOpenDraft)"
+          />
+          <h3 class="text-sm font-bold flex items-center gap-1.5">
+            <span>🏆</span> Legends Draft Auto-Open
+          </h3>
+        </label>
         <span
           v-if="autoOpenDraft"
-          class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
         >
           Active
         </span>
       </div>
-      <label class="flex items-center gap-2">
-        <input
-          id="setting-auto-open-draft"
-          v-model="autoOpenDraft"
-          type="checkbox"
-          @change="saveDraftAutoOpen(autoOpenDraft)"
-        />
-        Auto-open Legends Draft dialog when a draft match starts
-      </label>
-      <p class="text-xs text-slate-500">
-        Automatically opens the 15-hero candidate dialog when the game signals a Legends Draft match start or round transition (decrypted from DraftsXORCipher / session key).
+      <p class="text-[11px] text-slate-500 pl-5">
+        Automatically opens the 15-hero candidate dialog when a Legends Draft match starts or transitions rounds.
       </p>
     </section>
 
-    <!-- Auto Troop Training -->
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-            <span>🪖</span> Auto Troop Training
-          </h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            Automatically collect finished troops and train new units when queue is idle (batch size is min of max allowed and building training capacity).
-          </p>
-        </div>
+    <!-- Priority Rally Auto Join (Enable checkbox inline in title) -->
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <label for="setting-priority-autojoin-enabled" class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-priority-autojoin-enabled"
+            v-model="priorityAutoJoin.enabled"
+            type="checkbox"
+            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
+            @change="savePriorityJoin"
+          />
+          <h3 class="text-sm font-bold">⚡ Priority Rally Auto Join</h3>
+        </label>
         <span
-          v-if="autoTrainEnabled"
-          class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          v-if="priorityAutoJoin.enabled"
+          class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
         >
           Active
         </span>
       </div>
+      <div class="flex flex-wrap items-center gap-3 pl-5">
+        <label class="flex items-center gap-1.5 text-xs">
+          <span class="text-slate-500">Min Lv:</span>
+          <input id="setting-priority-autojoin-min-level" v-model.number="priorityAutoJoin.minLevel" type="number" min="1" max="30" @change="savePriorityJoin" class="w-16 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-1 dark:bg-slate-800" />
+        </label>
+        <label class="flex items-center gap-1.5 text-xs flex-1 min-w-[140px]">
+          <span class="text-slate-500">Team:</span>
+          <select id="setting-priority-autojoin-team" v-model="priorityAutoJoin.teamId" @change="savePriorityJoin" class="flex-1 rounded border border-slate-200 dark:border-slate-700 px-2 py-1 dark:bg-slate-800">
+            <option v-for="team in autoJoinTeams" :key="team.id" :value="team.id">{{ team.label }}</option>
+          </select>
+        </label>
+      </div>
+    </section>
+    </div>
+    </div>
 
-      <!-- Master Toggle & Status -->
+    <!-- Auto Troop Training (Enable checkbox inline in title) -->
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer font-medium text-slate-800 dark:text-slate-200">
+        <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer">
           <input
             id="setting-auto-train"
             v-model="autoTrainEnabled"
             type="checkbox"
-            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-4 cursor-pointer"
+            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3.5 cursor-pointer"
             @change="saveAutoTrain"
           />
-          <span>Enable Auto Troop Training</span>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>🪖</span> Auto Troop Training
+          </h3>
         </label>
-        <button
-          v-if="autoTrainEnabled"
-          type="button"
-          :disabled="autoTrainTickPending"
-          class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
-          @click="triggerAutoTrainNow"
-        >
-          {{ autoTrainTickPending ? 'Checking...' : 'Check Now' }}
-        </button>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="autoTrainEnabled"
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          >
+            Active
+          </span>
+          <button
+            v-if="autoTrainEnabled"
+            type="button"
+            :disabled="autoTrainTickPending"
+            class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
+            @click="triggerAutoTrainNow"
+          >
+            {{ autoTrainTickPending ? 'Checking...' : 'Check Now' }}
+          </button>
+        </div>
       </div>
 
       <div
@@ -1149,8 +1199,8 @@ async function toggleRecording() {
         </span>
       </div>
 
-      <!-- Freebie Groups Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <!-- Freebie Groups Grid (Compact Multi-Column) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         <!-- 1. Mail -->
         <label for="autoclaim-opt-mail" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
           <input id="autoclaim-opt-mail" v-model="autoClaimSettings.mail" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
@@ -1291,21 +1341,9 @@ async function toggleRecording() {
       </div>
     </section>
 
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-      <h3 class="text-sm font-bold">Priority Rally Auto Join</h3>
-      <p class="text-slate-500">Joins priority rallies using the shared RPC dispatch settings. Requires popup RPC calls.</p>
-      <label class="flex items-center gap-2"><input id="setting-priority-autojoin-enabled" v-model="priorityAutoJoin.enabled" type="checkbox" @change="savePriorityJoin" />Enabled</label>
-      <label class="flex items-center gap-2">Minimum monster level
-        <input id="setting-priority-autojoin-min-level" v-model.number="priorityAutoJoin.minLevel" type="number" min="1" max="30" @change="savePriorityJoin" class="rounded border p-1 dark:bg-slate-800" />
-      </label>
-      <label class="flex items-center gap-2">Team
-        <select id="setting-priority-autojoin-team" v-model="priorityAutoJoin.teamId" @change="savePriorityJoin" class="rounded border p-1 dark:bg-slate-800">
-          <option v-for="team in autoJoinTeams" :key="team.id" :value="team.id">{{ team.label }}</option>
-        </select>
-      </label>
-    </section>
-
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+    <!-- Row 4: Diagnostics | Storage, City Trees & Recording -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
       <h3 class="text-sm font-bold">Game Engine Diagnostics</h3>
       <p id="engine-status-badge">{{ engine.badge }}</p>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1464,6 +1502,7 @@ async function toggleRecording() {
       </div>
     </section>
     <!-- Storage & Runtime Telemetry -->
+    <div class="space-y-3.5">
     <section
       id="storage-telemetry-card"
       class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3"
@@ -1667,6 +1706,8 @@ async function toggleRecording() {
           <span>{{ isTogglingRecording ? (recordingState?.active ? 'Stopping...' : 'Starting...') : (recordingState?.active ? '⏹ Stop Recording' : '🔴 Record API Session') }}</span>
         </button>
       </div>
+    </div>
+    </div>
     </div>
   </div>
 </template>

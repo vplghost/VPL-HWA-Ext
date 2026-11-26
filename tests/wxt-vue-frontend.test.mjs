@@ -638,6 +638,42 @@ test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and
   assert.match(settings, /id="popup-rpc-enabled"/, 'SettingsTab must feature #popup-rpc-enabled');
   assert.match(settings, /socketRefreshMode/, 'SettingsTab must synchronize socketRefreshMode in chrome.storage');
   assert.match(settings, /id="socket-refresh-mode"/, 'SettingsTab must feature #socket-refresh-mode');
+  assert.match(settings, /id="settings-grid-root"/, 'SettingsTab must use compact multi-column grid root');
+  assert.match(settings, /lg:grid-cols-2/, 'SettingsTab must use 2-column responsive layout');
+  assert.match(settings, /id="setting-open-in-popup"/, 'SettingsTab must expose #setting-open-in-popup checkbox');
+  assert.match(settings, /set-action-launch-mode/, 'SettingsTab must sync openInPopup launch mode with background');
+
+  const { syncActionLaunchMode, openOrFocusExtensionTab } = await import('../src/background/backgroundRuntime.ts');
+  const setPopupCalls = [];
+  const createdTabs = [];
+  const updatedTabs = [];
+  const mockChrome = {
+    action: { setPopup: async (opts) => setPopupCalls.push(opts) },
+    runtime: { getURL: (p) => `chrome-extension://test-ext/${p}` },
+    tabs: {
+      query: (_q, cb) => cb([]),
+      create: async (opts) => { createdTabs.push(opts); return { id: 99 }; },
+      update: async (id, opts) => { updatedTabs.push({ id, opts }); },
+    },
+    windows: { update: async () => {} },
+  };
+
+  // Default (openInPopup = false) -> disables default popup so toolbar click opens full tab
+  await syncActionLaunchMode(false, mockChrome);
+  assert.deepEqual(setPopupCalls[0], { popup: '' });
+  const openRes = await openOrFocusExtensionTab(mockChrome);
+  assert.equal(openRes.focused, false);
+  assert.equal(createdTabs[0].url, 'chrome-extension://test-ext/popup.html?view=tab');
+
+  // Existing extension tab -> focuses instead of opening duplicate tab
+  mockChrome.tabs.query = (_q, cb) => cb([{ id: 42, windowId: 7 }]);
+  const focusRes = await openOrFocusExtensionTab(mockChrome);
+  assert.equal(focusRes.focused, true);
+  assert.equal(updatedTabs[0].id, 42);
+
+  // Opt-in popup mode -> restores popup.html
+  await syncActionLaunchMode(true, mockChrome);
+  assert.deepEqual(setPopupCalls[1], { popup: 'popup.html' });
 });
 
 test('Header.vue evaluates live mail rewards and opens the inbox instead of refreshing', async () => {

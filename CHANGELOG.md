@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.354 — 2026-11-26
+
+### Changed
+
+- **Default Open-in-Tab Toolbar Click, "Open in Popup" Setting & Compact Multi-Column Settings UI (`backgroundRuntime.ts`, `SettingsTab.vue`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Added `syncActionLaunchMode()` and `openOrFocusExtensionTab()` in `backgroundRuntime.ts` so clicking the browser extension toolbar icon defaults to opening or focusing `popup.html?view=tab` (`openInPopup: false`), while setting `openInPopup: true` restores the popup window immediately via `chrome.action.setPopup()`.
+  - Added `#setting-open-in-popup` checkbox in `SettingsTab.vue` and refactored Settings into a compact responsive 2-column grid (`#settings-grid-root`, `lg:grid-cols-2`) with 2-column Tab Order, 5-column Auto Claim Freebies checklist, and inline header Enable checkboxes for Daily Routine Autopilot, Legends Draft, Priority Rally Auto Join, and Auto Troop Training.
+
 ## 0.11.352 — 2026-11-26
 
 ### Fixed

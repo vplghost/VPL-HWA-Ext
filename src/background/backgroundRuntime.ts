@@ -3092,6 +3092,38 @@ export async function saveInteraction(entry: any, cr: any): Promise<any> {
   return { saved: true };
 }
 
+export async function syncActionLaunchMode(openInPopup: boolean, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const enabledPopup = openInPopup === true;
+  const popup = enabledPopup ? 'popup.html' : '';
+  try {
+    await cr?.action?.setPopup?.({ popup });
+  } catch (_) {}
+  return { openInPopup: enabledPopup, popup };
+}
+
+export async function openOrFocusExtensionTab(customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const tabUrl = cr?.runtime?.getURL?.('popup.html?view=tab') || 'popup.html?view=tab';
+  const basePrefix = cr?.runtime?.getURL?.('popup.html') || 'popup.html';
+  try {
+    const existingTabs = await new Promise<any[]>((resolve) => {
+      if (!cr?.tabs?.query) return resolve([]);
+      cr.tabs.query({ url: `${basePrefix}*` }, (tabs: any[]) => resolve(Array.isArray(tabs) ? tabs : []));
+    });
+    const existing = existingTabs.find((t) => t?.id != null);
+    if (existing) {
+      await cr?.tabs?.update?.(existing.id, { active: true });
+      if (existing.windowId != null) {
+        await cr?.windows?.update?.(existing.windowId, { focused: true });
+      }
+      return { focused: true, tabId: existing.id };
+    }
+  } catch (_) {}
+  const created = await cr?.tabs?.create?.({ url: tabUrl });
+  return { focused: false, tabId: created?.id ?? null };
+}
+
 export interface SetupBackgroundRuntimeOptions {
   chrome?: any;
   rpcDebounceMs?: number;
@@ -3132,11 +3164,12 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
   attemptedAutoJoinRallies.clear();
   cityQueueLanes.clear();
 
-  // Routine storage optimization on worker startup
+  // Routine storage optimization & toolbar action launch mode sync on worker startup
   try {
     pending = pending
       .then(async () => {
-        const stored = await cr.storage?.local?.get('rpcCache');
+        const stored = await cr.storage?.local?.get(['rpcCache', 'openInPopup']);
+        await syncActionLaunchMode(stored?.openInPopup === true, cr);
         if (stored?.rpcCache && rpcCacheService?.pruneCache) {
           const pruned = rpcCacheService.pruneCache(stored.rpcCache);
           if (pruned.changed) {
@@ -3147,6 +3180,17 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       })
       .catch(() => {});
   } catch (_) {}
+
+  // Browser toolbar icon click -> open or focus full tab when openInPopup is false (default)
+  cr.action?.onClicked?.addListener?.(() => {
+    void openOrFocusExtensionTab(cr);
+  });
+
+  cr.storage?.onChanged?.addListener?.((changes: any, area: string) => {
+    if (area === 'local' && changes && 'openInPopup' in changes) {
+      void syncActionLaunchMode(changes.openInPopup?.newValue === true, cr);
+    }
+  });
 
   // Tab remove listener
   cr.tabs?.onRemoved?.addListener?.((tabId: number) => {
@@ -4310,8 +4354,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       return true;
     }
     if (message?.kind === 'open-tab') {
-      cr.tabs?.create?.({ url: cr.runtime.getURL('popup.html?view=tab') });
+      void openOrFocusExtensionTab(cr);
       sendResponse({ ok: true });
+      return true;
+    }
+    if (message?.kind === 'set-action-launch-mode') {
+      syncActionLaunchMode(Boolean(message.openInPopup), cr)
+        .then((res) => sendResponse({ ok: true, ...res }))
+        .catch((err) => sendResponse({ ok: false, error: String(err) }));
       return true;
     }
     // Delegates 'draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event', 'draft-mqtt-event' (stamps autoOpenNonce)
