@@ -7,6 +7,7 @@ import {
   buildDailyExecutionPlan,
   computeExpeditionNextWakeMs,
   computeHeroicChestNextWakeMs,
+  computeRealmProductionPending,
   computeFreeGiftStripItems,
   mergeActivityWithAutopilotState,
   DEFAULT_DAILY_STEP_ORDER,
@@ -125,7 +126,7 @@ test('computeExpeditionNextWakeMs schedules single earliest finish + 5s buffer w
   assert.equal(computeExpeditionNextWakeMs({}, now), null);
 });
 
-test('computeFreeGiftStripItems splits all 7 free gift groups with isolated error and disabled states', () => {
+test('computeFreeGiftStripItems splits all 8 free gift groups with isolated error and disabled states', () => {
   const now = 1_795_000_000_000;
   const items = computeFreeGiftStripItems(
     {
@@ -139,7 +140,7 @@ test('computeFreeGiftStripItems splits all 7 free gift groups with isolated erro
       errorMap: { zeppelinGift: 'RPC timeout' },
     }
   );
-  assert.equal(items.length, 7);
+  assert.equal(items.length, 8);
   const byId = Object.fromEntries(items.map((i) => [i.id, i]));
 
   assert.equal(byId.videoBoxes.state, 'available');
@@ -267,4 +268,103 @@ test('ActivityGoals, FreeGiftsStrip, and SettingsTab wire Daily Autopilot contro
   const settingsSrc = await readFile(resolve(root, 'src/components/tabs/SettingsTab.vue'), 'utf8');
   assert.ok(settingsSrc.includes('id="settings-daily-autopilot"'));
   assert.ok(settingsSrc.includes('id="setting-daily-autopilot-skip-high-risk"'));
+  assert.ok(settingsSrc.includes('id="settings-auto-collectors-section"'));
+  assert.ok(settingsSrc.includes('Auto Freebies & Resource Collectors'));
+  assert.ok(settingsSrc.includes('id="setting-auto-free-spin"'));
+  assert.ok(settingsSrc.includes('id="setting-auto-frontier-rewards"'));
+  assert.ok(settingsSrc.includes('id="setting-auto-realm-resources"'));
+});
+
+test('rpcCache preserves/updates lastCollectDate and computeRealmProductionPending enforces 60s min & 8h cap', async () => {
+  const endpoint = 'https://api.hero-wars-alliance.com/api/rpc';
+  const lastCollect = 1_795_631_435_636;
+  const now2h = lastCollect + 2 * 3600 * 1000;
+
+  // 1. getSummary:resourceProduction preserves lastCollectDate & version
+  let cache = rpcCacheService.merge({}, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-26T06:58:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ ident: 'rp1', name: 'getSummary', feature: 'resourceProduction', args: {} }],
+    }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'rp1',
+        result: {
+          response: {
+            producers: [
+              { id: 1, residents: [2], lastCollectDate: lastCollect, version: 336 },
+              { id: 5, residents: [], lastCollectDate: lastCollect, version: 358 },
+            ],
+          },
+        },
+      }],
+    }),
+  }]).cache;
+
+  assert.equal(cache.productionStatus.data.producers[0].lastCollectDate, lastCollect);
+  assert.equal(cache.productionStatus.data.producers[1].lastCollectDate, lastCollect);
+
+  // Add campaign progress so producer 5 (material 1) produces ratePerMinute > 0
+  cache.missionProgressStatus = { data: { completed: [190] } };
+
+  // 2. Under 60s elapsed -> 0 calls, chip state = done
+  const tooSoon = computeRealmProductionPending(cache, lastCollect + 30_000);
+  assert.equal(tooSoon.hasSummary, true);
+  assert.equal(tooSoon.readyCount, 0);
+  const soonChip = computeFreeGiftStripItems(cache, lastCollect + 30_000, { hasGameTab: true })
+    .find((i) => i.id === 'realmResources');
+  assert.equal(soonChip.state, 'done');
+  assert.equal(soonChip.disabled, true);
+
+  // 3. After 2h -> producer 5 has valid collectedAmount and RPC payload
+  const pending2h = computeRealmProductionPending(cache, now2h);
+  assert.equal(pending2h.readyCount, 1);
+  assert.equal(pending2h.calls[0].name, 'collectResource');
+  assert.equal(pending2h.calls[0].feature, 'resourceProduction');
+  assert.equal(pending2h.calls[0].args.producerId, 5);
+  assert.ok(pending2h.calls[0].args.collectedAmount > 6000);
+
+  const readyChip = computeFreeGiftStripItems(cache, now2h, { hasGameTab: true })
+    .find((i) => i.id === 'realmResources');
+  assert.equal(readyChip.state, 'available');
+  assert.equal(readyChip.count, 1);
+  assert.equal(readyChip.disabled, false);
+
+  // 4. Cap at 8h (24h elapsed produces exact same amount as 8h)
+  const pending8h = computeRealmProductionPending(cache, lastCollect + 8 * 3600 * 1000);
+  const pending24h = computeRealmProductionPending(cache, lastCollect + 24 * 3600 * 1000);
+  assert.equal(pending24h.calls[0].args.collectedAmount, pending8h.calls[0].args.collectedAmount);
+
+  // 5. Merging collectResource:resourceProduction updates lastCollectDate immediately
+  cache = rpcCacheService.merge(cache, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-26T09:00:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{
+        ident: 'rc1',
+        name: 'collectResource',
+        feature: 'resourceProduction',
+        args: { producerId: 5, collectDate: now2h, collectedAmount: 6140 },
+      }],
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'rc1', result: { response: {} } }],
+    }),
+  }]).cache;
+
+  const updatedP5 = cache.productionStatus.data.producers.find((p) => p.id === 5);
+  assert.equal(updatedP5.lastCollectDate, now2h);
+
+  // 6. Background runtime wires hwa-auto-realm-resources & realm-resources-tick
+  const bgSrc = await readFile(resolve(root, 'src/background/backgroundRuntime.ts'), 'utf8');
+  assert.ok(bgSrc.includes('hwa-auto-realm-resources'));
+  assert.ok(bgSrc.includes('realm-resources-tick'));
+  assert.ok(bgSrc.includes('runRealmResourcesClaim'));
 });

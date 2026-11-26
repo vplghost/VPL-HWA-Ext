@@ -28,6 +28,7 @@ import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { buildAutoTrainCalls, getNextTroopTrainWakeAt, needsTroopTrainingRefresh, TROOP_DEFS } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
+import { computeRealmProductionPending } from '../services/dailyAutopilotService.ts';
 import { extractDraftHeroSteps, extractDraftSwapHeroIds, extractDraftHeroDetails } from '../utils/draftHelper.ts';
 import { getRecorderStore } from './storage/recorderDb.ts';
 import { pruneRpcCache } from '../core/cache/cachePruner.ts';
@@ -1276,6 +1277,17 @@ export function setupQueueAlarms(customChrome?: any) {
         }).catch(() => {});
       }
     });
+    cr.alarms.get('hwa-auto-realm-resources', (alarm: any) => {
+      if (!alarm) {
+        cr.storage?.local?.get(['autoRealmResourcesEnabled', 'autoRealmResourcesState']).then((st: any) => {
+          if (st?.autoRealmResourcesEnabled === true) {
+            const next = st.autoRealmResourcesState?.nextWakeAt;
+            const when = Number.isFinite(next) && next > Date.now() ? next : Date.now() + 60 * 60 * 1000;
+            cr.alarms.create('hwa-auto-realm-resources', { when });
+          }
+        }).catch(() => {});
+      }
+    });
   } catch (_) {}
 }
 
@@ -2373,6 +2385,89 @@ export async function runFrontierRewardsClaim(manual = false, customChrome?: any
   }
 }
 
+export async function runRealmResourcesClaim(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'autoRealmResourcesEnabled',
+      'autoRealmResourcesState',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings'
+    ])) || {};
+  const cache = stored.rpcCache || {};
+  const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id;
+  const now = Date.now();
+  let state = stored.autoRealmResourcesState ? structuredClone(stored.autoRealmResourcesState) : null;
+  if (!manual && !stored.autoRealmResourcesEnabled) return { ok: false, error: 'Auto realm resources is disabled.' };
+  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
+  if (accountId == null) return { ok: false, error: 'Waiting for current game account.' };
+
+  if (state && String(state.accountId) !== String(accountId)) {
+    state = null;
+  }
+  state = state || { accountId, lastClaimAt: 0 };
+
+  const ONE_HOUR = 60 * 60 * 1000;
+  if (!manual && state.lastClaimAt && (now - state.lastClaimAt) < (ONE_HOUR - 5000)) {
+    const nextWake = state.lastClaimAt + ONE_HOUR;
+    state.nextWakeAt = nextWake;
+    state.status = `Next collect scheduled at ${new Date(nextWake).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoRealmResourcesState: state });
+    cr?.alarms?.create?.('hwa-auto-realm-resources', { when: Math.max(now + 1000, nextWake) });
+    return { ok: true, scheduled: true, nextWakeAt: nextWake };
+  }
+
+  const tab = await findActiveGameTab(cr);
+  if (!tab?.id) {
+    state.status = 'No active game tab found. Retrying later.';
+    await cr?.storage?.local?.set({ autoRealmResourcesState: state });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  const pending = computeRealmProductionPending(cache, now);
+  if (!pending.hasSummary || pending.calls.length === 0) {
+    const refreshCalls = [
+      { name: 'getSummary', feature: 'resourceProduction', args: {} },
+      { name: 'getSummary', feature: 'bonus', args: {} }
+    ];
+    const refreshMsg = rpcMessageForSettings(stored, refreshCalls);
+    if (refreshMsg) {
+      await cr?.tabs?.sendMessage?.(tab.id, refreshMsg).catch(() => {});
+    }
+    const nextWake = now + ONE_HOUR;
+    state.nextWakeAt = nextWake;
+    state.status = pending.hasSummary
+      ? `Collected recently · next check at ${new Date(nextWake).toLocaleTimeString()}`
+      : `Refreshed production summary · next check at ${new Date(nextWake).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoRealmResourcesState: state });
+    cr?.alarms?.create?.('hwa-auto-realm-resources', { when: nextWake });
+    return { ok: true, refreshed: true, nextWakeAt: nextWake };
+  }
+
+  const calls = [
+    ...pending.calls,
+    { name: 'getSummary', feature: 'resourceProduction', args: {} }
+  ];
+  const dispatch = rpcMessageForSettings(stored, calls);
+  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+  try {
+    await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+    state.lastClaimAt = now;
+    state.nextWakeAt = now + ONE_HOUR;
+    state.status = `Collected ${pending.calls.length} producers at ${new Date(now).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoRealmResourcesState: state });
+    cr?.alarms?.create?.('hwa-auto-realm-resources', { when: now + ONE_HOUR });
+    return { ok: true, claimed: true, count: pending.calls.length, nextWakeAt: now + ONE_HOUR, queued: dispatch.kind === 'queue-rpc' };
+  } catch (err: any) {
+    state.status = `Collect dispatch failed: ${err?.message || err}`;
+    await cr?.storage?.local?.set({ autoRealmResourcesState: state });
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -3100,6 +3195,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runFrontierRewardsClaim(false, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === 'hwa-auto-realm-resources') {
+      pending = pending.then(() => runRealmResourcesClaim(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
@@ -3252,6 +3351,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runFrontierRewardsClaim(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'realm-resources-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runRealmResourcesClaim(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -4655,6 +4764,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     findActiveGameTab: () => findActiveGameTab(cr),
     runFreeSpin: (manual?: boolean, record?: any, sourceTabId?: any) => runFreeSpin(manual, record, sourceTabId, cr),
     runFrontierRewardsClaim: (manual?: boolean) => runFrontierRewardsClaim(manual, cr),
+    runRealmResourcesClaim: (manual?: boolean) => runRealmResourcesClaim(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),

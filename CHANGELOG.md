@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.348 — 2026-11-26
+
+### Added
+
+- **Realm Offline Resources Auto-Claim, Dashboard Free Gifts Button & Unified Settings Card (`rpcCache.ts`, `productionData.ts`, `dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `useRealmResourcesAutomation.ts`, `backgroundRuntime.ts`, `SettingsTab.vue`, `tests/daily-autopilot.test.mjs`)**:
+  - Updated `rpcCache.ts` to preserve `lastCollectDate` / `version` from `resourceProduction:getSummary` and immediately update `lastCollectDate` when `resourceProduction:collectResource` succeeds.
+  - Added `computeRealmProductionPending()` in `dailyAutopilotService.ts` (using `ratePerMinute()` with 60s minimum elapsed threshold and 8h offline cap) and added the 1-click `🏘️` Realm Resources chip (`#free-gift-chip-realmResources`) to the Dashboard Free Gifts strip.
+  - Added 60-minute background auto-collector `runRealmResourcesClaim()` (`hwa-auto-realm-resources` alarm & `realm-resources-tick` message) and `useRealmResourcesAutomation()` composable.
+  - Consolidated `Auto Free Spin`, `Auto Frontier Rewards`, and `Auto Realm Resources` into a single unified Settings section (`#settings-auto-collectors-section` — **Auto Freebies & Resource Collectors**).
+
 ## 0.11.346 — 2026-11-26
 
 ### Changed

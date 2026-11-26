@@ -11400,10 +11400,14 @@ const bonusById = new Map<number, { materialId: number; kind: string; value: num
 
 const producerByMaterial: Record<number, number> = { 4: 1, 5: 2, 3: 3, 2: 4 };
 
-export function ratePerMinute(cache: Record<string, any>, materialId: number): number | null {
+export function ratePerMinute(
+  cache: Record<string, any>,
+  materialId: number,
+  options: { allowStaleBonusUrl?: boolean } = {}
+): number | null {
   if (!cache || typeof cache !== 'object') return null;
   const config = cache.productionConfigStatus?.data;
-  if (config?.bonusUrl !== productionRules.bonusUrl || config?.campaignUrl !== productionRules.campaignUrl) {
+  if (!options.allowStaleBonusUrl && (config?.bonusUrl !== productionRules.bonusUrl || config?.campaignUrl !== productionRules.campaignUrl)) {
     return null;
   }
   if (materialId === 1) {

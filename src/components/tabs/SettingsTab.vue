@@ -8,6 +8,7 @@ import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
+import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { useDraft } from '@/src/composables/useDraft';
@@ -292,6 +293,7 @@ async function compactStorageCache() {
 }
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
+const { enabled: autoRealmResourcesEnabled, status: autoRealmResourcesStatus, save: saveAutoRealmResources } = useRealmResourcesAutomation();
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
@@ -974,18 +976,46 @@ async function toggleRecording() {
       </div>
     </section>
 
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-      <h3 class="text-sm font-bold">Auto Free Spin</h3>
-      <label class="flex items-center gap-2"><input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" @change="saveAutoFreeSpin" />Use free spin when its timer expires</label>
-      <p class="text-xs text-slate-500">Runs while the game is open, including when this popup is closed. Uses shared RPC settings and free spins only.</p>
-      <p role="status" class="text-xs text-slate-500">{{ autoFreeSpinStatus }}</p>
-    </section>
+    <section
+      id="settings-auto-collectors-section"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4"
+    >
+      <div>
+        <h3 class="text-sm font-bold">Auto Freebies & Resource Collectors</h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Runs automatically while the game is open, including when this popup is closed. Uses shared RPC settings and free claims only.
+        </p>
+      </div>
 
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-      <h3 class="text-sm font-bold">Auto Frontier Rewards</h3>
-      <label class="flex items-center gap-2"><input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />Auto claim Frontier chest hourly (every 60 minutes)</label>
-      <p class="text-xs text-slate-500">Collects accumulated Frontier (Eternal Story) chest rewards every hour while the game is open. Uses shared RPC settings.</p>
-      <p role="status" class="text-xs text-slate-500">{{ autoFrontierStatus }}</p>
+      <!-- 1. Auto Free Spin -->
+      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+          <input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" @change="saveAutoFreeSpin" />
+          <span>Use free Alchemy spin when its timer expires</span>
+        </label>
+        <p class="text-[11px] text-slate-500 pl-5">Claims free Alchemy Wheel spins only when cooldown reaches zero.</p>
+        <p v-if="autoFreeSpinStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFreeSpinStatus }}</p>
+      </div>
+
+      <!-- 2. Auto Frontier Rewards -->
+      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+          <input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />
+          <span>Auto claim Frontier chest hourly (every 60 minutes)</span>
+        </label>
+        <p class="text-[11px] text-slate-500 pl-5">Collects accumulated Frontier (Eternal Story) chest rewards every 60 minutes while the game is open.</p>
+        <p v-if="autoFrontierStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFrontierStatus }}</p>
+      </div>
+
+      <!-- 3. Auto Realm Resources -->
+      <div class="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+          <input id="setting-auto-realm-resources" v-model="autoRealmResourcesEnabled" type="checkbox" @change="saveAutoRealmResources" />
+          <span>Auto collect Realm resources hourly (every 60 minutes)</span>
+        </label>
+        <p class="text-[11px] text-slate-500 pl-5">Collects accumulated Realm offline production (Wood, Food, Stone, Iron, Gold) every 60 minutes while the game is open.</p>
+        <p v-if="autoRealmResourcesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoRealmResourcesStatus }}</p>
+      </div>
     </section>
 
     <!-- Legends Draft -->

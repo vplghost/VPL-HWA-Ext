@@ -10,6 +10,7 @@ import {
   buildDailyExecutionPlan,
   computeExpeditionNextWakeMs,
   computeHeroicChestNextWakeMs,
+  computeRealmProductionPending,
   computeFreeGiftStripItems,
   formatShortTime,
   type DailyAutopilotSettings,
@@ -233,6 +234,21 @@ export function useDailyAutopilot(
         if (nextWake && typeof chrome !== 'undefined' && chrome.alarms?.create) {
           try { chrome.alarms.create('daily-autopilot-heroic-video-wake', { when: nextWake }); } catch (_) {}
         }
+      } else if (giftId === 'realmResources') {
+        await dispatchRpc([
+          { name: 'getSummary', feature: 'resourceProduction', args: {} },
+          { name: 'getSummary', feature: 'bonus', args: {} },
+        ]);
+        const pending = computeRealmProductionPending(cacheRef.value, Date.now());
+        if (pending.calls.length === 0) {
+          return true;
+        }
+        const collectRes = await dispatchRpc([
+          ...pending.calls,
+          { name: 'getSummary', feature: 'resourceProduction', args: {} },
+        ]);
+        const collectErr = extractRpcError(collectRes);
+        if (collectErr) throw new Error(collectErr);
       } else {
         return false;
       }

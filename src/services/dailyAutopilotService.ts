@@ -18,6 +18,7 @@ import {
 } from '../composables/activityState.ts';
 import { freeAlchemyAvailability, freeAlchemyTimer } from '../utils/freeAlchemySpin.ts';
 import { getAttentionBonusAvailability, formatCooldownTimer } from '../utils/freeChestHelper.ts';
+import { ratePerMinute } from '../data/productionData.ts';
 
 export const DAILY_AUTOPILOT_SETTINGS_KEY = 'dailyAutopilotSettings';
 export const DAILY_AUTOPILOT_STATE_KEY = 'dailyAutopilotState';
@@ -427,7 +428,119 @@ export type FreeGiftId =
   | 'attentionBonuses'
   | 'zeppelinGift'
   | 'skillPointsVideo'
-  | 'heroicChestVideo';
+  | 'heroicChestVideo'
+  | 'realmResources';
+
+export const REALM_PRODUCER_MATERIAL_MAP: Record<number, number> = {
+  1: 4, // Wood
+  2: 5, // Food
+  3: 3, // Stone
+  4: 2, // Iron
+  5: 1, // Realm Gold
+};
+
+export const REALM_PRODUCER_LABELS: Record<number, string> = {
+  1: 'Wood',
+  2: 'Food',
+  3: 'Stone',
+  4: 'Iron',
+  5: 'Gold',
+};
+
+export const REALM_MIN_COLLECT_SEC = 60;
+export const REALM_MAX_OFFLINE_SEC = 8 * 3600;
+
+export interface RealmProducerPendingItem {
+  producerId: number;
+  materialId: number;
+  label: string;
+  lastCollectDate: number;
+  elapsedSec: number;
+  collectedAmount: number;
+}
+
+export interface RealmProductionPendingResult {
+  hasSummary: boolean;
+  readyCount: number;
+  maxElapsedSec: number;
+  items: RealmProducerPendingItem[];
+  calls: Array<{
+    name: 'collectResource';
+    feature: 'resourceProduction';
+    args: { producerId: number; collectDate: number; collectedAmount: number };
+  }>;
+}
+
+function formatCompactEstimate(amount: number): string {
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(2).replace(/\.?0+$/, '')}M`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(amount);
+}
+
+/**
+ * Computes safe pending offline production across all 5 Realm producers (1..5)
+ * using `productionStatus.data.producers[].lastCollectDate` and `ratePerMinute()`.
+ * Enforces minimum elapsed threshold (60s) and conservative offline cap (8h).
+ */
+export function computeRealmProductionPending(
+  cache: Record<string, any> | null | undefined,
+  now = Date.now()
+): RealmProductionPendingResult {
+  const producers = cache?.productionStatus?.data?.producers;
+  if (!Array.isArray(producers) || producers.length === 0) {
+    return { hasSummary: false, readyCount: 0, maxElapsedSec: 0, items: [], calls: [] };
+  }
+
+  let hasAnyDate = false;
+  let maxElapsedSec = 0;
+  const items: RealmProducerPendingItem[] = [];
+  const calls: RealmProductionPendingResult['calls'] = [];
+
+  for (const producer of producers) {
+    const producerId = Number(producer?.id);
+    const materialId = REALM_PRODUCER_MATERIAL_MAP[producerId];
+    const lastCollectDate = Number(producer?.lastCollectDate);
+    if (!materialId || !Number.isFinite(lastCollectDate) || lastCollectDate <= 0) continue;
+
+    hasAnyDate = true;
+    const elapsedSec = Math.max(0, (now - lastCollectDate) / 1000);
+    if (elapsedSec > maxElapsedSec) maxElapsedSec = elapsedSec;
+    if (elapsedSec < REALM_MIN_COLLECT_SEC) continue;
+
+    const rpm = ratePerMinute(cache || {}, materialId, { allowStaleBonusUrl: true });
+    if (rpm == null || !Number.isFinite(rpm) || rpm <= 0) continue;
+
+    const cappedSec = Math.min(elapsedSec, REALM_MAX_OFFLINE_SEC);
+    const collectedAmount = Math.floor((rpm / 60) * cappedSec);
+    if (!Number.isFinite(collectedAmount) || collectedAmount < 1) continue;
+
+    items.push({
+      producerId,
+      materialId,
+      label: REALM_PRODUCER_LABELS[producerId] || `Producer #${producerId}`,
+      lastCollectDate,
+      elapsedSec,
+      collectedAmount,
+    });
+    calls.push({
+      name: 'collectResource',
+      feature: 'resourceProduction',
+      args: {
+        producerId,
+        collectDate: Math.floor(now),
+        collectedAmount,
+      },
+    });
+  }
+
+  return {
+    hasSummary: hasAnyDate,
+    readyCount: calls.length,
+    maxElapsedSec,
+    items,
+    calls,
+  };
+}
 
 export interface FreeGiftStripItem {
   id: FreeGiftId;
@@ -638,6 +751,29 @@ export function computeFreeGiftStripItems(
     true
   );
 
+  // 8. Realm Offline Resources (resourceProduction:collectResource)
+  const realmPending = computeRealmProductionPending(c, now);
+  const realmState = !realmPending.hasSummary
+    ? 'unknown'
+    : realmPending.readyCount > 0
+      ? 'available'
+      : 'done';
+  const realmBreakdown = realmPending.items
+    .map((it) => `${it.label} ~${formatCompactEstimate(it.collectedAmount)}`)
+    .join(', ');
+  const realmResources = buildItem(
+    'realmResources',
+    '🏘️',
+    'Realm Resources',
+    realmPending.readyCount,
+    realmState,
+    realmPending.readyCount > 0
+      ? `Realm Resources ready (${realmPending.readyCount} producers): ${realmBreakdown}`
+      : realmState === 'done'
+        ? 'Realm Resources collected recently'
+        : 'Realm Resources: waiting for resourceProduction:getSummary'
+  );
+
   return [
     videoBoxes,
     videoTickets,
@@ -646,6 +782,7 @@ export function computeFreeGiftStripItems(
     zeppelinGift,
     skillPointsVideo,
     heroicChestVideo,
+    realmResources,
   ];
 }
 

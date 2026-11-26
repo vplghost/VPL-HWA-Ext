@@ -2458,8 +2458,12 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           return [{ key: 'productionStatus', method: call.name, feature: call.feature,
             group: 'internal', data: { producers: result.response.producers
               .filter((producer) => Number.isInteger(producer.id))
-              .map((producer) => ({ id: producer.id,
-                residentCount: Array.isArray(producer.residents) ? producer.residents.length : 0 })) },
+              .map((producer) => ({
+                id: producer.id,
+                residentCount: Array.isArray(producer.residents) ? producer.residents.length : 0,
+                lastCollectDate: Number.isFinite(Number(producer.lastCollectDate)) ? Number(producer.lastCollectDate) : null,
+                version: Number.isFinite(Number(producer.version)) ? Number(producer.version) : null,
+              })) },
             updatedAt: record.timestamp }];
         }
         if (key === 'collectResource:resourceProduction' && result && !result.error) {
@@ -5639,6 +5643,28 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             updatedAt: entry.updatedAt
           };
           changed = true;
+          continue;
+        }
+
+        if (entry.key === 'collectResourceAction') {
+          const producerId = Number(entry.data?.producerId);
+          const collectDate = Number(entry.data?.collectDate) ||
+            (entry.updatedAt ? Date.parse(entry.updatedAt) : Date.now());
+          if (Number.isInteger(producerId) && Number.isFinite(collectDate) && collectDate > 0 &&
+              Array.isArray(next.productionStatus?.data?.producers)) {
+            const updatedProducers = next.productionStatus.data.producers.map((p: any) =>
+              Number(p.id) === producerId ? { ...p, lastCollectDate: collectDate } : p
+            );
+            next.productionStatus = {
+              ...next.productionStatus,
+              data: {
+                ...next.productionStatus.data,
+                producers: updatedProducers,
+              },
+              updatedAt: entry.updatedAt || next.productionStatus.updatedAt,
+            };
+            changed = true;
+          }
           continue;
         }
 
