@@ -12,6 +12,9 @@ function getDataHelper(): any {
 }
 
 export const MONSTER_ATTACK_COST = 10;
+export const SOLO_SEARCH_TTL_MS = 300000;
+const MOB_UNAVAILABLE_RE =
+  /not.?found|not.?exist|expired|unavailable|already.*(?:dead|defeated|killed)|invalid.*(?:mob|target)|mob.*(?:missing|removed|not|dead|invalid|fail)|target.*(?:missing|dead|invalid|not|fail)|cannot.*find|disappeared/i;
 
 export function terminal(state?: MonsterQueueState | null): boolean {
   return !state || ['complete', 'stopped'].includes(state.phase);
@@ -250,15 +253,17 @@ export function start(
     return null;
   }
   const searchCache = cache?.experimentalSoloSearch?.data;
+  const searchedAt = Date.parse(cache?.experimentalSoloSearch?.updatedAt);
+  const isStaleSearch =
+    Number.isFinite(searchedAt) && (searchedAt > now || now - searchedAt > SOLO_SEARCH_TTL_MS);
   const configs = data.soloMonsterConfigIds(options.level);
   const mobs = safeList(searchCache?.mobs);
-  if (
-    searchCache?.mapId !== options.mapId ||
-    !sameValue(searchCache.mobConfigIds, configs) ||
-    !mobs.some((mob: any) => mob?.mobId === options.firstMobId)
-  ) {
-    return null;
-  }
+  const hasFreshSearch =
+    !isStaleSearch &&
+    searchCache?.mapId === options.mapId &&
+    sameValue(searchCache?.mobConfigIds, configs) &&
+    mobs.length > 0 &&
+    (!options.firstMobId || mobs.some((mob: any) => mob?.mobId === options.firstMobId));
   const state: MonsterQueueState = {
     id: `monster:${now}:${tabId}`,
     tabId,
@@ -273,11 +278,18 @@ export function start(
     targets: [],
     attackedMobIds: [],
     recentResults: [],
+    consecutiveAttackErrors: 0,
+    retriedCount: 0,
+    ...(Number.isFinite(searchedAt) ? { searchedAt } : {}),
   };
-  const first = mobs.find((mob: any) => mob?.mobId === options.firstMobId);
-  state.targets = [first, ...mobs.filter((mob: any) => mob?.mobId !== first?.mobId)].filter(
-    (mob: any) => typeof mob?.mobId === 'string'
-  );
+  if (hasFreshSearch) {
+    const first = options.firstMobId
+      ? mobs.find((mob: any) => mob?.mobId === options.firstMobId)
+      : mobs[0];
+    state.targets = [first, ...mobs.filter((mob: any) => mob?.mobId !== first?.mobId)].filter(
+      (mob: any) => typeof mob?.mobId === 'string'
+    );
+  }
   return refresh(state, cache, now, settings);
 }
 
@@ -311,6 +323,42 @@ export function advance(
         typeof error === 'string'
           ? error
           : error.message || error.description || error.code || '';
+      if (call.name === 'attackMob' && state.phase === 'attacking') {
+        const serializedError = JSON.stringify(error);
+        if (/energy|stamina|refillable|resource/i.test(serializedError)) {
+          return { state: stop(state, `Not enough World Energy: ${String(detail).slice(0, 160)}.`) };
+        }
+        const failedMobId = state.current?.mobId;
+        if (failedMobId != null && !state.attackedMobIds.includes(failedMobId)) {
+          state.attackedMobIds.push(failedMobId);
+        }
+        state.targets = state.targets.filter((target: any) => target?.mobId !== failedMobId);
+        state.current = null;
+        state.consecutiveAttackErrors = (Number(state.consecutiveAttackErrors) || 0) + 1;
+        state.retriedCount = (Number(state.retriedCount) || 0) + 1;
+        state.sessionEvents = appendSessionEvent(state.sessionEvents, {
+          at: now,
+          type: 'retried',
+          mobId: failedMobId,
+          detail: String(detail),
+        });
+        if (state.consecutiveAttackErrors >= 5) {
+          return {
+            state: stop(
+              state,
+              `attackMob failed ${state.consecutiveAttackErrors} times in a row (${String(detail).slice(0, 120)}). Queue stopped.`
+            ),
+          };
+        }
+        if (/unit|troop|soldier|squad/i.test(serializedError)) {
+          return issue(state, 'refreshing', rosterCalls(), now);
+        }
+        if (MOB_UNAVAILABLE_RE.test(serializedError) || !state.targets.length) {
+          state.targets = [];
+          return search(state, now);
+        }
+        return nextAttack(state, cache, now, settings);
+      }
       const suffix = detail && !result?.error ? ` (${String(detail).slice(0, 120)})` : '';
       return { state: stop(state, `Game rejected ${call.name}${suffix}. Queue stopped.`) };
     }
@@ -342,6 +390,7 @@ export function advance(
         (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object'))
     );
     if (match) {
+      state.searchedAt = now;
       const replyMobs = safeList(match.result?.response?.mobs);
       state.targets = [
         ...new Map(
@@ -360,6 +409,7 @@ export function advance(
     );
     if (match) {
       const route = match.result.response.route;
+      state.consecutiveAttackErrors = 0;
       state.current = {
         ...state.current,
         mobId: state.current?.mobId!,

@@ -569,6 +569,32 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             data: { token: call.ident, call, kind: speedup.kind, item: speedup.item, totalMs: speedup.totalMs, success,
               error: success ? null : String(error?.description || error?.message || error?.name || error || 'No confirmed speedup response').slice(0, 200) }, updatedAt: record.timestamp }];
         }
+        if (['attackMob:mob', 'createRally:mob'].includes(key) && call.args?.mobId) {
+          const mobErrCode = result?.response?.errorCode ?? result?.errorCode;
+          const mobErr =
+            result?.error ||
+            result?.response?.error ||
+            (mobErrCode != null && mobErrCode !== 0 && mobErrCode !== '0' && mobErrCode !== '' ? mobErrCode : null);
+          if (
+            mobErr &&
+            /not.?found|not.?exist|expired|unavailable|already.*(?:dead|defeated|killed)|invalid.*(?:mob|target)|mob.*(?:missing|removed|not|dead|invalid|fail)|target.*(?:missing|dead|invalid|not|fail)|cannot.*find|disappeared/i.test(
+              JSON.stringify(mobErr)
+            )
+          ) {
+            return [{
+              key: 'mobUnavailableAction',
+              method: call.name,
+              feature: call.feature,
+              group: 'internal',
+              data: {
+                searchKey: key === 'createRally:mob' ? 'experimentalRallySearch' : 'experimentalSoloSearch',
+                mapId: call.args.mapId ?? null,
+                mobId: call.args.mobId,
+              },
+              updatedAt: record.timestamp,
+            }];
+          }
+        }
         if (result?.error && ['createRally:mob', 'attackMine:mine', 'getRallyById:rally'].includes(key)) return [];
         if (key === 'searchMob:mob' && call.args?.mobType === 'rally' &&
             (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object'))) {
@@ -2909,6 +2935,19 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     for (const record of records) {
       const entries = record && record.key ? [record] : extract(record);
       for (const entry of entries) {
+        if (entry.key === 'mobUnavailableAction') {
+          const searchKey = entry.data?.searchKey;
+          const search = searchKey ? next[searchKey] : null;
+          if (search?.data && (entry.data?.mapId == null || search.data.mapId === entry.data.mapId)) {
+            const searchMobs = normalizeArrayData(search.data.mobs);
+            const filtered = searchMobs.filter((mob) => mob && mob.mobId !== entry.data.mobId);
+            if (filtered.length !== searchMobs.length) {
+              next[searchKey] = { ...search, data: { ...search.data, mobs: filtered } };
+              changed = true;
+            }
+          }
+          continue;
+        }
         if (entry.key === 'experimentalRallySearch') {
           const won = normalizeArrayData(next.experimentalDefeatedBosses?.data);
           const mobs = normalizeArrayData(entry.data?.mobs);

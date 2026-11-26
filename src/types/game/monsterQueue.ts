@@ -52,6 +52,9 @@ export interface MonsterQueueState {
   squad?: any;
   roster?: any;
   reason?: string;
+  consecutiveAttackErrors?: number;
+  retriedCount?: number;
+  searchedAt?: number;
   [key: string]: any;
 }
 

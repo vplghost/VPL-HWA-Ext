@@ -107,5 +107,88 @@ test('single attack completes, depleted energy and missing targets stop safely',
   assert.equal(state.completed, 1);
   assert.equal(queue.start(options, 1, 10, at(0), { ...cache,
     'resource:world-energy': { data: { amount: 9 } } }, {}).state.phase, 'stopped');
-  assert.equal(queue.start({ ...options, firstMobId: 'missing' }, 1, 10, at(0), cache, {}), null);
+  const missingFirst = queue.start({ ...options, firstMobId: 'missing' }, 1, 10, at(0), cache, {});
+  assert.equal(missingFirst.state.phase, 'searching');
+  assert.equal(missingFirst.calls[0].name, 'searchMob');
+});
+
+test('MobNotFound auto-retries via fresh searchMob, evicts dead target, caps at 5 consecutive errors, and stops on energy errors', () => {
+  const first = queue.start({ ...options, count: 1 }, 1, 10, at(0), cache, { defaultHero: 600, base: 950 });
+  assert.equal(first.state.phase, 'attacking');
+  assert.equal(first.calls[0].args.mobId, 'monster-a');
+
+  // Server replies MobNotFound -> must evict monster-a and immediately issue fresh searchMob
+  const retried = queue.advance(
+    first.state,
+    rpc(first.calls[0], { errorCode: 'MobNotFound' }, 2),
+    cache,
+    at(2)
+  );
+  assert.equal(retried.state.phase, 'searching');
+  assert.equal(retried.calls[0].name, 'searchMob');
+  assert.equal(retried.state.consecutiveAttackErrors, 1);
+  assert.equal(retried.state.retriedCount, 1);
+  assert.ok(retried.state.attackedMobIds.includes('monster-a'));
+  assert.equal(retried.state.targets.length, 0);
+
+  // Fresh searchMob returns monster-a (stale) and monster-c (fresh) -> skips monster-a, attacks monster-c
+  const found = queue.advance(
+    retried.state,
+    rpc(retried.calls[0], { mobs: [{ mobId: 'monster-a' }, { mobId: 'monster-c' }] }, 4),
+    cache,
+    at(4)
+  );
+  assert.equal(found.state.phase, 'attacking');
+  assert.equal(found.calls[0].args.mobId, 'monster-c');
+
+  // Successful attack resets consecutiveAttackErrors to 0
+  const accepted = queue.advance(
+    found.state,
+    rpc(found.calls[0], {
+      squadId: 'squad-c',
+      route: { routeId: 'outbound-c', startedAt: at(5), durationMs: 30000 },
+    }, 5),
+    cache,
+    at(5)
+  );
+  assert.equal(accepted.state.phase, 'active');
+  assert.equal(accepted.state.consecutiveAttackErrors, 0);
+
+  // 5 consecutive MobNotFound errors stop cleanly
+  const fifth = queue.advance(
+    { ...first.state, consecutiveAttackErrors: 4 },
+    rpc(first.calls[0], { errorCode: 'MobNotFound' }, 6),
+    cache,
+    at(6)
+  );
+  assert.equal(fifth.state.phase, 'stopped');
+  assert.match(fifth.state.reason || '', /failed 5 times in a row/);
+
+  // Energy error stops immediately without retrying
+  const noEnergy = queue.advance(
+    first.state,
+    rpc(first.calls[0], { errorCode: 'NotEnoughEnergy' }, 7),
+    cache,
+    at(7)
+  );
+  assert.equal(noEnergy.state.phase, 'stopped');
+  assert.match(noEnergy.state.reason || '', /World Energy/);
+});
+
+test('start auto-searches when experimentalSoloSearch cache is stale (>5m) or empty', () => {
+  const staleCache = {
+    ...cache,
+    experimentalSoloSearch: {
+      ...cache.experimentalSoloSearch,
+      updatedAt: new Date(at(0) - 360000).toISOString(),
+    },
+  };
+  const fromStale = queue.start(options, 1, 10, at(0), staleCache, { defaultHero: 600, base: 950 });
+  assert.equal(fromStale.state.phase, 'searching');
+  assert.equal(fromStale.calls[0].name, 'searchMob');
+
+  const emptyCache = { ...cache, experimentalSoloSearch: undefined };
+  const fromEmpty = queue.start({ ...options, firstMobId: '' }, 1, 10, at(0), emptyCache, { defaultHero: 600, base: 950 });
+  assert.equal(fromEmpty.state.phase, 'searching');
+  assert.equal(fromEmpty.calls[0].name, 'searchMob');
 });

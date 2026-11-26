@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.360 — 2026-11-27
+
+### Fixed
+
+- **Monster Queue `MobNotFound` Auto-Retry, Stale Search TTL & Dead Target Eviction (`monsterQueue.ts`, `rpcCache.ts`, `MonsterModal.vue`, `tests/monster-queue.test.mjs`, `tests/raid-queue.test.mjs`, `tests/rpc-cache.test.mjs`)**:
+  - Updated `monsterQueueService.advance()` to automatically record failed `mobId` in `attackedMobIds`, clear stale `targets`, and dispatch a fresh `searchMob` when `mob:attackMob` returns `MobNotFound` (or mob-unavailable errors), matching `raidQueue.ts` parity with a 5-consecutive-error safety cap and immediate stop on World Energy errors.
+  - Added a 5-minute TTL (`SOLO_SEARCH_TTL_MS = 300000`) to `monsterQueueService.start()` so stale, missing, or mismatched `experimentalSoloSearch` caches automatically trigger `searchMob` instead of attacking vanished targets or returning `null`.
+  - Added `mobUnavailableAction` handling in `src/core/cache/rpcCache.ts` to immediately evict dead `mobId`s from `experimentalSoloSearch.data.mobs` and `experimentalRallySearch.data.mobs` when `mob:attackMob` or `rally:createRally` returns `MobNotFound`.
+  - Updated `MonsterModal.vue` (`startMonsterQueue`) to dispatch `monster-queue-start` directly with an empty `firstMobId` when no cached monsters remain, enabling seamless 1-click auto-search and start.
+
 ## 0.11.358 — 2026-11-26
 
 ### Changed

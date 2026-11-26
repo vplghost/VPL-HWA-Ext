@@ -123,6 +123,29 @@ test('rally search retains map context and candidate boss IDs for the experiment
   assert.equal(second.experimentalRallySearch.data.mobConfigIds[0], 60);
 });
 
+test('MobNotFound on attackMob and createRally evicts dead mobId from solo and rally search caches', () => {
+  const solo = record([{ name: 'searchMob', feature: 'mob', ident: 'solo', args: {
+    mapId: 'map-1', mobConfigIds: [37, 67], mobType: 'solo', center: { x: 100, y: 200 }
+  } }], [{ ident: 'solo', result: { response: { mobs: [
+    { mobId: 'dead-mob' }, { mobId: 'alive-mob' }
+  ] } } }], '2026-11-26T17:16:00.000Z');
+  const rally = record([{ name: 'searchMob', feature: 'mob', ident: 'rally', args: {
+    mapId: 'map-1', mobConfigIds: [60], mobType: 'rally', center: { x: 100, y: 200 }
+  } }], [{ ident: 'rally', result: { response: { mobs: [
+    { mobId: 'dead-boss' }, { mobId: 'alive-boss' }
+  ] } } }], '2026-11-26T17:16:00.000Z');
+  let state = cache.merge({}, [solo, rally]).cache;
+  const attackNotFound = record([{ name: 'attackMob', feature: 'mob', ident: 'atk-1', args: {
+    mapId: 'map-1', mobId: 'dead-mob'
+  } }], [{ ident: 'atk-1', result: { response: { errorCode: 'MobNotFound' } } }], '2026-11-26T17:16:21.000Z');
+  const rallyNotFound = record([{ name: 'createRally', feature: 'mob', ident: 'ral-1', args: {
+    mapId: 'map-1', mobId: 'dead-boss'
+  } }], [{ ident: 'ral-1', result: { response: { errorCode: 'MobNotFound' } } }], '2026-11-26T17:16:22.000Z');
+  state = cache.merge(state, [attackNotFound, rallyNotFound]).cache;
+  assert.deepEqual(state.experimentalSoloSearch.data.mobs.map((m) => m.mobId), ['alive-mob']);
+  assert.deepEqual(state.experimentalRallySearch.data.mobs.map((m) => m.mobId), ['alive-boss']);
+});
+
 test('world map chunk supplies map ID and experimental actions record RPC errors', () => {
   const chunk = record([{ name: 'getChunks', feature: 'globalMap', ident: 'map',
     args: { mapId: 'map-1' } }], [{ ident: 'map', result: {

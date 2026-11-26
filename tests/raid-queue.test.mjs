@@ -628,7 +628,7 @@ test('createRally response with result.response.errorCode MobNotFound recovers i
   assert.equal(fifthError.state.phase, 'stopped');
   assert.match(fifthError.state.reason || '', /5 times in a row \(MobNotFound\)/);
 
-  // Monster queue parity: result.response.errorCode stops cleanly instead of hanging
+  // Monster queue parity: result.response.errorCode triggers auto-retry searchMob instead of hanging or hard-stopping
   const monsterExpected = { name: 'attackMob', feature: 'mob', args: { mapId: 'm1', mobId: 'mob-gone' } };
   const monsterRes = monsterQueueService.advance(
     {
@@ -659,8 +659,10 @@ test('createRally response with result.response.errorCode MobNotFound recovers i
     {},
     3500
   );
-  assert.equal(monsterRes.state.phase, 'stopped');
-  assert.match(monsterRes.state.reason || '', /MobNotFound/);
+  assert.equal(monsterRes.state.phase, 'searching');
+  assert.equal(monsterRes.calls?.[0]?.name, 'searchMob');
+  assert.ok(monsterRes.state.attackedMobIds.includes('mob-gone'));
+  assert.equal(monsterRes.state.retriedCount, 1);
 });
 
 test('recallForQueue returns null instead of false error when needed heroes are already returning from raid/combat', () => {

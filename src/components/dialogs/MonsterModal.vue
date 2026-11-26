@@ -378,9 +378,7 @@ async function startMonsterQueue(count = mobCount.value) {
       firstMobId = foundMonsters.value[0].mobId;
       selectedMobId.value = firstMobId;
     } else {
-      statusMessage.value = `⚠️ Searching for Level ${mobLevel.value} monsters on world map...`;
-      await findMonsters();
-      return;
+      firstMobId = '';
     }
   }
 
