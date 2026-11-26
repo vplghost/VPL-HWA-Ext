@@ -70,12 +70,22 @@ const equipmentRank = computed(() => {
 
 const soulProgress = computed(() => {
   const prog = getHeroSoulProgress(props.heroId, props.hero, props.inventory);
-  if (!prog) return { owned: 0, needed: '—', canEvolve: false, percent: 0 };
+  if (!prog) return { owned: 0, needed: '—', canEvolve: false, percent: 0, isMax: starCount.value >= 6 };
   const owned = Number(prog.owned) || 0;
   const needed = prog.needed;
-  const canEvolve = typeof needed === 'number' && owned >= needed;
-  const percent = typeof needed === 'number' && needed > 0 ? Math.min(100, Math.round((owned / needed) * 100)) : 100;
-  return { owned, needed, canEvolve, percent };
+  const isMax = starCount.value >= 6 || needed === 'Max';
+  const canEvolve = !isMax && typeof needed === 'number' && owned >= needed;
+  const percent = !isMax && typeof needed === 'number' && needed > 0 ? Math.min(100, Math.round((owned / needed) * 100)) : 100;
+  return { owned, needed, canEvolve, percent, isMax };
+});
+
+const MAX_SPARK_LEVEL = 30;
+
+const sparkProgress = computed(() => {
+  const level = Math.max(0, Number(props.hero?.titanGiftLevel) || 0);
+  const isMax = level >= MAX_SPARK_LEVEL;
+  const percent = Math.min(100, Math.round((level / MAX_SPARK_LEVEL) * 100));
+  return { level, maxLevel: MAX_SPARK_LEVEL, isMax, percent };
 });
 
 // Equipment slots (1..6) status with gear image, rarity border, and equipped opacity
@@ -316,18 +326,32 @@ const artifactsList = computed(() => {
         </div>
 
         <!-- Soul Stones Progress -->
-        <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 space-y-1">
+        <div
+          data-section="soul-stones"
+          class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60"
+          :class="!soulProgress.isMax && typeof soulProgress.needed === 'number' ? 'space-y-1' : ''"
+        >
           <div class="flex items-center justify-between text-[10px]">
             <span class="text-slate-400 uppercase tracking-wider font-semibold">Soul Stones</span>
             <span
-              class="font-mono font-semibold"
+              v-if="soulProgress.isMax"
+              class="text-[10px] font-semibold tracking-wide text-amber-300 tabular-nums"
+            >
+              {{ soulProgress.owned > 0 ? `${formatNumber(soulProgress.owned)} / MAX` : 'MAX' }}
+            </span>
+            <span
+              v-else
+              class="text-[10px] font-mono font-semibold tabular-nums"
               :class="soulProgress.canEvolve ? 'text-emerald-400' : 'text-slate-300'"
             >
               {{ formatNumber(soulProgress.owned) }} / {{ typeof soulProgress.needed === 'number' ? formatNumber(soulProgress.needed) : soulProgress.needed }}
               <span v-if="soulProgress.canEvolve" class="ml-1 text-emerald-400 font-bold">✨ Ready</span>
             </span>
           </div>
-          <div v-if="typeof soulProgress.needed === 'number'" class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
+          <div
+            v-if="!soulProgress.isMax && typeof soulProgress.needed === 'number'"
+            class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden"
+          >
             <div
               class="h-full rounded-full transition-all"
               :class="soulProgress.canEvolve ? 'bg-emerald-400' : 'bg-blue-500'"
@@ -336,12 +360,37 @@ const artifactsList = computed(() => {
           </div>
         </div>
 
-        <!-- Spark of Power -->
-        <div v-if="hero?.titanGiftLevel" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between text-[10px]">
-          <span class="text-slate-400 uppercase tracking-wider font-semibold">Spark of Power</span>
-          <span class="font-semibold text-purple-300 text-xs tabular-nums">
-            Lv. {{ hero.titanGiftLevel }} / 30
-          </span>
+        <!-- Spark of Power Progress -->
+        <div
+          v-if="sparkProgress.level > 0"
+          data-section="spark-of-power"
+          class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60"
+          :class="!sparkProgress.isMax ? 'space-y-1' : ''"
+        >
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-slate-400 uppercase tracking-wider font-semibold">Spark of Power</span>
+            <span
+              v-if="sparkProgress.isMax"
+              class="text-[10px] font-semibold tracking-wide text-amber-300 tabular-nums"
+            >
+              {{ sparkProgress.level }} / MAX
+            </span>
+            <span
+              v-else
+              class="text-[10px] font-mono font-semibold text-purple-300 tabular-nums"
+            >
+              {{ sparkProgress.level }} / {{ sparkProgress.maxLevel }}
+            </span>
+          </div>
+          <div
+            v-if="!sparkProgress.isMax"
+            class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden"
+          >
+            <div
+              class="h-full rounded-full bg-purple-400 transition-all"
+              :style="{ width: `${sparkProgress.percent}%` }"
+            ></div>
+          </div>
         </div>
 
         <!-- Skills: No S1/S2/S3/S4, 1-line layout, threshold highlighted -->

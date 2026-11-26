@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.334 — 2026-11-26
+
+### Changed
+
+- **Hero Hover Card UI Polish (`HeroHoverCard.vue`, `tests/hero-hover-card.test.mjs`)**:
+  - Added a `Spark of Power` progress bar (`sparkProgress`, cap `30`) matching the `Soul Stones` progress layout when below max level.
+  - Hid progress bars when `Soul Stones` or `Spark of Power` reaches max and rendered `#num / MAX` or `MAX` in balanced `text-[10px]` typography matching the section titles (removing the oversized `text-xs` mismatch).
+
 ## 0.11.332 — 2026-11-26
 
 ### Changed

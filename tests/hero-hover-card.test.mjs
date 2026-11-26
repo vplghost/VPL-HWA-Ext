@@ -40,6 +40,15 @@ test('HeroHoverCard component implements unified equipment frame, gear thumbnail
 
   // 3. Compact inline sections for scrollbar prevention
   assert.match(content, /flex items-center justify-between gap-1\.5/, 'Must use 1-line flex layouts for skills, skins, glyphs, and artifacts');
+
+  // 4. P2-19: Spark of Power progress bar + balanced MAX typography (text-[10px]) for Soul Stones & Spark of Power
+  assert.match(content, /data-section="soul-stones"/, 'Must mark Soul Stones section');
+  assert.match(content, /data-section="spark-of-power"/, 'Must mark Spark of Power section');
+  assert.match(content, /const sparkProgress = computed/, 'Must compute sparkProgress');
+  assert.match(content, /v-if="!sparkProgress\.isMax"[\s\S]*?bg-purple-400/, 'Must show Spark of Power progress bar when not max');
+  assert.match(content, /v-if="soulProgress\.isMax"[\s\S]*?\/ MAX` : 'MAX'/, 'Must display #num / MAX or MAX for maxed Soul Stones');
+  assert.match(content, /v-if="sparkProgress\.isMax"[\s\S]*?\/ MAX/, 'Must display #num / MAX for maxed Spark of Power');
+  assert.doesNotMatch(content, /text-purple-300 text-xs/, 'Must not use oversized text-xs on Spark of Power value');
 });
 
 test('TitanHoverCard displays skill names and icons, and TitansTab expands hover area to entire card', async () => {
