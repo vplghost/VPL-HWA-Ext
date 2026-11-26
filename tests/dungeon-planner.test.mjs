@@ -10,6 +10,8 @@ import {
   scoreDungeonOutcome,
   compareDungeonOutcomes,
   runSingleDoorBestOfTen,
+  areAllDoorsPoolDepleted,
+  mergeClearedRoomEntry,
   SINGLE_DOOR_SIM_ROUNDS,
 } from '../src/services/dungeonPlanner.ts';
 import { executeDungeonAutomationStep } from '../src/services/queues/dungeonAutomationRunner.ts';
@@ -251,4 +253,73 @@ test('DungeonModal keeps single Auto Attack button, compact config bar, and no r
   const simSrc = fs.readFileSync(path.join(ROOT, 'src', 'components', 'dialogs', 'DungeonSimModal.vue'), 'utf8');
   assert.ok(!simSrc.includes('curFloor % 10 === 0'), 'Outdated % 10 checkpoint check in DungeonSimModal must be removed');
   assert.match(simSrc, /id="dungeon-sim-best10-summary"/);
+
+  // P2-17 selectors: tank switch, force-majeure, ordered pool panel, unified compact combat log grid & tooltip
+  assert.match(modalSrc, /id="dungeon-tank-switch-select"/);
+  assert.match(modalSrc, /id="dungeon-force-majeure-checkbox"/);
+  assert.match(modalSrc, /id="dungeon-pool-config-toggle"/);
+  assert.match(modalSrc, /id="dungeon-pool-config-panel"/);
+  assert.match(modalSrc, /id="dungeon-combat-log-grid"/);
+  assert.match(modalSrc, /id="dungeon-log-card-tooltip"/);
+});
+
+test('areAllDoorsPoolDepleted returns true only when all available doors have 1..5 alive titans', () => {
+  assert.equal(areAllDoorsPoolDepleted([5]), true);
+  assert.equal(areAllDoorsPoolDepleted([4, 5]), true);
+  assert.equal(areAllDoorsPoolDepleted([5, 6]), false);
+  assert.equal(areAllDoorsPoolDepleted([0, 5]), false);
+  assert.equal(areAllDoorsPoolDepleted([]), false);
+});
+
+test('mergeClearedRoomEntry deduplicates by (floor, door) and preserves rich auto metadata', () => {
+  const base = mergeClearedRoomEntry([], {
+    id: 'auto_581_1',
+    floor: 581,
+    door: 1,
+    element: 'Water',
+    source: 'auto',
+    win: true,
+    stars: 3,
+    casualties: 0,
+    fallenTitans: [],
+    tankLossPct: 8.5,
+    teamLossPct: 2.1,
+    switchedTankFrom: 'Sigurd',
+    switchedTankTo: 'Brustar',
+    timestamp: '2026-11-26T03:00:00.000Z',
+  });
+  assert.equal(base.length, 1);
+
+  // Merging same (floor, door) updates in place without duplicating
+  const merged = mergeClearedRoomEntry(base, {
+    id: 'casualty_581_1',
+    floor: 581,
+    door: 1,
+    element: 'Water',
+    source: 'manual',
+    win: true,
+    stars: 3,
+    casualties: 0,
+    fallenTitans: [],
+    timestamp: '2026-11-26T03:00:05.000Z',
+  });
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].tankLossPct, 8.5);
+  assert.equal(merged[0].switchedTankTo, 'Brustar');
+
+  const added = mergeClearedRoomEntry(merged, {
+    id: 'manual_582_2',
+    floor: 582,
+    door: 2,
+    element: 'Fire',
+    source: 'manual',
+    win: true,
+    stars: 2,
+    casualties: 1,
+    fallenTitans: ['Moloch'],
+    timestamp: '2026-11-26T03:01:00.000Z',
+  });
+  assert.equal(added.length, 2);
+  assert.equal(added[1].source, 'manual');
+  assert.equal(added[1].casualties, 1);
 });

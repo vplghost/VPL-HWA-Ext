@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.330 — 2026-11-26
+
+### Added
+
+- **Titan Dungeon Smart Squad Picker, Tank Auto-Switch, Force-Majeure Mode & Unified Compact Combat Log (`dungeonPlanner.ts`, `dungeonAutomation.ts`, `dungeonAutomationRunner.ts`, `DungeonModal.vue`, `DungeonSimModal.vue`, `tests/dungeon-*.test.mjs`)**:
+  - Added per-room-type ordered Titan pools (`water`, `fire`, `earth`, `neutral`) with full Dual-Element (Pallant `4050`, Orm `4052`, Alecto `4051`) and Light/Darkness/Spirit roster support, plus a collapsible 4-tab `#dungeon-pool-config-panel` in `DungeonModal.vue` for reordering and resetting pool priorities.
+  - Added automatic Tanker rotation (`pickSmartSquadForDoor()` + `#dungeon-tank-switch-select`) that promotes the next healthy `Tank`-role titan to frontline whenever the primary tank's HP drops to or below `tankSwitchHpPct`.
+  - Added Force-Majeure fallback (`#dungeon-force-majeure-checkbox` / `allowCasualtyOnDepletedPool`): when all available doors on the current floor (1 or 2 doors) have `<= 5` alive eligible titans, simulates all doors via Unity WASM, selects the winning door with minimum casualties/HP loss (re-syncing `dungeonStartBattle` session if needed), and halts only if no door can win.
+  - Unified Automation Status and Daily Combat Log in `#dungeon-combat-log-section` with a compact 4–5 column cleared-room card grid (`#dungeon-combat-log-grid`) displaying floor number, color-coded element, casualty badge, Auto/Manual icon, and hover/focus details (`#dungeon-log-card-tooltip`).
+
+### Fixed
+
+- **Room-Card Simulation Stale Team Cache & Retry Handler (`DungeonSimModal.vue`)**:
+  - Fixed `DungeonSimModal.vue` to watch `[modelValue, doorIdx, floorNumber, doorElementKey, door]`, reset stale selections on door/floor/element switches, and pre-pick squads strictly for the current door element via `pickSmartSquadForDoor()` instead of reusing cached teams from previous rooms.
+  - Fixed the error banner Retry button calling nonexistent `handleSimulateBattle` to call `handleRunSimulation`.
+
 ## 0.11.326 — 2026-11-26
 
 ### Fixed

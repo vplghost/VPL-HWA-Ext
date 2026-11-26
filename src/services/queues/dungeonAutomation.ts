@@ -3,18 +3,25 @@ import type {
   DungeonDoorSelectionResult,
   DungeonPlanResult,
 } from '../../types/game/dungeonAutomation.ts';
-import { titanMetadata } from '../../data/titanMetadata.ts';
+import { titanMetadata, getTitanRole } from '../../data/titanMetadata.ts';
 import { observedToday } from '../../composables/activityState.ts';
+import { isTitanEligibleForDoor } from '../../utils/dungeonBattleSim.ts';
+import {
+  DEFAULT_ORDERED_TITAN_POOLS,
+  normalizeDungeonElementKey,
+  type DungeonElementKey,
+  type DungeonOrderedPools,
+} from '../dungeonPlanner.ts';
 
 export const DEFAULT_DOOR_PRIORITY: string[] = ['prime', 'water', 'mixed', 'neutral', 'earth', 'fire'];
 export const DEFAULT_ATTACKER_PRIORITY: string[] = ['water', 'mixed', 'neutral', 'earth', 'fire'];
 
 export const DEFAULT_TITAN_POOLS: Record<string, number[]> = {
-  water: [4000, 4001, 4052, 4004, 4002, 4003],
-  earth: [4020, 4022, 4024, 4023, 4021],
-  fire: [4010, 4011, 4013, 4012, 4014, 4051],
-  neutral: [4000, 4001, 4052, 4004, 4002, 4020, 4023, 4013, 4022, 4021, 4010, 4011, 4012, 4053],
-  mixed: [4000, 4001, 4052, 4004, 4002, 4020, 4023, 4013, 4022, 4021, 4010, 4011, 4012, 4053],
+  water: [...DEFAULT_ORDERED_TITAN_POOLS.water],
+  earth: [...DEFAULT_ORDERED_TITAN_POOLS.earth],
+  fire: [...DEFAULT_ORDERED_TITAN_POOLS.fire],
+  neutral: [...DEFAULT_ORDERED_TITAN_POOLS.neutral],
+  mixed: [...DEFAULT_ORDERED_TITAN_POOLS.neutral],
 };
 
 export const FALLBACK_LINEUPS: Record<string, number[]> = {
@@ -396,6 +403,275 @@ export function resetTitanStates(cache: any): any {
   return cache;
 }
 
+export interface SmartSquadPickOptions {
+  orderedPools?: Partial<DungeonOrderedPools>;
+  savedLineups?: Record<string, number[]>;
+  customTeams?: Array<{ id: string; name: string; type?: string; heroIds: number[] }>;
+  cache?: any;
+  tankSwitchHpPct?: number;
+  safetyThresholdPct?: number;
+  ignoreSavedLineups?: boolean;
+}
+
+export interface SmartSquadPickResult {
+  elemKey: DungeonElementKey;
+  squadIds: number[];
+  frontlineId: number | null;
+  primaryTankId: number | null;
+  switchedTankFrom: number | null;
+  switchedTankTo: number | null;
+  aliveEligibleIds: number[];
+  aliveEligibleCount: number;
+  isPoolDepleted: boolean;
+  orderedPool: number[];
+}
+
+function getTitanHpPct(id: number, titanStates: Record<string, any>): number {
+  const st = titanStates?.[String(id)] ?? titanStates?.[Number(id)];
+  if (!st) return 100;
+  const maxHp = Math.max(1, Number(st.maxHp) || 1000000);
+  const hp = Math.max(0, st.hp != null ? Number(st.hp) : maxHp);
+  return (hp / maxHp) * 100;
+}
+
+/**
+ * Resolves the optimal 5-titan squad for a door element using:
+ * 1. User-configured ordered pool for that room type (water / fire / earth / neutral)
+ * 2. Fallback to saved lineups / custom teams / server saved teams / DEFAULT_ORDERED_TITAN_POOLS
+ * 3. Automatic tanker rotation when the primary tank's HP% drops to or below `tankSwitchHpPct`
+ */
+export function pickSmartSquadForDoor(
+  doorElement: string,
+  titanStates: Record<string, any> = {},
+  options: SmartSquadPickOptions = {}
+): SmartSquadPickResult {
+  const elemKey = normalizeDungeonElementKey(doorElement);
+  const tankSwitchHpPct = Number.isFinite(Number(options.tankSwitchHpPct))
+    ? Number(options.tankSwitchHpPct)
+    : 35;
+  const safetyThresholdPct = Number.isFinite(Number(options.safetyThresholdPct))
+    ? Number(options.safetyThresholdPct)
+    : 20;
+
+  const roster = options.cache?.titanGetAll?.data || {};
+  const stateKeys = Object.keys(titanStates || {});
+  const rosterKeys = Object.keys(roster || {});
+  const hasKnownRoster = stateKeys.length > 0 || rosterKeys.length > 0;
+  const ownedSet = new Set<number>();
+  for (const k of stateKeys) {
+    const n = Number(k);
+    if (Number.isInteger(n) && n > 0) ownedSet.add(n);
+  }
+  for (const k of rosterKeys) {
+    const n = Number(k);
+    if (Number.isInteger(n) && n > 0) ownedSet.add(n);
+  }
+
+  const isEligibleAndAlive = (id: number): boolean => {
+    if (!Number.isInteger(id) || id <= 0) return false;
+    if (hasKnownRoster && !ownedSet.has(id)) return false;
+    const st = titanStates?.[String(id)] ?? titanStates?.[Number(id)];
+    if (!isTitanAlive(st)) return false;
+    const meta = titanMetadata[String(id)] || null;
+    return isTitanEligibleForDoor(id, doorElement, meta);
+  };
+
+  // Build ordered candidate pool
+  const orderedPool: number[] = [];
+  const pushUnique = (ids: Array<number | string> | undefined | null) => {
+    if (!Array.isArray(ids)) return;
+    for (const raw of ids) {
+      const n = Number(raw);
+      if (Number.isInteger(n) && n > 0 && !orderedPool.includes(n)) {
+        orderedPool.push(n);
+      }
+    }
+  };
+
+  // 1. User-configured ordered pool for this room type (highest priority)
+  const customOrdered = options.orderedPools?.[elemKey];
+  if (Array.isArray(customOrdered) && customOrdered.length > 0) {
+    pushUnique(customOrdered);
+  } else {
+    // 2. Saved lineup (unless explicitly ignored, e.g., when strictly using ordered pool)
+    if (!options.ignoreSavedLineups) {
+      const saved =
+        options.savedLineups?.[elemKey] ||
+        (elemKey === 'neutral' ? options.savedLineups?.['mixed'] : undefined);
+      if (Array.isArray(saved) && saved.length > 0) {
+        const aliveSaved = saved.map(Number).filter(isEligibleAndAlive);
+        if (aliveSaved.length >= 3) {
+          pushUnique(aliveSaved);
+        }
+      }
+    }
+
+    // 3. Custom Titan Teams
+    if (Array.isArray(options.customTeams)) {
+      for (const ct of options.customTeams) {
+        const isTitan = ct.type === 'titan' || ct.heroIds.some((id) => Number(id) >= 4000);
+        if (!isTitan) continue;
+        const aliveCt = ct.heroIds.map(Number).filter(isEligibleAndAlive);
+        if (aliveCt.length >= 5) {
+          pushUnique(aliveCt);
+          break;
+        }
+      }
+    }
+
+    // 4. Server Saved Team
+    const serverTeams = options.cache?.teamGetAll?.data || {};
+    const serverCandidate =
+      serverTeams[`dungeon_${elemKey}`] ||
+      (elemKey === 'neutral'
+        ? serverTeams['dungeon_neutral'] || serverTeams['dungeon'] || serverTeams['dungeon_mixed']
+        : undefined);
+    if (Array.isArray(serverCandidate) && serverCandidate.length > 0) {
+      const aliveServer = serverCandidate.map(Number).filter(isEligibleAndAlive);
+      if (aliveServer.length >= 3) {
+        pushUnique(aliveServer);
+      }
+    }
+  }
+
+  // 5. Default ordered pool for this element
+  pushUnique(DEFAULT_ORDERED_TITAN_POOLS[elemKey]);
+
+  // 6. Any remaining owned alive eligible titans sorted by power desc, HP% desc
+  if (hasKnownRoster) {
+    const remainingOwned = [...ownedSet]
+      .filter((id) => !orderedPool.includes(id) && isEligibleAndAlive(id))
+      .sort((a, b) => {
+        const pA = Number(roster?.[String(a)]?.power) || 0;
+        const pB = Number(roster?.[String(b)]?.power) || 0;
+        if (pB !== pA) return pB - pA;
+        return getTitanHpPct(b, titanStates) - getTitanHpPct(a, titanStates);
+      });
+    pushUnique(remainingOwned);
+  }
+
+  const aliveEligibleIds = orderedPool.filter(isEligibleAndAlive);
+  const aliveEligibleCount = aliveEligibleIds.length;
+  const isPoolDepleted = aliveEligibleCount > 0 && aliveEligibleCount <= 5;
+
+  if (aliveEligibleCount === 0) {
+    return {
+      elemKey,
+      squadIds: [],
+      frontlineId: null,
+      primaryTankId: null,
+      switchedTankFrom: null,
+      switchedTankTo: null,
+      aliveEligibleIds: [],
+      aliveEligibleCount: 0,
+      isPoolDepleted: false,
+      orderedPool,
+    };
+  }
+
+  // Auto-Switch Tanker logic
+  const tanks = aliveEligibleIds.filter((id) => getTitanRole(id) === 'Tank');
+  const primaryTankId = tanks[0] ?? null;
+  let switchedTankFrom: number | null = null;
+  let switchedTankTo: number | null = null;
+  const demotedLowHpTanks = new Set<number>();
+
+  if (primaryTankId != null && tankSwitchHpPct > 0) {
+    const primaryHpPct = getTitanHpPct(primaryTankId, titanStates);
+    if (primaryHpPct <= tankSwitchHpPct) {
+      const healthyTank = tanks.find((id) => getTitanHpPct(id, titanStates) > tankSwitchHpPct);
+      if (healthyTank != null && healthyTank !== primaryTankId) {
+        switchedTankFrom = primaryTankId;
+        switchedTankTo = healthyTank;
+        for (const tId of tanks) {
+          if (tId === healthyTank) break;
+          if (getTitanHpPct(tId, titanStates) <= tankSwitchHpPct) {
+            demotedLowHpTanks.add(tId);
+          }
+        }
+      } else if (tanks.length > 1) {
+        let healthiestTank = primaryTankId;
+        let bestTankHp = primaryHpPct;
+        for (const tId of tanks) {
+          const hpPct = getTitanHpPct(tId, titanStates);
+          if (hpPct > bestTankHp) {
+            bestTankHp = hpPct;
+            healthiestTank = tId;
+          }
+        }
+        if (healthiestTank !== primaryTankId) {
+          switchedTankFrom = primaryTankId;
+          switchedTankTo = healthiestTank;
+          demotedLowHpTanks.add(primaryTankId);
+        }
+      }
+    }
+  }
+
+  // Build final 5-titan squad
+  const squadIds: number[] = [];
+  if (switchedTankTo != null) {
+    squadIds.push(switchedTankTo);
+    // Pass 1: healthy non-demoted titans in pool order
+    for (const id of aliveEligibleIds) {
+      if (squadIds.length >= 5) break;
+      if (squadIds.includes(id) || demotedLowHpTanks.has(id)) continue;
+      if (getTitanHpPct(id, titanStates) >= safetyThresholdPct) {
+        squadIds.push(id);
+      }
+    }
+    // Pass 2: remaining non-demoted titans in pool order
+    for (const id of aliveEligibleIds) {
+      if (squadIds.length >= 5) break;
+      if (squadIds.includes(id) || demotedLowHpTanks.has(id)) continue;
+      squadIds.push(id);
+    }
+    // Pass 3: demoted low-HP tanks (highest HP% first) if still < 5
+    if (squadIds.length < 5 && demotedLowHpTanks.size > 0) {
+      const sortedDemoted = [...demotedLowHpTanks].sort(
+        (a, b) => getTitanHpPct(b, titanStates) - getTitanHpPct(a, titanStates)
+      );
+      for (const id of sortedDemoted) {
+        if (squadIds.length >= 5) break;
+        if (!squadIds.includes(id)) squadIds.push(id);
+      }
+    }
+  } else {
+    // No tank switch needed: preserve pool order, skipping below-safety titans only if >5 alive
+    if (aliveEligibleIds.length > 5 && safetyThresholdPct > 0) {
+      for (const id of aliveEligibleIds) {
+        if (squadIds.length >= 5) break;
+        if (getTitanHpPct(id, titanStates) >= safetyThresholdPct) {
+          squadIds.push(id);
+        }
+      }
+    }
+    for (const id of aliveEligibleIds) {
+      if (squadIds.length >= 5) break;
+      if (!squadIds.includes(id)) squadIds.push(id);
+    }
+  }
+
+  const frontlineId =
+    switchedTankTo ??
+    squadIds.find((id) => getTitanRole(id) === 'Tank') ??
+    squadIds[0] ??
+    null;
+
+  return {
+    elemKey,
+    squadIds,
+    frontlineId,
+    primaryTankId,
+    switchedTankFrom,
+    switchedTankTo,
+    aliveEligibleIds,
+    aliveEligibleCount,
+    isPoolDepleted,
+    orderedPool,
+  };
+}
+
 export const dungeonAutomationService = {
   DEFAULT_DOOR_PRIORITY,
   DEFAULT_ATTACKER_PRIORITY,
@@ -405,6 +681,7 @@ export const dungeonAutomationService = {
   getEffectiveTitanStates,
   getPoolForType,
   pickLineupFromPool,
+  pickSmartSquadForDoor,
   getLineupForDoor,
   checkLineupIntactness,
   evaluateDoor,

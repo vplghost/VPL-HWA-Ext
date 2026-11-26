@@ -3,17 +3,28 @@ import {
   simulateBattleWithUnity,
   evaluateDoorSafetyAndLoss,
   calculateHpLossMetrics,
-  isTitanEligibleForDoor,
   type DoorEvaluationResult,
   type SimResultPayload,
+  type HpLossMetrics,
 } from '../../utils/dungeonBattleSim.ts';
-import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from './dungeonAutomation.ts';
+import {
+  getEffectiveTitanStates,
+  pickSmartSquadForDoor,
+  type SmartSquadPickResult,
+} from './dungeonAutomation.ts';
 import {
   needsFiveFloorCheckpointClaim,
   shouldUseBestOfTen,
   runSingleDoorBestOfTen,
+  scoreDungeonOutcome,
+  compareDungeonOutcomes,
+  areAllDoorsPoolDepleted,
+  formatDungeonElementName,
   SINGLE_DOOR_SIM_ROUNDS,
   type BestOfTenReport,
+  type DungeonOrderedPools,
+  type DungeonOutcomeScore,
+  type DungeonClearedRoomEntry,
 } from '../dungeonPlanner.ts';
 
 export interface DungeonAutomationOptions {
@@ -21,10 +32,13 @@ export interface DungeonAutomationOptions {
   dispatchRpc: (calls: Array<{ name: string; args?: any }>) => Promise<any>;
   savedLineups?: Record<string, number[]>;
   customTeams?: Array<{ id: string; name: string; type?: string; heroIds: number[] }>;
+  orderedPools?: Partial<DungeonOrderedPools>;
   safetyThresholdPct?: number; // default: 20
+  tankSwitchHpPct?: number; // default: 35
   targetTitanite?: number; // 0 = unlimited
   todayTitanite?: number;
   singleDoorBestOf10?: boolean; // default: true
+  allowCasualtyOnDepletedPool?: boolean; // default: false
   simulateFn?: (rawBattle: any, seed: number) => Promise<SimResultPayload>;
   shouldStop?: () => boolean;
 }
@@ -41,79 +55,77 @@ export interface DungeonAutomationStepResult {
   checkpointClaimed?: boolean;
   checkpointGold?: number;
   bestOfTenReport?: BestOfTenReport | null;
+  switchedTankFrom?: number | null;
+  switchedTankTo?: number | null;
+  forceMajeureUsed?: boolean;
+  casualties?: number;
+  fallenTitans?: string[];
+  clearedRoomEntry?: DungeonClearedRoomEntry;
+}
+
+interface DoorCandidateContext {
+  door: any;
+  doorIdx: number;
+  doorElement: 'Water' | 'Fire' | 'Earth' | 'Neutral';
+  squadPick: SmartSquadPickResult;
+  evaluation: DoorEvaluationResult;
+}
+
+interface SimulatedDoorCandidate {
+  ctx: DoorCandidateContext;
+  outcome: SimResultPayload;
+  score: DungeonOutcomeScore;
+  metrics: HpLossMetrics;
+  bestOfTenReport: BestOfTenReport | null;
 }
 
 /**
  * Resolves the candidate titan squad for a specific door element.
- * Priority:
- * 1. Saved accepted lineup for this element from user simulation
- * 2. Custom Titan Team matching this element's titans
- * 3. Server team for this element (teamGetAll)
- * 4. Default Titan Pool for this element
+ * Delegates to `pickSmartSquadForDoor` (ordered pool + tanker auto-switch + fallback chain).
  */
 export function resolveSquadForDoor(
   doorElement: string,
   states: Record<string, any>,
   options: {
+    orderedPools?: Partial<DungeonOrderedPools>;
     savedLineups?: Record<string, number[]>;
     customTeams?: Array<{ id: string; name: string; type?: string; heroIds: number[] }>;
     cache?: any;
+    tankSwitchHpPct?: number;
+    safetyThresholdPct?: number;
   }
 ): number[] {
-  const normElem = doorElement.toLowerCase();
-  const elemKey = (normElem === 'water' || normElem === 'fire' || normElem === 'earth') ? normElem : 'neutral';
+  const res = pickSmartSquadForDoor(doorElement, states, {
+    orderedPools: options.orderedPools,
+    savedLineups: options.savedLineups,
+    customTeams: options.customTeams,
+    cache: options.cache,
+    tankSwitchHpPct: options.tankSwitchHpPct ?? 35,
+    safetyThresholdPct: options.safetyThresholdPct ?? 20,
+  });
+  return res.squadIds;
+}
 
-  // 1. Saved lineup
-  const saved = options.savedLineups?.[elemKey] || (elemKey === 'neutral' ? options.savedLineups?.['mixed'] : null);
-  if (Array.isArray(saved) && saved.length > 0) {
-    const aliveAndEligible = saved
-      .map(Number)
-      .filter((id) => !states[String(id)]?.isDead && isTitanEligibleForDoor(id, doorElement, getTitanMetadata(id)));
-    if (aliveAndEligible.length >= 3) {
-      return aliveAndEligible.slice(0, 5);
+function extractFallenTitanNames(outcome: SimResultPayload): string[] {
+  const fallen: string[] = [];
+  for (const [idStr, att] of Object.entries(outcome?.attackers || {})) {
+    if (att?.isDead === true || (typeof att?.hp === 'number' && att.hp <= 0)) {
+      const meta = getTitanMetadata(idStr);
+      fallen.push(meta?.name || `Titan #${idStr}`);
     }
   }
-
-  // 2. Custom Titan Teams
-  if (Array.isArray(options.customTeams)) {
-    for (const ct of options.customTeams) {
-      const isTitan = ct.type === 'titan' || ct.heroIds.some((id) => Number(id) >= 4000);
-      if (!isTitan) continue;
-      const ids = ct.heroIds
-        .map(Number)
-        .filter((id) => !states[String(id)]?.isDead && isTitanEligibleForDoor(id, doorElement, getTitanMetadata(id)));
-      if (ids.length >= 5) {
-        return ids.slice(0, 5);
-      }
-    }
-  }
-
-  // 3. Server Saved Team
-  const serverTeams = options.cache?.teamGetAll?.data || {};
-  const serverCandidate = serverTeams[`dungeon_${elemKey}`] || (elemKey === 'neutral' ? (serverTeams['dungeon_neutral'] || serverTeams['dungeon'] || serverTeams['dungeon_mixed']) : null);
-  if (Array.isArray(serverCandidate) && serverCandidate.length > 0) {
-    const ids = serverCandidate
-      .map(Number)
-      .filter((id) => !states[String(id)]?.isDead && isTitanEligibleForDoor(id, doorElement, getTitanMetadata(id)));
-    if (ids.length >= 3) {
-      return ids.slice(0, 5);
-    }
-  }
-
-  // 4. Default Pool fallback
-  const pool = DEFAULT_TITAN_POOLS[elemKey] || DEFAULT_TITAN_POOLS.neutral || DEFAULT_TITAN_POOLS.mixed;
-  const picked = pool
-    .map(Number)
-    .filter((id) => !states[String(id)]?.isDead && isTitanEligibleForDoor(id, doorElement, getTitanMetadata(id)));
-  return picked.slice(0, 5);
+  return fallen;
 }
 
 /**
  * Executes a single automated Dungeon floor step:
- * 1. Checks current floor doors and titan states.
- * 2. Evaluates all doors via battle simulation with tank-loss weighting.
- * 3. Enforces the 20% health safety threshold.
- * 4. Submits the battle for the safest / lowest-damage door.
+ * 1. Checks current floor doors, 5-floor checkpoints, and titan states.
+ * 2. Picks squads per door using Ordered Titan Pool + Auto-Switch Tanker.
+ * 3. Evaluates doors via Unity WASM simulation (with Best-of-10 when depleted <= 5).
+ * 4. In standard mode, enforces 3-star win and safety HP threshold.
+ * 5. In Force-Majeure mode (`allowCasualtyOnDepletedPool` when all doors have <= 5 alive titans),
+ *    compares all available doors (1 or 2) and accepts the winning door with minimum casualties/loss,
+ *    stopping only when no door can win.
  */
 export async function executeDungeonAutomationStep(
   options: DungeonAutomationOptions
@@ -123,10 +135,13 @@ export async function executeDungeonAutomationStep(
     dispatchRpc,
     savedLineups = {},
     customTeams = [],
+    orderedPools,
     safetyThresholdPct = 20,
+    tankSwitchHpPct = 35,
     targetTitanite = 0,
     todayTitanite = 0,
     singleDoorBestOf10 = true,
+    allowCasualtyOnDepletedPool = false,
     simulateFn = simulateBattleWithUnity,
   } = options;
 
@@ -187,39 +202,53 @@ export async function executeDungeonAutomationStep(
 
   const titanStates = getEffectiveTitanStates(cache.value);
 
-  // Evaluate each door
+  // Build smart squad picks and baseline evaluations for every door
+  const doorContexts: DoorCandidateContext[] = [];
   const evaluations: DoorEvaluationResult[] = [];
 
   for (let idx = 0; idx < doors.length; idx++) {
     const door = doors[idx];
     const rawElem = door?.attackerType || door?.element || '';
-    let doorElement = 'Neutral';
-    if (/water/i.test(rawElem)) doorElement = 'Water';
-    else if (/fire/i.test(rawElem)) doorElement = 'Fire';
-    else if (/earth/i.test(rawElem)) doorElement = 'Earth';
+    const doorElement = formatDungeonElementName(rawElem);
 
-    const squad = resolveSquadForDoor(doorElement, titanStates, {
+    const squadPick = pickSmartSquadForDoor(doorElement, titanStates, {
+      orderedPools,
       savedLineups,
       customTeams,
       cache: cache.value,
+      tankSwitchHpPct,
+      safetyThresholdPct,
     });
 
     const evalResult = evaluateDoorSafetyAndLoss(
       door,
       idx,
-      squad,
+      squadPick.squadIds,
       titanStates,
       safetyThresholdPct
     );
 
     evaluations.push(evalResult);
+    doorContexts.push({
+      door,
+      doorIdx: idx,
+      doorElement,
+      squadPick,
+      evaluation: evalResult,
+    });
   }
 
-  // Filter for safe doors
-  const safeDoors = evaluations.filter((e) => e.isSafe);
+  const allDoorsDepleted = areAllDoorsPoolDepleted(
+    doorContexts.map((c) => c.squadPick.aliveEligibleCount)
+  );
+  const forceMajeureEligible = Boolean(allowCasualtyOnDepletedPool && allDoorsDepleted);
 
-  if (safeDoors.length === 0) {
-    const firstReason = evaluations[0]?.disqualificationReason || 'Titan health below 20% safety threshold.';
+  const safeContexts = doorContexts
+    .filter((c) => c.evaluation.isSafe)
+    .sort((a, b) => a.evaluation.score - b.evaluation.score);
+
+  if (safeContexts.length === 0 && !forceMajeureEligible) {
+    const firstReason = evaluations[0]?.disqualificationReason || `Titan health below ${safetyThresholdPct}% safety threshold.`;
     return {
       stopped: true,
       stopReason: `Automation stopped: ${firstReason}`,
@@ -227,90 +256,132 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // Pick best door with lowest combined score (heavily minimizing tank loss)
-  safeDoors.sort((a, b) => a.score - b.score);
-  const bestDoor = safeDoors[0];
+  // Order candidate doors to simulate:
+  // - Standard mode: only the best safe door
+  // - Force-majeure mode (all doors <= 5 alive): all doors with at least 1 alive titan, safest first
+  const candidatesToTry: DoorCandidateContext[] = forceMajeureEligible
+    ? [...doorContexts]
+        .filter((c) => c.squadPick.squadIds.length > 0)
+        .sort((a, b) => {
+          if (a.evaluation.isSafe !== b.evaluation.isSafe) return a.evaluation.isSafe ? -1 : 1;
+          return a.evaluation.score - b.evaluation.score;
+        })
+    : [safeContexts[0]!];
 
-  // Execute the battle officially
-  // 1. Start battle
-  const startRes = await dispatchRpc([
-    {
-      name: 'dungeonStartBattle',
-      args: {
-        teamNum: bestDoor.doorIdx,
-        heroes: bestDoor.teamIds,
+  if (candidatesToTry.length === 0) {
+    return {
+      stopped: true,
+      stopReason: 'No alive titans available for any door on this floor.',
+      evaluations,
+    };
+  }
+
+  // Helper to start & simulate a single door candidate via Unity WASM
+  const startAndSimulateDoor = async (
+    ctx: DoorCandidateContext,
+    overrideSeed?: number
+  ): Promise<{ result?: SimulatedDoorCandidate; error?: string }> => {
+    const startRes = await dispatchRpc([
+      {
+        name: 'dungeonStartBattle',
+        args: {
+          teamNum: ctx.doorIdx,
+          heroes: ctx.squadPick.squadIds,
+        },
       },
-    },
-  ]);
+    ]);
 
-  const startPayload = startRes?.results?.[0]?.result?.response || startRes?.results?.[0]?.response;
-  if (!startPayload || startRes?.results?.[0]?.error) {
-    const errMsg = startRes?.results?.[0]?.error?.description || 'Failed to start dungeon battle on server.';
+    const startPayload = startRes?.results?.[0]?.result?.response || startRes?.results?.[0]?.response;
+    if (!startPayload || startRes?.results?.[0]?.error) {
+      return {
+        error: startRes?.results?.[0]?.error?.description || 'Failed to start dungeon battle on server.',
+      };
+    }
+
+    const seed = overrideSeed ?? (Number(startPayload.seed) || Math.floor(Math.random() * 1000000000));
+    const frontlineId = ctx.squadPick.frontlineId ?? ctx.squadPick.squadIds[0] ?? 0;
+    const useBestOfTen =
+      overrideSeed == null &&
+      singleDoorBestOf10 &&
+      (shouldUseBestOfTen(doors, ctx.squadPick.aliveEligibleIds) ||
+        (forceMajeureEligible && ctx.squadPick.isPoolDepleted));
+
+    let outcome: SimResultPayload;
+    let bestOfTenReport: BestOfTenReport | null = null;
+    try {
+      if (useBestOfTen) {
+        bestOfTenReport = await runSingleDoorBestOfTen(startPayload, simulateFn, {
+          frontlineId,
+          minHpThresholdPct: safetyThresholdPct,
+          rounds: SINGLE_DOOR_SIM_ROUNDS,
+        });
+        outcome = bestOfTenReport.bestOutcome;
+      } else {
+        outcome = await simulateFn(startPayload, seed);
+      }
+    } catch (err: any) {
+      if (cache?.value?.dungeonStatus?.data) {
+        cache.value.dungeonStatus.data.activeBattle = null;
+      }
+      await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+      const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
+      return {
+        error: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Battle retreated without loss.`,
+      };
+    }
+
+    const metrics = calculateHpLossMetrics(outcome?.attackers || {}, frontlineId, safetyThresholdPct);
+    const score = scoreDungeonOutcome(outcome, frontlineId, safetyThresholdPct);
+
     return {
-      stopped: true,
-      stopReason: errMsg,
-      chosenEvaluation: bestDoor,
-      evaluations,
+      result: {
+        ctx,
+        outcome,
+        score,
+        metrics,
+        bestOfTenReport,
+      },
     };
+  };
+
+  // Simulate candidate door(s)
+  const simulatedDoors: SimulatedDoorCandidate[] = [];
+  let lastStartedDoorIdx = -1;
+
+  for (const ctx of candidatesToTry) {
+    const simAttempt = await startAndSimulateDoor(ctx);
+    if (simAttempt.error || !simAttempt.result) {
+      return {
+        stopped: true,
+        stopReason: simAttempt.error || 'Failed to simulate dungeon battle.',
+        chosenEvaluation: ctx.evaluation,
+        evaluations,
+      };
+    }
+
+    const sim = simAttempt.result;
+    lastStartedDoorIdx = ctx.doorIdx;
+    simulatedDoors.push(sim);
+
+    const isFlawlessSafeWin = sim.outcome.win && sim.outcome.stars >= 3 && !sim.metrics.hasCriticalHp;
+    // Short-circuit: if first door already yields a flawless safe win, no need to probe the second door
+    if (isFlawlessSafeWin || !forceMajeureEligible) {
+      break;
+    }
   }
 
-  const seed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
-
-  // Count total alive eligible titans for this door to detect Single-Door Best-of-10 (<= 5 members)
-  const rawBestElem = bestDoor.door?.attackerType || bestDoor.door?.element || '';
-  let bestDoorElemName = 'Neutral';
-  if (/water/i.test(rawBestElem)) bestDoorElemName = 'Water';
-  else if (/fire/i.test(rawBestElem)) bestDoorElemName = 'Fire';
-  else if (/earth/i.test(rawBestElem)) bestDoorElemName = 'Earth';
-
-  const aliveEligibleIds = Object.keys(titanStates)
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0 && !titanStates[String(id)]?.isDead && isTitanEligibleForDoor(id, bestDoorElemName, getTitanMetadata(id)));
-
-  const useBestOfTen = singleDoorBestOf10 && shouldUseBestOfTen(doors, aliveEligibleIds);
-
-  // 2. Simulate outcome strictly using Unity Engine (zero heuristic fallback)
-  let outcome: SimResultPayload;
-  let bestOfTenReport: BestOfTenReport | null = null;
-  try {
-    if (useBestOfTen) {
-      bestOfTenReport = await runSingleDoorBestOfTen(startPayload, simulateFn, {
-        frontlineId: bestDoor.teamIds[0],
-        minHpThresholdPct: safetyThresholdPct,
-        rounds: SINGLE_DOOR_SIM_ROUNDS,
-      });
-      outcome = bestOfTenReport.bestOutcome;
-    } else {
-      outcome = await simulateFn(startPayload, seed);
-    }
-  } catch (err: any) {
-    if (cache?.value?.dungeonStatus?.data) {
-      cache.value.dungeonStatus.data.activeBattle = null;
-    }
-    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
-
-    const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
-    return {
-      stopped: true,
-      stopReason: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Battle retreated without loss.`,
-      chosenEvaluation: bestDoor,
-      evaluations,
-    };
-  }
-
-  // Evaluate post-battle titan health
-  const frontlineId = bestDoor.teamIds[0];
-  const metrics = calculateHpLossMetrics(outcome?.attackers || {}, frontlineId, safetyThresholdPct);
+  // Pick the best simulated door (win > fewest casualties > highest preservation score)
+  simulatedDoors.sort((a, b) => compareDungeonOutcomes(a.score, b.score));
+  let chosen = simulatedDoors[0]!;
 
   const userRequestedStop = typeof options.shouldStop === 'function' ? options.shouldStop() : false;
-  const isLoss = !outcome.win;
-  const hasCasualty = outcome.stars < 3;
-  const isUnsafeHp = metrics.hasCriticalHp;
+  const isLoss = !chosen.outcome.win;
+  const hasCasualty = chosen.outcome.stars < 3 || chosen.score.casualties > 0;
+  const isUnsafeHp = chosen.metrics.hasCriticalHp;
+  const acceptedViaForceMajeure = forceMajeureEligible && !isLoss && (hasCasualty || isUnsafeHp);
 
-  // Retreat and abort if battle was lost, titan casualty occurred, health fell below safety threshold, or stop requested
-  if (userRequestedStop || isLoss || hasCasualty || isUnsafeHp) {
-    // RETREAT FLOW: DO NOT SEND dungeonEndBattle!
-    // Discarding the battle keeps titans 100% preserved on the game server without any damage or casualty.
+  // Retreat and abort if user requested stop, battle is unwinnable, or standard safety checks failed
+  if (userRequestedStop || isLoss || (!forceMajeureEligible && (hasCasualty || isUnsafeHp))) {
     if (cache?.value?.dungeonStatus?.data) {
       cache.value.dungeonStatus.data.activeBattle = null;
     }
@@ -320,27 +391,55 @@ export async function executeDungeonAutomationStep(
     if (userRequestedStop) {
       stopReason = 'Automation stopped by user. Current battle retreated without loss.';
     } else if (isLoss) {
-      stopReason = 'Unity simulation predicted defeat. Battle retreated without loss.';
+      stopReason = forceMajeureEligible
+        ? 'No winnable door found across depleted pool (<=5 titans). Battle retreated without loss.'
+        : 'Unity simulation predicted defeat. Battle retreated without loss.';
     } else if (hasCasualty) {
-      stopReason = `Unity simulation predicted titan casualty (${outcome.stars} stars). Battle retreated without loss.`;
+      stopReason = `Unity simulation predicted titan casualty (${chosen.outcome.stars} stars). Battle retreated without loss.`;
     } else {
-      stopReason = `Titan health would fall to ${metrics.minFinalHpPct.toFixed(1)}% (below ${safetyThresholdPct}% safety threshold). Battle retreated without loss.`;
+      stopReason = `Titan health would fall to ${chosen.metrics.minFinalHpPct.toFixed(1)}% (below ${safetyThresholdPct}% safety threshold). Battle retreated without loss.`;
     }
 
     return {
       stopped: true,
       stopReason,
       chosenEvaluation: {
-        ...bestDoor,
-        tankLossPct: metrics.tankLossPct,
-        teamLossPct: metrics.teamLossPct,
-        minHpPct: metrics.minFinalHpPct,
+        ...chosen.ctx.evaluation,
+        tankLossPct: chosen.metrics.tankLossPct,
+        teamLossPct: chosen.metrics.teamLossPct,
+        minHpPct: chosen.metrics.minFinalHpPct,
       },
       evaluations,
     };
   }
 
-  // 3. End battle - only submitted when verified win, 3 stars, and all titans stay above safety threshold
+  // Session sync guard: if force-majeure compared 2 doors and Door 0 beat Door 1,
+  // re-start Door 0 on server so `dungeonEndBattle` matches the active battle session!
+  if (chosen.ctx.doorIdx !== lastStartedDoorIdx) {
+    const resyncAttempt = await startAndSimulateDoor(chosen.ctx, chosen.outcome.seed);
+    if (resyncAttempt.error || !resyncAttempt.result || !resyncAttempt.result.outcome.win) {
+      if (cache?.value?.dungeonStatus?.data) {
+        cache.value.dungeonStatus.data.activeBattle = null;
+      }
+      await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+      return {
+        stopped: true,
+        stopReason: resyncAttempt.error || 'Failed to re-sync winning door session with server. Battle retreated without loss.',
+        chosenEvaluation: chosen.ctx.evaluation,
+        evaluations,
+      };
+    }
+    chosen = resyncAttempt.result;
+  }
+
+  const bestDoor = chosen.ctx.evaluation;
+  const outcome = chosen.outcome;
+  const metrics = chosen.metrics;
+  const bestOfTenReport = chosen.bestOfTenReport;
+  const squadPick = chosen.ctx.squadPick;
+  const doorElem = chosen.ctx.doorElement;
+
+  // 3. Submit official battle outcome
   const endRes = await dispatchRpc([
     {
       name: 'dungeonEndBattle',
@@ -359,9 +458,7 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // 4. Claim 5-floor checkpoint reward (`dungeonSaveProgress`) whenever required:
-  // Confirmed from live game logs: every 5th floor (e.g. 580, 585), `dungeonEndBattle` returns `dungeon: null`
-  // and blocks further battles until `dungeonSaveProgress({})` is called to claim gold & unlock floor N+1.
+  // 4. Claim 5-floor checkpoint reward (`dungeonSaveProgress`) whenever required
   const endResp = endPayload?.result?.response || endPayload?.response || {};
   const endDungeon = endResp?.dungeon || {};
   const currentRespawn = Number(endDungeon.respawnFloor ?? dungeonData.respawnFloor) || 0;
@@ -407,11 +504,37 @@ export async function executeDungeonAutomationStep(
   // 6. Refresh dungeon status
   await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
 
-  const rawAttacker = bestDoor.door?.attackerType || bestDoor.door?.element || '';
-  let doorElem = 'Neutral';
-  if (/water/i.test(rawAttacker)) doorElem = 'Water';
-  else if (/fire/i.test(rawAttacker)) doorElem = 'Fire';
-  else if (/earth/i.test(rawAttacker)) doorElem = 'Earth';
+  const fallenTitans = extractFallenTitanNames(outcome);
+  const casualties = Math.max(chosen.score.casualties, fallenTitans.length);
+  const switchedFromName = squadPick.switchedTankFrom
+    ? getTitanMetadata(squadPick.switchedTankFrom)?.name || `Titan #${squadPick.switchedTankFrom}`
+    : null;
+  const switchedToName = squadPick.switchedTankTo
+    ? getTitanMetadata(squadPick.switchedTankTo)?.name || `Titan #${squadPick.switchedTankTo}`
+    : null;
+
+  const clearedRoomEntry: DungeonClearedRoomEntry = {
+    id: `${floorNumber}_${bestDoor.doorIdx + 1}_${Date.now()}`,
+    floor: floorNumber,
+    door: bestDoor.doorIdx + 1,
+    element: doorElem,
+    source: 'auto',
+    win: true,
+    stars: Number(outcome.stars) || (casualties > 0 ? Math.max(1, 3 - casualties) : 3),
+    casualties,
+    fallenTitans,
+    teamIds: [...bestDoor.teamIds],
+    tankLossPct: Math.round(metrics.tankLossPct * 10) / 10,
+    teamLossPct: Math.round(metrics.teamLossPct * 10) / 10,
+    switchedTankFrom: switchedFromName,
+    switchedTankTo: switchedToName,
+    forceMajeure: acceptedViaForceMajeure,
+    bestOfTenNote: bestOfTenReport
+      ? `#${bestOfTenReport.bestIndex + 1}/${bestOfTenReport.roundsRun} (${bestOfTenReport.wins}/${bestOfTenReport.roundsRun} wins)`
+      : null,
+    checkpointGold: checkpointClaimed ? checkpointGold : undefined,
+    timestamp: new Date().toISOString(),
+  };
 
   return {
     floorPassed: floorNumber,
@@ -427,5 +550,11 @@ export async function executeDungeonAutomationStep(
     checkpointClaimed,
     checkpointGold,
     bestOfTenReport,
+    switchedTankFrom: squadPick.switchedTankFrom,
+    switchedTankTo: squadPick.switchedTankTo,
+    forceMajeureUsed: acceptedViaForceMajeure,
+    casualties,
+    fallenTitans,
+    clearedRoomEntry,
   };
 }

@@ -56,6 +56,13 @@ test('DungeonSimModal Single File Component defines simulation controls, squad p
   assert.match(content, /copyDiagnostics/, 'Must have copyDiagnostics action for clipboard export');
   assert.match(content, /errorDetail/, 'Must track structured errorDetail');
   assert.match(content, /Retry/, 'Must have retry simulation action in error banner');
+  assert.ok(!content.includes('handleSimulateBattle'), 'Must not reference nonexistent handleSimulateBattle');
+
+  // Room-typed smart pre-pick & stale cache fix (P2-17)
+  assert.match(content, /pickSmartSquadForDoor/, 'Must use shared pickSmartSquadForDoor resolver');
+  assert.match(content, /ignoreSavedLineups:\s*true/, 'Must pre-pick strictly by room type instead of stale cached team');
+  assert.match(content, /doorElementKey\.value/, 'Must watch doorElementKey to reset squad when room element changes');
+  assert.match(content, /id="dungeon-sim-tank-switch-badge"/, 'Must display tank-switch notice badge when auto-switched');
 });
 
 test('interceptor captures Unity instance and prepares Model A simulation bridge with granular error diagnostics', async () => {

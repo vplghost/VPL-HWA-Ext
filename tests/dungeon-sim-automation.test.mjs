@@ -12,6 +12,7 @@ import {
   resolveSquadForDoor,
   executeDungeonAutomationStep,
 } from '../src/services/queues/dungeonAutomationRunner.ts';
+import { pickSmartSquadForDoor } from '../src/services/queues/dungeonAutomation.ts';
 
 describe('Dungeon Simulator & Automation Engine', () => {
   describe('Heuristic Elimination & Unity Simulation Enforcement', () => {
@@ -540,6 +541,228 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.match(step.stopReason, /Automation stopped by user/);
       assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), false);
       assert.equal(mockCache.value.dungeonStatus.data.activeBattle, null);
+    });
+
+    it('force-majeure mode compares both depleted doors (<=5), re-syncs Door 0 when it has fewer casualties, and submits win', async () => {
+      const dispatchedCalls = [];
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 901,
+              respawnFloor: 900,
+              currentFloorDoors: [
+                { attackerType: 'water', power: 400000 },
+                { attackerType: 'fire', power: 400000 },
+              ],
+              states: {
+                titans: {
+                  // Water pool <= 5 (4 alive, Sigurd low HP 15% < 20%)
+                  '4000': { hp: 150000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 800000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 800000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 800000, maxHp: 1000000, isDead: false },
+                  // Fire pool <= 5 (4 alive, Moloch low HP 15% < 20%)
+                  '4010': { hp: 150000, maxHp: 1000000, isDead: false },
+                  '4011': { hp: 800000, maxHp: 1000000, isDead: false },
+                  '4012': { hp: 800000, maxHp: 1000000, isDead: false },
+                  '4013': { hp: 800000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        dispatchedCalls.push(...calls);
+        const c = calls[0];
+        if (c?.name === 'dungeonStartBattle') {
+          return {
+            results: [{ result: { response: { seed: c.args.teamNum === 0 ? 111 : 222, teamNum: c.args.teamNum } } }],
+          };
+        }
+        if (c?.name === 'dungeonEndBattle') {
+          return { results: [{ result: { response: { dungeon: { floorNumber: 902, floorType: 'battle' } } } }] };
+        }
+        return { results: [{ result: { response: {} } }] };
+      };
+
+      const simulateFn = async (rawBattle, seed) => {
+        if (rawBattle.teamNum === 0) {
+          // Door 0 (Water): wins with 1 casualty (Sigurd falls)
+          return {
+            win: true,
+            stars: 2,
+            duration: 18,
+            seed,
+            attackers: {
+              '4000': { hp: 0, maxHp: 1000000, energy: 0, isDead: true, hpDelta: -150000 },
+              '4001': { hp: 700000, maxHp: 1000000, energy: 600, isDead: false, hpDelta: -100000 },
+              '4002': { hp: 750000, maxHp: 1000000, energy: 600, isDead: false, hpDelta: -50000 },
+              '4004': { hp: 760000, maxHp: 1000000, energy: 600, isDead: false, hpDelta: -40000 },
+            },
+            defenders: {},
+            endArgs: { doorMarker: 0, seed },
+          };
+        }
+        // Door 1 (Fire): wins with 2 casualties (worse than Door 0)
+        return {
+          win: true,
+          stars: 1,
+          duration: 24,
+          seed,
+          attackers: {
+            '4010': { hp: 0, maxHp: 1000000, energy: 0, isDead: true, hpDelta: -150000 },
+            '4011': { hp: 0, maxHp: 1000000, energy: 0, isDead: true, hpDelta: -800000 },
+            '4012': { hp: 500000, maxHp: 1000000, energy: 400, isDead: false, hpDelta: -300000 },
+            '4013': { hp: 600000, maxHp: 1000000, energy: 400, isDead: false, hpDelta: -200000 },
+          },
+          defenders: {},
+          endArgs: { doorMarker: 1, seed },
+        };
+      };
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        simulateFn,
+        safetyThresholdPct: 20,
+        singleDoorBestOf10: false,
+        allowCasualtyOnDepletedPool: true,
+      });
+
+      assert.equal(step.stopped, undefined);
+      assert.equal(step.floorPassed, 901);
+      assert.equal(step.doorIdx, 0, 'Must pick Door 0 with 1 casualty over Door 1 with 2 casualties');
+      assert.equal(step.forceMajeureUsed, true);
+      assert.equal(step.casualties, 1);
+      assert.equal(step.clearedRoomEntry?.source, 'auto');
+      assert.equal(step.clearedRoomEntry?.forceMajeure, true);
+
+      const startTeamNums = dispatchedCalls
+        .filter((c) => c.name === 'dungeonStartBattle')
+        .map((c) => c.args.teamNum);
+      assert.deepEqual(startTeamNums, [0, 1, 0], 'Must re-sync Door 0 session before submitting dungeonEndBattle');
+
+      const endCall = dispatchedCalls.find((c) => c.name === 'dungeonEndBattle');
+      assert.equal(endCall?.args?.doorMarker, 0);
+    });
+
+    it('force-majeure mode retreats and stops when no depleted door can win', async () => {
+      const dispatchedCalls = [];
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 905,
+              respawnFloor: 901,
+              currentFloorDoors: [
+                { attackerType: 'water', power: 999999 },
+                { attackerType: 'fire', power: 999999 },
+              ],
+              states: {
+                titans: {
+                  '4000': { hp: 100000, maxHp: 1000000, isDead: false },
+                  '4010': { hp: 100000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        dispatchedCalls.push(...calls);
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 333 } } }] };
+        }
+        return { results: [{ result: { response: {} } }] };
+      };
+
+      const simulateFn = async (_raw, seed) => ({
+        win: false,
+        stars: 0,
+        duration: 12,
+        seed,
+        attackers: { '4000': { hp: 0, maxHp: 1000000, energy: 0, isDead: true, hpDelta: -100000 } },
+        defenders: {},
+        endArgs: { seed },
+      });
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        simulateFn,
+        safetyThresholdPct: 20,
+        singleDoorBestOf10: false,
+        allowCasualtyOnDepletedPool: true,
+      });
+
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason || '', /No winnable door found/);
+      assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), false);
+    });
+  });
+
+  describe('pickSmartSquadForDoor (Ordered Pool & Auto-Switch Tanker)', () => {
+    it('respects user-configured ordered pool per room type and includes dual-element Pallant (4050) in Earth', () => {
+      const states = {
+        '4020': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4050': { hp: 950000, maxHp: 1000000, isDead: false },
+        '4022': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4024': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4023': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4021': { hp: 900000, maxHp: 1000000, isDead: false },
+      };
+      const res = pickSmartSquadForDoor('Earth', states, {
+        orderedPools: { earth: [4050, 4023, 4022, 4024, 4021, 4020] },
+        tankSwitchHpPct: 35,
+      });
+      assert.deepEqual(res.squadIds, [4050, 4023, 4022, 4024, 4021]);
+      assert.equal(res.switchedTankTo, null);
+      assert.equal(res.isPoolDepleted, false);
+    });
+
+    it('automatically switches to next healthy tank when primary tank HP <= tankSwitchHpPct', () => {
+      const states = {
+        '4000': { hp: 250000, maxHp: 1000000, isDead: false }, // Sigurd 25% <= 35%
+        '4030': { hp: 950000, maxHp: 1000000, isDead: false }, // Brustar 95% > 35%
+        '4001': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4004': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4002': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4053': { hp: 900000, maxHp: 1000000, isDead: false },
+      };
+      const res = pickSmartSquadForDoor('Neutral', states, {
+        orderedPools: { neutral: [4000, 4030, 4001, 4004, 4002, 4053] },
+        tankSwitchHpPct: 35,
+        safetyThresholdPct: 20,
+      });
+      assert.equal(res.switchedTankFrom, 4000);
+      assert.equal(res.switchedTankTo, 4030);
+      assert.equal(res.frontlineId, 4030);
+      assert.equal(res.squadIds[0], 4030);
+      assert.ok(!res.squadIds.includes(4000), 'Low-HP primary tank should be benched when 5 healthier titans exist');
+    });
+
+    it('falls back to healthiest alive tank when all tanks are below tankSwitchHpPct', () => {
+      const states = {
+        '4020': { hp: 150000, maxHp: 1000000, isDead: false }, // Angus 15%
+        '4050': { hp: 300000, maxHp: 1000000, isDead: false }, // Pallant 30%
+        '4022': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4024': { hp: 900000, maxHp: 1000000, isDead: false },
+        '4023': { hp: 900000, maxHp: 1000000, isDead: false },
+      };
+      const res = pickSmartSquadForDoor('Earth', states, {
+        orderedPools: { earth: [4020, 4050, 4022, 4024, 4023] },
+        tankSwitchHpPct: 35,
+        safetyThresholdPct: 20,
+      });
+      assert.equal(res.switchedTankFrom, 4020);
+      assert.equal(res.switchedTankTo, 4050);
+      assert.equal(res.squadIds[0], 4050);
+      assert.equal(res.squadIds.length, 5);
+      assert.equal(res.isPoolDepleted, true);
     });
   });
 });

@@ -9,6 +9,10 @@ import { renderToString } from '@vue/server-renderer';
 import { normalizeArray } from '../src/utils/troops.ts';
 import { formatNumber } from '../src/utils/formatters.ts';
 import { getTitanMetadata } from '../src/data/titanMetadata.ts';
+import {
+  DEFAULT_DUNGEON_AUTO_SETTINGS,
+  DEFAULT_ORDERED_TITAN_POOLS,
+} from '../src/services/dungeonPlanner.ts';
 import UnitStars from './helpers/unit-stars.mjs';
 
 const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
@@ -25,7 +29,7 @@ const render = new Function('Vue', compile(findGrid(parse(template)).loc.source,
 function setup(data) {
   const cache = Vue.ref({ dungeonStatus: { data } });
   const context = { ref: Vue.ref, computed: Vue.computed, normalizeArray, formatNumber,
-    getTitanMetadata,
+    getTitanMetadata, DEFAULT_DUNGEON_AUTO_SETTINGS, DEFAULT_ORDERED_TITAN_POOLS,
     useRpcCache: () => ({ cache, dispatchRpc() {}, updateCacheLocally() {} }),
     useAccountTeams: () => ({ customTeams: Vue.ref([]) }),
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},

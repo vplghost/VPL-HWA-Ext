@@ -9,18 +9,130 @@
 
 export const SINGLE_DOOR_SIM_ROUNDS = 10;
 export const DUNGEON_AUTO_SETTINGS_KEY = 'dungeonAutoSettings';
+export const DUNGEON_CLEARED_ROOMS_KEY = 'dungeonClearedRoomsLog';
+
+export type DungeonElementKey = 'water' | 'fire' | 'earth' | 'neutral';
+export type DungeonElementName = 'Water' | 'Fire' | 'Earth' | 'Neutral';
+export type DungeonOrderedPools = Record<DungeonElementKey, number[]>;
+
+export const DEFAULT_ORDERED_TITAN_POOLS: DungeonOrderedPools = {
+  water: [4000, 4001, 4052, 4004, 4002, 4003],
+  earth: [4020, 4050, 4022, 4024, 4023, 4021],
+  fire: [4010, 4011, 4013, 4012, 4014, 4051],
+  neutral: [
+    4000, 4030, 4040, 4020, 4050, 4010,
+    4003, 4004, 4042, 4043, 4052, 4053,
+    4013, 4023, 4033, 4001, 4002, 4022,
+    4024, 4021, 4011, 4012, 4014, 4031,
+    4032, 4034, 4041, 4044, 4051, 4054,
+  ],
+};
 
 export interface DungeonAutoSettings {
-  targetTitanite: number;     // 75 | 150 | 300 | 0 (Unlimited)
-  safetyThresholdPct: number; // default: 20
-  singleDoorBestOf10: boolean; // default: true
+  targetTitanite: number;               // 75 | 150 | 300 | 0 (Unlimited)
+  safetyThresholdPct: number;           // default: 20
+  tankSwitchHpPct: number;              // default: 35
+  singleDoorBestOf10: boolean;          // default: true
+  allowCasualtyOnDepletedPool: boolean; // default: false (force-majeure when all doors <= 5 alive)
+  orderedPools?: Partial<DungeonOrderedPools>;
 }
 
 export const DEFAULT_DUNGEON_AUTO_SETTINGS: DungeonAutoSettings = {
   targetTitanite: 150,
   safetyThresholdPct: 20,
+  tankSwitchHpPct: 35,
   singleDoorBestOf10: true,
+  allowCasualtyOnDepletedPool: false,
+  orderedPools: {
+    water: [...DEFAULT_ORDERED_TITAN_POOLS.water],
+    earth: [...DEFAULT_ORDERED_TITAN_POOLS.earth],
+    fire: [...DEFAULT_ORDERED_TITAN_POOLS.fire],
+    neutral: [...DEFAULT_ORDERED_TITAN_POOLS.neutral],
+  },
 };
+
+export interface DungeonClearedRoomEntry {
+  id: string;
+  floor: number;
+  door: number; // 1-based door index
+  element: DungeonElementName;
+  source: 'auto' | 'manual';
+  win: boolean;
+  stars: number;
+  casualties: number;
+  fallenTitans: string[];
+  teamIds?: number[];
+  tankLossPct?: number;
+  teamLossPct?: number;
+  switchedTankFrom?: string | null;
+  switchedTankTo?: string | null;
+  forceMajeure?: boolean;
+  bestOfTenNote?: string | null;
+  checkpointGold?: number;
+  timestamp: string;
+}
+
+export function normalizeDungeonElementKey(raw: string | null | undefined): DungeonElementKey {
+  const str = String(raw || '').toLowerCase().trim();
+  if (str.includes('water')) return 'water';
+  if (str.includes('fire')) return 'fire';
+  if (str.includes('earth')) return 'earth';
+  return 'neutral';
+}
+
+export function formatDungeonElementName(raw: string | null | undefined): DungeonElementName {
+  const key = normalizeDungeonElementKey(raw);
+  if (key === 'water') return 'Water';
+  if (key === 'fire') return 'Fire';
+  if (key === 'earth') return 'Earth';
+  return 'Neutral';
+}
+
+/**
+ * Returns true when every available door on the current floor has a depleted
+ * alive eligible pool (<= 5 titans remaining, at least 1 alive).
+ */
+export function areAllDoorsPoolDepleted(aliveCounts: number[]): boolean {
+  if (!Array.isArray(aliveCounts) || aliveCounts.length === 0) return false;
+  return aliveCounts.every((count) => Number(count) > 0 && Number(count) <= 5);
+}
+
+/**
+ * Merges a cleared room entry into the daily combat log list, deduplicating by (floor, door)
+ * while preserving richer automation/simulation metadata.
+ */
+export function mergeClearedRoomEntry(
+  list: DungeonClearedRoomEntry[],
+  entry: DungeonClearedRoomEntry
+): DungeonClearedRoomEntry[] {
+  const next = Array.isArray(list) ? [...list] : [];
+  const existingIdx = next.findIndex((item) => item.floor === entry.floor && item.door === entry.door);
+
+  if (existingIdx === -1) {
+    next.push({ ...entry, fallenTitans: [...(entry.fallenTitans || [])] });
+    return next;
+  }
+
+  const prev = next[existingIdx]!;
+  next[existingIdx] = {
+    ...prev,
+    ...entry,
+    source: entry.source === 'auto' || prev.source === 'auto' ? (entry.source || prev.source) : 'manual',
+    fallenTitans:
+      entry.fallenTitans && entry.fallenTitans.length > 0
+        ? [...entry.fallenTitans]
+        : [...(prev.fallenTitans || [])],
+    teamIds: entry.teamIds && entry.teamIds.length > 0 ? [...entry.teamIds] : prev.teamIds,
+    tankLossPct: entry.tankLossPct ?? prev.tankLossPct,
+    teamLossPct: entry.teamLossPct ?? prev.teamLossPct,
+    switchedTankFrom: entry.switchedTankFrom ?? prev.switchedTankFrom ?? null,
+    switchedTankTo: entry.switchedTankTo ?? prev.switchedTankTo ?? null,
+    forceMajeure: entry.forceMajeure ?? prev.forceMajeure ?? false,
+    bestOfTenNote: entry.bestOfTenNote ?? prev.bestOfTenNote ?? null,
+    checkpointGold: Math.max(Number(entry.checkpointGold) || 0, Number(prev.checkpointGold) || 0) || undefined,
+  };
+  return next;
+}
 
 export interface DungeonOutcomeScore {
   win: boolean;

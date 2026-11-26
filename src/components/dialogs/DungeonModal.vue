@@ -10,13 +10,24 @@ import {
   getModalStackLevel,
 } from '@/src/composables/useModals';
 import { getTitanMetadata } from '@/src/utils/metadata';
+import { getTitanRole, titanMetadata } from '@/src/data/titanMetadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { executeDungeonAutomationStep } from '@/src/services/queues/dungeonAutomationRunner';
-import { DUNGEON_SAVED_LINEUPS_KEY } from '@/src/utils/dungeonBattleSim';
-import type { DungeonAutoSettings } from '@/src/services/dungeonPlanner';
+import { DUNGEON_SAVED_LINEUPS_KEY, isTitanEligibleForDoor } from '@/src/utils/dungeonBattleSim';
+import {
+  DEFAULT_DUNGEON_AUTO_SETTINGS,
+  DEFAULT_ORDERED_TITAN_POOLS,
+  DUNGEON_AUTO_SETTINGS_KEY,
+  DUNGEON_CLEARED_ROOMS_KEY,
+  mergeClearedRoomEntry,
+  formatDungeonElementName,
+  type DungeonAutoSettings,
+  type DungeonClearedRoomEntry,
+  type DungeonElementKey,
+} from '@/src/services/dungeonPlanner';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -159,7 +170,11 @@ function openSimModal(door: any, idx: number) {
   isSimModalOpen.value = true;
 }
 
-function handleSimBattleSubmitted() {
+function handleSimBattleSubmitted(entry?: DungeonClearedRoomEntry) {
+  if (entry) {
+    clearedRooms.value = mergeClearedRoomEntry(clearedRooms.value, entry);
+    void saveClearedRooms();
+  }
   refreshDungeon();
 }
 
@@ -191,6 +206,7 @@ watch(
 
   onMounted(() => {
     void loadDungeonAutoSettings();
+    void loadClearedRooms();
     if (props.modelValue) {
       registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
@@ -228,23 +244,212 @@ const autoStatusMessage = ref<string | null>(null);
 const autoFloorCount = ref(0);
 const autoCheckpointsClaimed = ref(0);
 const autoCheckpointGold = ref(0);
-const DUNGEON_AUTO_CFG_KEY = 'dungeonAutoSettings';
+const showPoolConfig = ref(false);
+const activePoolTab = ref<DungeonElementKey>('water');
+const clearedRooms = ref<DungeonClearedRoomEntry[]>([]);
+const hoveredLogEntry = ref<DungeonClearedRoomEntry | null>(null);
+
+const POOL_TABS: Array<{ key: DungeonElementKey; label: string }> = [
+  { key: 'water', label: 'Water' },
+  { key: 'fire', label: 'Fire' },
+  { key: 'earth', label: 'Earth' },
+  { key: 'neutral', label: 'Neutral' },
+];
+
 const autoSettings = ref<DungeonAutoSettings>({
-  targetTitanite: 150,
-  safetyThresholdPct: 20,
-  singleDoorBestOf10: true,
+  ...DEFAULT_DUNGEON_AUTO_SETTINGS,
+  orderedPools: {
+    water: [...DEFAULT_ORDERED_TITAN_POOLS.water],
+    earth: [...DEFAULT_ORDERED_TITAN_POOLS.earth],
+    fire: [...DEFAULT_ORDERED_TITAN_POOLS.fire],
+    neutral: [...DEFAULT_ORDERED_TITAN_POOLS.neutral],
+  },
 });
+
+function getTodayDateKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function loadClearedRooms() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const res = await chrome.storage.local.get(DUNGEON_CLEARED_ROOMS_KEY);
+      const saved = res?.[DUNGEON_CLEARED_ROOMS_KEY];
+      if (saved && saved.dateKey === getTodayDateKey() && Array.isArray(saved.rooms)) {
+        clearedRooms.value = saved.rooms;
+      } else {
+        clearedRooms.value = [];
+      }
+    } catch (_) {}
+  }
+}
+
+async function saveClearedRooms() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({
+        [DUNGEON_CLEARED_ROOMS_KEY]: {
+          dateKey: getTodayDateKey(),
+          rooms: clearedRooms.value.slice(-100),
+        },
+      });
+    } catch (_) {}
+  }
+}
+
+const mergedCombatLogRooms = computed<DungeonClearedRoomEntry[]>(() => {
+  let list: DungeonClearedRoomEntry[] = [...clearedRooms.value];
+  for (const c of casualtiesList.value) {
+    const floor = Number(c?.floor) || 0;
+    const door = Number(c?.door) || 1;
+    if (floor <= 0) continue;
+    const fallen = Array.isArray(c?.fallen) ? c.fallen.map(String) : [];
+    list = mergeClearedRoomEntry(list, {
+      id: `casualty_${floor}_${door}`,
+      floor,
+      door,
+      element: formatDungeonElementName(c?.element || c?.attackerType || 'neutral'),
+      source: 'manual',
+      win: true,
+      stars: Math.max(1, 3 - fallen.length),
+      casualties: fallen.length || 1,
+      fallenTitans: fallen,
+      timestamp: c?.time || 'Today',
+    });
+  }
+  return list.sort((a, b) => a.floor - b.floor || a.door - b.door);
+});
+
+const totalCasualtyCount = computed(() => {
+  return mergedCombatLogRooms.value.reduce((sum, r) => sum + (r.casualties > 0 ? 1 : 0), 0);
+});
+
+function getOrderedPoolIds(elemKey: DungeonElementKey): number[] {
+  const configured = autoSettings.value.orderedPools?.[elemKey];
+  const base = Array.isArray(configured) && configured.length > 0
+    ? configured.map(Number)
+    : [...DEFAULT_ORDERED_TITAN_POOLS[elemKey]];
+
+  const states = effectiveTitanStates.value;
+  const allEligibleIds = new Set<number>();
+  for (const id of base) {
+    if (isTitanEligibleForDoor(id, elemKey, titanMetadata[String(id)])) {
+      allEligibleIds.add(id);
+    }
+  }
+  for (const idStr of Object.keys(states)) {
+    const id = Number(idStr);
+    if (Number.isInteger(id) && id > 0 && isTitanEligibleForDoor(id, elemKey, titanMetadata[String(id)])) {
+      allEligibleIds.add(id);
+    }
+  }
+  return [...allEligibleIds];
+}
+
+const activePoolTitans = computed(() => {
+  const elemKey = activePoolTab.value;
+  const ids = getOrderedPoolIds(elemKey);
+  const states = effectiveTitanStates.value;
+  return ids.map((id, idx) => {
+    const meta = getTitanMetadata(id);
+    const st = states[String(id)];
+    const maxHp = st?.maxHp || 1;
+    const hp = st ? Math.max(0, st.hp || 0) : maxHp;
+    const hpPct = st ? Math.min(100, Math.round((hp / maxHp) * 100)) : 100;
+    const isDead = st ? (st.isDead === true || hp <= 0) : false;
+    return {
+      id,
+      index: idx,
+      name: meta?.name || `Titan ${id}`,
+      element: meta?.element || '',
+      role: getTitanRole(id),
+      isTank: getTitanRole(id) === 'Tank',
+      hpPct,
+      isDead,
+    };
+  });
+});
+
+function movePoolTitan(titanId: number, delta: -1 | 1) {
+  const elemKey = activePoolTab.value;
+  const list = [...getOrderedPoolIds(elemKey)];
+  const idx = list.indexOf(titanId);
+  const targetIdx = idx + delta;
+  if (idx === -1 || targetIdx < 0 || targetIdx >= list.length) return;
+  const tmp = list[idx]!;
+  list[idx] = list[targetIdx]!;
+  list[targetIdx] = tmp;
+  autoSettings.value = {
+    ...autoSettings.value,
+    orderedPools: {
+      ...(autoSettings.value.orderedPools || {}),
+      [elemKey]: list,
+    },
+  };
+  void saveDungeonAutoSettings();
+}
+
+function resetPoolOrder() {
+  const elemKey = activePoolTab.value;
+  autoSettings.value = {
+    ...autoSettings.value,
+    orderedPools: {
+      ...(autoSettings.value.orderedPools || {}),
+      [elemKey]: [...DEFAULT_ORDERED_TITAN_POOLS[elemKey]],
+    },
+  };
+  void saveDungeonAutoSettings();
+}
+
+function getElementCardClasses(element: string, casualties: number): string {
+  const norm = element.toLowerCase();
+  if (casualties > 0) {
+    return 'border-rose-300 bg-rose-50/80 text-rose-900 dark:border-rose-800/80 dark:bg-rose-950/40 dark:text-rose-200';
+  }
+  if (norm === 'water') {
+    return 'border-sky-200 bg-sky-50/80 text-sky-900 dark:border-sky-800/70 dark:bg-sky-950/40 dark:text-sky-200';
+  }
+  if (norm === 'fire') {
+    return 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-200';
+  }
+  if (norm === 'earth') {
+    return 'border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200';
+  }
+  return 'border-purple-200 bg-purple-50/80 text-purple-900 dark:border-purple-800/70 dark:bg-purple-950/40 dark:text-purple-200';
+}
+
+function getElementShortTag(element: string): string {
+  const norm = element.toLowerCase();
+  if (norm === 'water') return 'W';
+  if (norm === 'fire') return 'F';
+  if (norm === 'earth') return 'E';
+  return 'N';
+}
+
+function formatLogTime(ts: string): string {
+  if (!ts) return '';
+  if (/^\d{2}:\d{2}/.test(ts) || ts === 'Today') return ts;
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 async function loadDungeonAutoSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const res = await chrome.storage.local.get(DUNGEON_AUTO_CFG_KEY);
-      if (res?.[DUNGEON_AUTO_CFG_KEY]) {
+      const res = await chrome.storage.local.get(DUNGEON_AUTO_SETTINGS_KEY);
+      if (res?.[DUNGEON_AUTO_SETTINGS_KEY]) {
+        const stored = res[DUNGEON_AUTO_SETTINGS_KEY];
         autoSettings.value = {
-          targetTitanite: 150,
-          safetyThresholdPct: 20,
-          singleDoorBestOf10: true,
-          ...res[DUNGEON_AUTO_CFG_KEY],
+          ...DEFAULT_DUNGEON_AUTO_SETTINGS,
+          ...stored,
+          orderedPools: {
+            water: [...DEFAULT_ORDERED_TITAN_POOLS.water],
+            earth: [...DEFAULT_ORDERED_TITAN_POOLS.earth],
+            fire: [...DEFAULT_ORDERED_TITAN_POOLS.fire],
+            neutral: [...DEFAULT_ORDERED_TITAN_POOLS.neutral],
+            ...(stored.orderedPools || {}),
+          },
         };
       }
     } catch (_) {}
@@ -254,7 +459,7 @@ async function loadDungeonAutoSettings() {
 async function saveDungeonAutoSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     try {
-      await chrome.storage.local.set({ [DUNGEON_AUTO_CFG_KEY]: { ...autoSettings.value } });
+      await chrome.storage.local.set({ [DUNGEON_AUTO_SETTINGS_KEY]: { ...autoSettings.value } });
     } catch (_) {}
   }
 }
@@ -286,16 +491,24 @@ async function startAutomation() {
         dispatchRpc,
         savedLineups,
         customTeams: customTeams.value,
+        orderedPools: autoSettings.value.orderedPools,
         safetyThresholdPct: autoSettings.value.safetyThresholdPct,
+        tankSwitchHpPct: autoSettings.value.tankSwitchHpPct,
         targetTitanite: autoSettings.value.targetTitanite,
         todayTitanite: todayTitanite.value,
         singleDoorBestOf10: autoSettings.value.singleDoorBestOf10,
+        allowCasualtyOnDepletedPool: autoSettings.value.allowCasualtyOnDepletedPool,
         shouldStop: () => autoStopRequested.value,
       });
 
       if (step.checkpointClaimed) {
         autoCheckpointsClaimed.value++;
         autoCheckpointGold.value += Number(step.checkpointGold) || 0;
+      }
+
+      if (step.clearedRoomEntry) {
+        clearedRooms.value = mergeClearedRoomEntry(clearedRooms.value, step.clearedRoomEntry);
+        void saveClearedRooms();
       }
 
       if (step.stopped) {
@@ -308,13 +521,20 @@ async function startAutomation() {
         const chosen = step.chosenEvaluation;
         const tankLoss = chosen?.tankLossPct != null ? chosen.tankLossPct.toFixed(1) : '0';
         const teamLoss = chosen?.teamLossPct != null ? chosen.teamLossPct.toFixed(1) : '0';
+        const tankSwitchNote =
+          step.switchedTankFrom && step.switchedTankTo
+            ? ` · Switched tank: ${getTitanName(step.switchedTankFrom)} -> ${getTitanName(step.switchedTankTo)}`
+            : '';
+        const forceNote = step.forceMajeureUsed
+          ? ` · Last-resort win (${step.casualties || 0} casualties)`
+          : '';
         const best10Note = step.bestOfTenReport
           ? ` · Best-of-10 (#${step.bestOfTenReport.bestIndex + 1}/10, ${step.bestOfTenReport.wins}/10 wins)`
           : '';
         const cpNote = step.checkpointClaimed
           ? ` · 5-floor reward claimed${step.checkpointGold ? ` (+${formatNumber(step.checkpointGold)} Gold)` : ''}`
           : '';
-        autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%${best10Note}${cpNote}.`;
+        autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%${tankSwitchNote}${forceNote}${best10Note}${cpNote}.`;
       } else {
         autoStatusMessage.value = step.stopReason || `Checkpoint reward claimed at Floor ${step.floorPassed}.`;
       }
@@ -447,89 +667,201 @@ function handleImgError(e: Event) {
           <!-- Compact Auto Attack Config Bar -->
           <div
             id="dungeon-auto-config-bar"
-            class="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-[11px]"
+            class="space-y-2 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-[11px]"
           >
-            <div class="flex flex-wrap items-center gap-3">
-              <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
-                <span>Target Titanite:</span>
-                <select
-                  id="dungeon-target-titanite-select"
-                  v-model.number="autoSettings.targetTitanite"
-                  :disabled="isAutomating"
-                  class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
-                  @change="saveDungeonAutoSettings"
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap items-center gap-3">
+                <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                  <span>Target Titanite:</span>
+                  <select
+                    id="dungeon-target-titanite-select"
+                    v-model.number="autoSettings.targetTitanite"
+                    :disabled="isAutomating"
+                    class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
+                    @change="saveDungeonAutoSettings"
+                  >
+                    <option :value="75">75</option>
+                    <option :value="150">150</option>
+                    <option :value="300">300</option>
+                    <option :value="0">Unlimited</option>
+                  </select>
+                </label>
+
+                <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                  <span>Min HP:</span>
+                  <select
+                    id="dungeon-min-hp-select"
+                    v-model.number="autoSettings.safetyThresholdPct"
+                    :disabled="isAutomating"
+                    class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
+                    @change="saveDungeonAutoSettings"
+                  >
+                    <option :value="15">15%</option>
+                    <option :value="20">20%</option>
+                    <option :value="25">25%</option>
+                    <option :value="35">35%</option>
+                  </select>
+                </label>
+
+                <label
+                  class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium"
+                  title="Automatically rotate to the next healthy Tank in the room pool when the current Tank HP drops to or below this threshold"
                 >
-                  <option :value="75">75</option>
-                  <option :value="150">150</option>
-                  <option :value="300">300</option>
-                  <option :value="0">Unlimited</option>
-                </select>
-              </label>
-
-              <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
-                <span>Min HP:</span>
-                <select
-                  id="dungeon-min-hp-select"
-                  v-model.number="autoSettings.safetyThresholdPct"
-                  :disabled="isAutomating"
-                  class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
-                  @change="saveDungeonAutoSettings"
-                >
-                  <option :value="15">15%</option>
-                  <option :value="20">20%</option>
-                  <option :value="25">25%</option>
-                  <option :value="35">35%</option>
-                </select>
-              </label>
-
-              <label class="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300 font-medium">
-                <input
-                  id="dungeon-best10-checkbox"
-                  v-model="autoSettings.singleDoorBestOf10"
-                  type="checkbox"
-                  :disabled="isAutomating"
-                  class="rounded border-slate-300 text-indigo-600"
-                  @change="saveDungeonAutoSettings"
-                />
-                <span>Best-of-10 (Single Door &le;5)</span>
-              </label>
-            </div>
-            <span class="text-[10px] text-slate-400">Auto-claims 5-floor reward</span>
-          </div>
-
-          <!-- Automation Status Banner -->
-          <div
-            v-if="autoStatusMessage"
-            class="rounded-xl border p-3.5 space-y-1.5 transition-all text-xs"
-            :class="
-              isAutomating
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
-                : autoStatusMessage.includes('stopped') || autoStatusMessage.includes('threshold') || autoStatusMessage.includes('below')
-                ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
-                : 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
-            "
-          >
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2 font-bold">
-                <span v-if="isAutomating" class="inline-flex size-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>{{ isAutomating ? '⚡ Automation Running' : '🛑 Automation Info' }}</span>
-                <span v-if="autoFloorCount > 0" class="rounded bg-white/70 dark:bg-slate-800/80 px-1.5 py-0.2 text-[10px] font-mono">
-                  +{{ autoFloorCount }} floors
-                </span>
-                <span v-if="autoCheckpointsClaimed > 0" class="rounded bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 text-[10px] font-mono">
-                  {{ autoCheckpointsClaimed }} checkpoints{{ autoCheckpointGold > 0 ? ` (+${formatNumber(autoCheckpointGold)} Gold)` : '' }}
-                </span>
+                  <span>Tank Switch:</span>
+                  <select
+                    id="dungeon-tank-switch-select"
+                    v-model.number="autoSettings.tankSwitchHpPct"
+                    :disabled="isAutomating"
+                    class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
+                    @change="saveDungeonAutoSettings"
+                  >
+                    <option :value="20">20%</option>
+                    <option :value="30">30%</option>
+                    <option :value="35">35%</option>
+                    <option :value="45">45%</option>
+                    <option :value="50">50%</option>
+                  </select>
+                </label>
               </div>
+
               <button
-                v-if="!isAutomating"
+                id="dungeon-pool-config-toggle"
                 type="button"
-                class="cursor-pointer text-[10px] opacity-70 hover:opacity-100"
-                @click="autoStatusMessage = null"
+                class="cursor-pointer inline-flex items-center gap-1 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                @click="showPoolConfig = !showPoolConfig"
               >
-                ✕ Clear
+                <span>📋 Pool Order</span>
+                <span class="text-[9px]">{{ showPoolConfig ? '▲' : '▼' }}</span>
               </button>
             </div>
-            <p class="font-medium leading-relaxed">{{ autoStatusMessage }}</p>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/70 dark:border-slate-700/60">
+              <div class="flex flex-wrap items-center gap-3">
+                <label class="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300 font-medium">
+                  <input
+                    id="dungeon-best10-checkbox"
+                    v-model="autoSettings.singleDoorBestOf10"
+                    type="checkbox"
+                    :disabled="isAutomating"
+                    class="rounded border-slate-300 text-indigo-600"
+                    @change="saveDungeonAutoSettings"
+                  />
+                  <span>Best-of-10 (Single Door &le;5)</span>
+                </label>
+
+                <label
+                  class="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300 font-medium"
+                  title="When all available doors have <=5 alive titans, allow winning with minimum casualties instead of stopping; halt only if no door can win"
+                >
+                  <input
+                    id="dungeon-force-majeure-checkbox"
+                    v-model="autoSettings.allowCasualtyOnDepletedPool"
+                    type="checkbox"
+                    :disabled="isAutomating"
+                    class="rounded border-slate-300 text-amber-600"
+                    @change="saveDungeonAutoSettings"
+                  />
+                  <span>Allow Casualties if Pool &le;5</span>
+                </label>
+              </div>
+              <span class="text-[10px] text-slate-400">Auto-claims 5-floor reward</span>
+            </div>
+
+            <!-- Collapsible Ordered Titan Pool Panel -->
+            <div
+              v-if="showPoolConfig"
+              id="dungeon-pool-config-panel"
+              class="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2"
+            >
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-1">
+                  <button
+                    v-for="tab in POOL_TABS"
+                    :key="tab.key"
+                    :id="`dungeon-pool-tab-${tab.key}`"
+                    type="button"
+                    class="cursor-pointer px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors"
+                    :class="
+                      activePoolTab === tab.key
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    "
+                    @click="activePoolTab = tab.key"
+                  >
+                    {{ tab.label }}
+                  </button>
+                </div>
+
+                <button
+                  id="dungeon-pool-reset-btn"
+                  type="button"
+                  :disabled="isAutomating"
+                  class="cursor-pointer text-[10px] font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 disabled:opacity-50"
+                  @click="resetPoolOrder"
+                >
+                  Reset Default
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                <div
+                  v-for="(pt, pIdx) in activePoolTitans"
+                  :key="pt.id"
+                  class="flex items-center justify-between gap-2 rounded-lg border px-2 py-1 bg-white dark:bg-slate-900/70"
+                  :class="
+                    pt.isDead
+                      ? 'border-rose-200/70 dark:border-rose-900/60 opacity-60'
+                      : 'border-slate-200 dark:border-slate-700/80'
+                  "
+                >
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-4 text-[10px] font-mono font-bold text-slate-400">{{ pIdx + 1 }}.</span>
+                    <img
+                      :src="`assets/titans/${pt.id}.png`"
+                      class="size-5 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
+                      alt=""
+                      @error="handleImgError"
+                    />
+                    <span class="font-semibold text-slate-800 dark:text-slate-100 truncate">{{ pt.name }}</span>
+                    <span
+                      v-if="pt.isTank"
+                      class="px-1 rounded text-[9px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300"
+                    >
+                      Tank
+                    </span>
+                    <span
+                      class="text-[10px] font-mono"
+                      :class="pt.isDead ? 'text-rose-600 font-bold' : pt.hpPct <= autoSettings.tankSwitchHpPct ? 'text-amber-600' : 'text-emerald-600'"
+                    >
+                      {{ pt.isDead ? 'Fallen' : `${pt.hpPct}%` }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-0.5 shrink-0">
+                    <button
+                      :id="`dungeon-pool-move-up-${pt.id}`"
+                      type="button"
+                      :disabled="isAutomating || pIdx === 0"
+                      class="cursor-pointer px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-[10px] font-bold"
+                      title="Move up"
+                      @click="movePoolTitan(pt.id, -1)"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      :id="`dungeon-pool-move-down-${pt.id}`"
+                      type="button"
+                      :disabled="isAutomating || pIdx === activePoolTitans.length - 1"
+                      class="cursor-pointer px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-[10px] font-bold"
+                      title="Move down"
+                      @click="movePoolTitan(pt.id, 1)"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Active Battle Banner -->
@@ -651,49 +983,175 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- SECTION 3: DAILY COMBAT LOG & TITAN CASUALTY TRACKING -->
-          <div id="dungeon-combat-log-section" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <span>⚔️</span>
-                <span>Daily Combat Log</span>
-              </h3>
-              <div class="flex items-center gap-2 text-xs">
+          <!-- SECTION 3: UNIFIED COMBAT LOG & AUTOMATION RESULTS -->
+          <div id="dungeon-combat-log-section" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <span>⚔️</span>
+                  <span>Combat Log</span>
+                </h3>
+                <span
+                  v-if="isAutomating"
+                  class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                >
+                  <span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span>Auto Running</span>
+                </span>
+                <span
+                  v-if="autoFloorCount > 0"
+                  class="rounded bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  +{{ autoFloorCount }} floors
+                </span>
+                <span
+                  v-if="autoCheckpointsClaimed > 0"
+                  class="rounded bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-mono font-semibold"
+                >
+                  {{ autoCheckpointsClaimed }} CP{{ autoCheckpointGold > 0 ? ` (+${formatNumber(autoCheckpointGold)}g)` : '' }}
+                </span>
+              </div>
+
+              <div class="flex items-center gap-1.5 text-[11px]">
                 <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                   Flawless: <strong id="dungeon-flawless-count" class="tabular-nums">{{ flawlessBattles }}</strong>
                 </span>
+                <span
+                  v-if="totalCasualtyCount > 0 || casualtiesList.length > 0"
+                  class="rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                >
+                  Casualties: <strong class="tabular-nums">{{ Math.max(totalCasualtyCount, casualtiesList.length) }}</strong>
+                </span>
                 <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                  Total: <strong id="dungeon-total-battles" class="tabular-nums">{{ totalBattles }}</strong>
+                  Total: <strong id="dungeon-total-battles" class="tabular-nums">{{ Math.max(totalBattles, mergedCombatLogRooms.length) }}</strong>
                 </span>
               </div>
             </div>
 
-            <!-- Casualty list -->
-            <div v-if="casualtiesList.length > 0" id="dungeon-casualty-list" class="space-y-2">
-              <div class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
-                Battles With Casualties ({{ casualtiesList.length }})
-              </div>
-              <div
-                v-for="(c, cIdx) in casualtiesList"
-                :key="cIdx"
-                class="rounded-lg border border-rose-200 bg-rose-50/50 p-2.5 dark:border-rose-900/60 dark:bg-rose-950/20 text-xs space-y-1.5"
+            <!-- Inline Automation Status Strip -->
+            <div
+              v-if="autoStatusMessage"
+              id="dungeon-auto-status-strip"
+              class="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]"
+              :class="
+                isAutomating
+                  ? 'border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  : autoStatusMessage.includes('stopped') || autoStatusMessage.includes('threshold') || autoStatusMessage.includes('below') || autoStatusMessage.includes('No winnable')
+                  ? 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-200'
+                  : 'border-blue-200 bg-blue-50/80 text-blue-900 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-200'
+              "
+            >
+              <span class="font-medium leading-snug">{{ autoStatusMessage }}</span>
+              <button
+                v-if="!isAutomating"
+                type="button"
+                class="cursor-pointer shrink-0 text-[10px] opacity-70 hover:opacity-100"
+                @click="autoStatusMessage = null"
               >
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-rose-900 dark:text-rose-200">
-                    Floor {{ c.floor }} · Door {{ c.door }}
-                  </span>
-                  <span class="text-[10px] text-slate-500 font-mono">
-                    {{ c.time || 'Today' }}
+                ✕
+              </button>
+            </div>
+
+            <!-- Compact 4-5 Column Cleared Room Cards Grid -->
+            <div v-if="mergedCombatLogRooms.length > 0" class="space-y-2">
+              <div
+                id="dungeon-combat-log-grid"
+                class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-1.5"
+              >
+                <button
+                  v-for="room in mergedCombatLogRooms"
+                  :key="`${room.floor}-${room.door}`"
+                  :id="`dungeon-log-card-${room.floor}-${room.door}`"
+                  type="button"
+                  class="group relative flex flex-col justify-between rounded-lg border px-2 py-1.5 text-left transition-all hover:shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  :class="getElementCardClasses(room.element, room.casualties)"
+                  :aria-label="`Floor ${room.floor} Door ${room.door} ${room.element} (${room.source === 'auto' ? 'Auto' : 'Manual'})`"
+                  @mouseenter="hoveredLogEntry = room"
+                  @mouseleave="hoveredLogEntry = null"
+                  @focus="hoveredLogEntry = room"
+                  @blur="hoveredLogEntry = null"
+                >
+                  <div class="flex items-center justify-between gap-1 w-full">
+                    <span class="font-mono font-bold text-[11px] leading-none">F{{ room.floor }}</span>
+                    <span
+                      class="text-[10px] leading-none opacity-80"
+                      :title="room.source === 'auto' ? 'Auto Attack' : 'Manual Battle'"
+                    >
+                      {{ room.source === 'auto' ? '⚡' : '👤' }}
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between gap-1 mt-1 w-full">
+                    <span class="text-[9px] font-bold uppercase tracking-wide opacity-85">
+                      {{ getElementShortTag(room.element) }} · D{{ room.door }}
+                    </span>
+                    <span
+                      v-if="room.casualties > 0"
+                      class="inline-flex items-center gap-0.5 rounded bg-rose-600/90 px-1 py-0.2 text-[9px] font-bold text-white"
+                      :title="room.fallenTitans.length ? `Fallen: ${room.fallenTitans.join(', ')}` : `${room.casualties} casualty`"
+                    >
+                      💀{{ room.casualties }}{{ room.forceMajeure ? '!' : '' }}
+                    </span>
+                    <span
+                      v-else-if="room.forceMajeure"
+                      class="rounded bg-amber-500/90 px-1 py-0.2 text-[9px] font-bold text-white"
+                      title="Last-resort win"
+                    >
+                      !
+                    </span>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Hover / Focus Detail Panel -->
+              <div
+                v-if="hoveredLogEntry"
+                id="dungeon-log-card-tooltip"
+                class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/90 p-2.5 text-[11px] space-y-1 shadow-xs"
+              >
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                    <span>Floor {{ hoveredLogEntry.floor }} · Door {{ hoveredLogEntry.door }} ({{ hoveredLogEntry.element }})</span>
+                    <span class="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-semibold">
+                      {{ hoveredLogEntry.source === 'auto' ? '⚡ Auto' : '👤 Manual' }}
+                    </span>
+                  </div>
+                  <span v-if="hoveredLogEntry.timestamp" class="text-[10px] font-mono text-slate-400">
+                    {{ formatLogTime(hoveredLogEntry.timestamp) }}
                   </span>
                 </div>
-                <div v-if="c.fallen && c.fallen.length" class="text-rose-700 dark:text-rose-300">
-                  Fallen Titans: <strong>{{ c.fallen.join(', ') }}</strong>
+
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300">
+                  <span v-if="hoveredLogEntry.casualties === 0" class="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Flawless ({{ hoveredLogEntry.stars }}★)
+                  </span>
+                  <span v-else class="text-rose-600 dark:text-rose-400 font-semibold">
+                    Casualties ({{ hoveredLogEntry.casualties }}): {{ hoveredLogEntry.fallenTitans.join(', ') || 'Fallen Titan' }}
+                  </span>
+                  <span v-if="hoveredLogEntry.tankLossPct != null || hoveredLogEntry.teamLossPct != null" class="font-mono text-[10px]">
+                    Tank -{{ hoveredLogEntry.tankLossPct ?? 0 }}% · Team -{{ hoveredLogEntry.teamLossPct ?? 0 }}%
+                  </span>
+                  <span v-if="hoveredLogEntry.switchedTankFrom && hoveredLogEntry.switchedTankTo" class="text-amber-600 dark:text-amber-400 font-medium">
+                    Tank switched: {{ hoveredLogEntry.switchedTankFrom }} → {{ hoveredLogEntry.switchedTankTo }}
+                  </span>
+                  <span v-if="hoveredLogEntry.forceMajeure" class="text-amber-600 dark:text-amber-400 font-semibold">
+                    Last-resort win (Pool ≤5)
+                  </span>
+                  <span v-if="hoveredLogEntry.bestOfTenNote" class="text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
+                    Best-of-10 {{ hoveredLogEntry.bestOfTenNote }}
+                  </span>
+                  <span v-if="hoveredLogEntry.checkpointGold" class="text-amber-600 dark:text-amber-300 font-mono text-[10px]">
+                    +{{ formatNumber(hoveredLogEntry.checkpointGold) }} Gold
+                  </span>
+                </div>
+
+                <div v-if="hoveredLogEntry.teamIds && hoveredLogEntry.teamIds.length > 0" class="text-[10px] text-slate-500 dark:text-slate-400">
+                  Squad: {{ hoveredLogEntry.teamIds.map((id) => getTitanName(id)).join(', ') }}
                 </div>
               </div>
             </div>
 
-            <div v-else class="text-center p-3 text-slate-400 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg text-xs">
-              No titan casualties recorded today. All victories flawless!
+            <div v-else class="text-center p-2.5 text-slate-400 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg text-xs">
+              No rooms cleared yet today. Start Auto Attack or Simulate a door to record combat history.
             </div>
           </div>
 
@@ -879,6 +1337,7 @@ function handleImgError(e: Event) {
       :doors-count="doors.length"
       :floor-number="floorNumber"
       :titan-states="effectiveTitanStates"
+      :auto-settings="autoSettings"
       @battle-submitted="handleSimBattleSubmitted"
     />
   </Teleport>

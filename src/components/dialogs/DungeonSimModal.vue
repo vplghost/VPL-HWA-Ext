@@ -5,7 +5,7 @@ import { formatNumber } from '@/src/utils/formatters';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import UnitStars from '@/src/components/common/UnitStars.vue';
-import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from '@/src/services/queues/dungeonAutomation';
+import { getEffectiveTitanStates, pickSmartSquadForDoor } from '@/src/services/queues/dungeonAutomation';
 import {
   simulateBattleWithUnity,
   BattleSimError,
@@ -21,7 +21,12 @@ import {
   shouldUseBestOfTen,
   runSingleDoorBestOfTen,
   SINGLE_DOOR_SIM_ROUNDS,
+  DUNGEON_AUTO_SETTINGS_KEY,
+  DEFAULT_DUNGEON_AUTO_SETTINGS,
+  formatDungeonElementName,
   type BestOfTenReport,
+  type DungeonAutoSettings,
+  type DungeonClearedRoomEntry,
 } from '@/src/services/dungeonPlanner';
 
 const props = defineProps<{
@@ -31,11 +36,12 @@ const props = defineProps<{
   doorsCount?: number;
   floorNumber: number;
   titanStates: Record<string, any>;
+  autoSettings?: DungeonAutoSettings;
 }>();
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
-  (e: 'battleSubmitted'): void;
+  (e: 'battleSubmitted', entry?: DungeonClearedRoomEntry): void;
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -54,6 +60,8 @@ const copiedDiagnostics = ref(false);
 const successMessage = ref<string | null>(null);
 const savedLineups = ref<Record<string, number[]>>({});
 const showTeamDropdown = ref(false);
+const switchedTankNotice = ref<string | null>(null);
+const loadedAutoSettings = ref<DungeonAutoSettings>({ ...DEFAULT_DUNGEON_AUTO_SETTINGS });
 
 interface TeamPresetOption {
   id: string;
@@ -171,13 +179,19 @@ const doorElementKey = computed<'water' | 'fire' | 'earth' | 'neutral'>(() => {
   return (el === 'water' || el === 'fire' || el === 'earth') ? el : 'neutral';
 });
 
-// Load persistent saved lineups from storage
+// Load persistent saved lineups and auto settings from storage
 async function loadSavedLineups() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const res = await chrome.storage.local.get(DUNGEON_SAVED_LINEUPS_KEY);
+      const res = await chrome.storage.local.get([DUNGEON_SAVED_LINEUPS_KEY, DUNGEON_AUTO_SETTINGS_KEY]);
       if (res?.[DUNGEON_SAVED_LINEUPS_KEY]) {
         savedLineups.value = res[DUNGEON_SAVED_LINEUPS_KEY];
+      }
+      if (res?.[DUNGEON_AUTO_SETTINGS_KEY]) {
+        loadedAutoSettings.value = {
+          ...DEFAULT_DUNGEON_AUTO_SETTINGS,
+          ...res[DUNGEON_AUTO_SETTINGS_KEY],
+        };
       }
     } catch (_) {}
   }
@@ -302,28 +316,35 @@ function toggleTitan(titan: SimTitanItem) {
 }
 
 /**
- * Auto-select squad for current door:
- * Prioritizes persistent accepted lineup -> server saved team -> default pool -> highest alive titans.
+ * Auto-select squad strictly for the current door element type:
+ * Uses the unified ordered pool + auto-switch tanker resolver so teams from
+ * previous rooms or different elements never leak into the current door.
  */
 function autoSelectSquad() {
-  const normDoor = doorElementKey.value;
-  const preferred = savedLineups.value[normDoor]
-    || cache.value.teamGetAll?.data?.[`dungeon_${normDoor}`]
-    || DEFAULT_TITAN_POOLS[normDoor]
-    || [];
+  const effectiveSettings = props.autoSettings || loadedAutoSettings.value;
+  const states = props.titanStates && Object.keys(props.titanStates).length > 0
+    ? props.titanStates
+    : getEffectiveTitanStates(cache.value);
+
+  const pick = pickSmartSquadForDoor(doorElement.value, states, {
+    orderedPools: effectiveSettings?.orderedPools,
+    cache: cache.value,
+    tankSwitchHpPct: effectiveSettings?.tankSwitchHpPct ?? 35,
+    safetyThresholdPct: effectiveSettings?.safetyThresholdPct ?? 20,
+    ignoreSavedLineups: true,
+  });
 
   const aliveMap = new Map(availableTitans.value.filter((t) => !t.isDead).map((t) => [t.id, t]));
   const picked: number[] = [];
 
-  for (const id of preferred) {
-    const numId = Number(id);
-    if (aliveMap.has(numId) && !picked.includes(numId)) {
-      picked.push(numId);
+  for (const id of pick.squadIds) {
+    if (aliveMap.has(id) && !picked.includes(id)) {
+      picked.push(id);
       if (picked.length >= 5) break;
     }
   }
 
-  // If preferred team has fewer than 5 alive titans, fill remaining slots with highest alive titans
+  // Fill any remaining slots with highest alive eligible titans for this door
   if (picked.length < 5) {
     for (const t of availableTitans.value) {
       if (!t.isDead && !picked.includes(t.id)) {
@@ -334,24 +355,36 @@ function autoSelectSquad() {
   }
 
   selectedTitanIds.value = picked;
+  if (pick.switchedTankFrom && pick.switchedTankTo) {
+    const fromName = getTitanMetadata(pick.switchedTankFrom)?.name || `#${pick.switchedTankFrom}`;
+    const toName = getTitanMetadata(pick.switchedTankTo)?.name || `#${pick.switchedTankTo}`;
+    switchedTankNotice.value = `Tank switched: ${fromName} -> ${toName}`;
+  } else {
+    switchedTankNotice.value = null;
+  }
   simResult.value = null;
   errorMessage.value = null;
 }
 
 function clearSquad() {
   selectedTitanIds.value = [];
+  switchedTankNotice.value = null;
   simResult.value = null;
   errorMessage.value = null;
 }
 
-// Reset and auto-select squad when modal opens or door changes
+// Reset and auto-select squad whenever modal opens or door/floor/element changes
 watch(
-  () => [props.modelValue, props.doorIdx],
+  () => [props.modelValue, props.doorIdx, props.floorNumber, doorElementKey.value, props.door],
   async ([isOpen]) => {
     if (isOpen) {
+      selectedTitanIds.value = [];
       simResult.value = null;
+      bestOfTenReport.value = null;
       errorMessage.value = null;
+      errorDetail.value = null;
       successMessage.value = null;
+      switchedTankNotice.value = null;
       await loadSavedLineups();
       autoSelectSquad();
     }
@@ -498,8 +531,31 @@ async function handleSubmitOfficial() {
     // 4. Refresh Dungeon state from game
     await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
 
+    const fallenTitans: string[] = [];
+    for (const [idStr, att] of Object.entries(simResult.value.attackers || {})) {
+      if (att?.isDead === true || (typeof att?.hp === 'number' && att.hp <= 0)) {
+        fallenTitans.push(getTitanMetadata(idStr)?.name || `Titan #${idStr}`);
+      }
+    }
+    const manualEntry: DungeonClearedRoomEntry = {
+      id: `${curFloor}_${props.doorIdx + 1}_${Date.now()}`,
+      floor: curFloor,
+      door: props.doorIdx + 1,
+      element: formatDungeonElementName(doorElement.value),
+      source: 'manual',
+      win: Boolean(simResult.value.win),
+      stars: Number(simResult.value.stars) || 3,
+      casualties: fallenTitans.length,
+      fallenTitans,
+      teamIds: [...selectedTitanIds.value],
+      bestOfTenNote: bestOfTenReport.value
+        ? `#${bestOfTenReport.value.bestIndex + 1}/${bestOfTenReport.value.roundsRun} (${bestOfTenReport.value.wins}/${bestOfTenReport.value.roundsRun} wins)`
+        : null,
+      timestamp: new Date().toISOString(),
+    };
+
     successMessage.value = 'Battle submitted successfully! Rewards and Titanite have been recorded.';
-    emit('battleSubmitted');
+    emit('battleSubmitted', manualEntry);
 
     setTimeout(() => {
       emit('update:modelValue', false);
@@ -581,7 +637,7 @@ async function handleSubmitOfficial() {
                   type="button"
                   class="cursor-pointer px-2 py-1 rounded bg-rose-200/80 hover:bg-rose-300 dark:bg-rose-900/60 dark:hover:bg-rose-800 text-[11px] font-semibold transition-colors"
                   :disabled="isSimulating"
-                  @click="handleSimulateBattle"
+                  @click="handleRunSimulation"
                 >
                   🔄 Retry
                 </button>
@@ -668,6 +724,13 @@ async function handleSubmitOfficial() {
                 <span>🛡️ Select Attack Squad</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" :class="selectedTitanIds.length === 5 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'">
                   {{ selectedTitanIds.length }} / 5 Titans
+                </span>
+                <span
+                  v-if="switchedTankNotice"
+                  id="dungeon-sim-tank-switch-badge"
+                  class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300"
+                >
+                  {{ switchedTankNotice }}
                 </span>
               </div>
 
