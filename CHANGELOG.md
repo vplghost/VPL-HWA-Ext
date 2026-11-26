@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.362 — 2026-11-27
+
+### Fixed
+
+- **Dashboard Activity Stats Accuracy — Campaign Raid Counter (Multi-Raid), Actual Campaign Energy & Personal Titanite (`rpcCache.ts`, `activityStats.ts`, `CampaignRaidModal.vue`, `DungeonModal.vue`, `IncomeOverview.vue`, `tests/activity-stats.test.mjs`, `tests/rpc-cache.test.mjs`)**:
+  - Added compact `< 1 KB` `campaignDailySummary` aggregate in `rpcCache.ts` (`days` capped at 7 UTC days, `recentIdents` capped at 30 entries, zero new `chrome.storage.local` keys and no per-receipt `drops` storage) so batched multi-raid `missionRaid` calls from Extension and raids across different missions accumulate accurately without double-counting, tracking actual mission energy (`6 / 8 / 12 / 16⚡`) instead of hardcoded `6⚡`.
+  - Synced `CampaignRaidModal.vue` direct RPC fast-path into `campaignDailySummary` by call `ident` and updated `IncomeOverview.vue` Campaign Energy subtitle to `Actual mission cost (6–16⚡ / raid)`.
+  - Updated `activityStats.ts` (`getTodayActivityStats` & `getActivityStatsForDay`) to read `campaignDailySummary` and preserve actual campaign energy across merges (while remaining backward-compatible with legacy `campaignRaidReceipts` / `lastCampaignRaidResult`).
+  - Added shared `resolvePersonalTitaniteToday()` helper (used by both Dashboard and `DungeonModal.vue`) combining uncapped `guildStatus.data.members[accountId].stats.todayDungeonActivity`, `Math.max` across Titanite daily quests `[10031, 10032, 10108]`, and UTC-aligned `dungeonStatus` / `dailyCombatLog` so `todayTitanite: 0` or quest 75-cap no longer masks real personal Titanite.
+
 ## 0.11.360 — 2026-11-27
 
 ### Fixed

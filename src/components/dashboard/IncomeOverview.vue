@@ -736,7 +736,7 @@ watch(
               <span class="text-base">⚡</span>
               <div>
                 <span class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block leading-tight">Campaign Energy Spent</span>
-                <span class="text-[10px] text-slate-400">Campaign Raids (6⚡ / raid)</span>
+                <span class="text-[10px] text-slate-400">Actual mission cost (6–16⚡ / raid)</span>
               </div>
             </div>
             <div class="text-sm font-black text-sky-600 dark:text-sky-400 tabular-nums flex items-baseline gap-1">

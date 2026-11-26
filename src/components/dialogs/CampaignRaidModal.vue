@@ -711,12 +711,66 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
       if (missionResponses.length > 0) {
         await missionHistory.record(raidMission, raidAccount);
         const drops = extractDropsFromRaidResponse(missionResponses);
+        const costs = getMissionCosts()?.[raidMission];
+        const fallbackPerRaid = costs ? (costs[0] + costs[1]) : 6;
+        const nowIso = new Date().toISOString();
+        const utcDay = nowIso.slice(0, 10);
+        const callEntries = effectiveResults
+          .filter((r: any) => r?.result?.response)
+          .map((r: any, idx: number) => {
+            const respObj = r.result.response;
+            const expVal = Number(respObj?.[0]?.experience);
+            const energy = Number.isFinite(expVal) && expVal > 0 ? expVal : fallbackPerRaid;
+            const ident = String(r?.ident || `${nowIso}:${idx}:missionRaid`);
+            return { ident, energy };
+          });
+        const totalEnergySpent = callEntries.reduce((sum: number, item: { energy: number }) => sum + item.energy, 0);
         if (typeof updateCacheLocally === 'function') {
           void updateCacheLocally((draft) => {
             draft.lastCampaignRaidResult = {
-              updatedAt: new Date().toISOString(),
-              data: { missionId: raidMission, times, drops, currentDrops: drops }
+              updatedAt: nowIso,
+              data: {
+                missionId: raidMission,
+                times: callEntries.length,
+                energySpent: totalEnergySpent,
+                ident: callEntries.map((c: { ident: string }) => c.ident).join(','),
+                drops,
+                currentDrops: drops
+              }
             };
+            const prevSummary = draft.campaignDailySummary?.data || {};
+            const recentIdents: string[] = Array.isArray(prevSummary.recentIdents) ? [...prevSummary.recentIdents] : [];
+            const days: Record<string, { count: number; energy: number }> = { ...(prevSummary.days || {}) };
+            const existingDay = days[utcDay] || { count: 0, energy: 0 };
+            let addedCount = 0;
+            let addedEnergy = 0;
+            for (const item of callEntries) {
+              if (!recentIdents.includes(item.ident)) {
+                recentIdents.push(item.ident);
+                addedCount += 1;
+                addedEnergy += item.energy;
+              }
+            }
+            if (addedCount > 0) {
+              days[utcDay] = {
+                count: (Number(existingDay.count) || 0) + addedCount,
+                energy: (Number(existingDay.energy) || 0) + addedEnergy,
+              };
+              const sortedDays = Object.keys(days).sort();
+              while (sortedDays.length > 7) {
+                const oldest = sortedDays.shift();
+                if (oldest) delete days[oldest];
+              }
+              if (recentIdents.length > 30) recentIdents.splice(0, recentIdents.length - 30);
+              draft.campaignDailySummary = {
+                key: 'campaignDailySummary',
+                method: 'missionRaid',
+                feature: null,
+                group: 'internal',
+                data: { days, recentIdents },
+                updatedAt: nowIso,
+              };
+            }
           });
         }
         return { ok: true, drops };

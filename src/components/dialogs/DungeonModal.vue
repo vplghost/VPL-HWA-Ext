@@ -14,6 +14,7 @@ import { getTitanRole, titanMetadata } from '@/src/data/titanMetadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { moveItemToFirst } from '@/src/utils/listReorder';
+import { resolvePersonalTitaniteToday } from '@/src/utils/activityStats';
 import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { executeDungeonAutomationStep } from '@/src/services/queues/dungeonAutomationRunner';
@@ -53,24 +54,7 @@ const floorNumber = computed(() => {
 
 const floorType = computed(() => dungeonData.value.floorType || '');
 
-const todayTitanite = computed(() => {
-  const d = dungeonData.value;
-  if (Number.isFinite(d.todayTitanite)) return d.todayTitanite;
-  if (Number.isFinite(d.dailyCombatLog?.todayTitanite)) return d.dailyCombatLog.todayTitanite;
-  const quests = cache.value.questGetAll?.data;
-  if (quests) {
-    const q = (Array.isArray(quests) ? quests.find((item: any) => [10031, 10032, 10108].includes(Number(item?.id))) : null) ||
-              quests[10031] || quests[10032] || quests[10108];
-    if (q && Number.isFinite(Number(q.progress))) return Number(q.progress);
-  }
-  const dailyQuests = cache.value['getDailyQuests:quest']?.data?.events;
-  if (dailyQuests) {
-    const q = (Array.isArray(dailyQuests) ? dailyQuests.find((item: any) => [10031, 10032, 10108].includes(Number(item?.id))) : null) ||
-              dailyQuests[10031] || dailyQuests[10032] || dailyQuests[10108];
-    if (q && Number.isFinite(Number(q.progress))) return Number(q.progress);
-  }
-  return 0;
-});
+const todayTitanite = computed(() => resolvePersonalTitaniteToday(cache.value));
 
 const activeBattle = computed(() => dungeonData.value.activeBattle || null);
 const activeDoorIdx = computed(() => Number(activeBattle.value?.teamNum ?? 0) + 1);

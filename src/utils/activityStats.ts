@@ -33,6 +33,159 @@ export const MONSTER_ENERGY_COST = 10;
 export const BRIGAND_ENERGY_COST = 10;
 export const ACTIVITY_HISTORY_STORAGE_KEY = 'dailyActivityHistory';
 export const MAX_ACTIVITY_HISTORY_DAYS = 30;
+const TITANITE_QUEST_IDS = [10031, 10032, 10108];
+
+function isSameUtcDayOrUnstamped(updatedAt: any, todayUtc: string): boolean {
+  if (!updatedAt) return true;
+  const ts = typeof updatedAt === 'string' ? Date.parse(updatedAt) : Number(updatedAt);
+  return Number.isFinite(ts) ? formatUtcDay(ts) === todayUtc : true;
+}
+
+function maxTitaniteQuestProgress(quests: any): number {
+  if (!quests) return 0;
+  let maxVal = 0;
+  if (Array.isArray(quests)) {
+    for (const q of quests) {
+      if (q && TITANITE_QUEST_IDS.includes(Number(q.id)) && Number.isFinite(Number(q.progress))) {
+        maxVal = Math.max(maxVal, Number(q.progress));
+      }
+    }
+  } else if (typeof quests === 'object') {
+    for (const qId of TITANITE_QUEST_IDS) {
+      const q = quests[qId] ?? quests[String(qId)];
+      if (q && Number.isFinite(Number(q.progress))) {
+        maxVal = Math.max(maxVal, Number(q.progress));
+      }
+    }
+  }
+  return maxVal;
+}
+
+/**
+ * Resolves the most accurate personal Titanite earned today (UTC) by combining:
+ * 1. Guild member stats (`guildStatus.data.members[accountId].stats.todayDungeonActivity`, uncapped)
+ * 2. Max progress across Titanite daily quests (`10031`, `10032`, `10108`) in `questGetAll` & `getDailyQuests:quest`
+ * 3. `dungeonStatus` (`todayTitanite` / `dailyCombatLog.todayTitanite`, falling back to `dungeonActivity` only when others are 0)
+ */
+export function resolvePersonalTitaniteToday(cache: Record<string, any> = {}, now = Date.now()): number {
+  const today = formatUtcDay(now);
+  const accountId = String(cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? '');
+  let best = 0;
+
+  // 1. Uncapped server-authoritative personal Titanite from guildStatus
+  const guildData = cache?.guildStatus?.data;
+  if (
+    guildData &&
+    accountId &&
+    (!guildData.accountId || String(guildData.accountId) === accountId) &&
+    isSameUtcDayOrUnstamped(cache?.guildStatus?.updatedAt, today)
+  ) {
+    const member = guildData.members?.[accountId];
+    const guildTitanite = Number(member?.stats?.todayDungeonActivity);
+    if (Number.isFinite(guildTitanite) && guildTitanite > 0) {
+      best = Math.max(best, guildTitanite);
+    }
+  }
+
+  // 2. Max progress across all Titanite quests (avoids capping at quest 10031's 75 limit)
+  if (isSameUtcDayOrUnstamped(cache?.questGetAll?.updatedAt, today)) {
+    best = Math.max(best, maxTitaniteQuestProgress(cache?.questGetAll?.data));
+  }
+  if (isSameUtcDayOrUnstamped(cache?.['getDailyQuests:quest']?.updatedAt, today)) {
+    best = Math.max(best, maxTitaniteQuestProgress(cache?.['getDailyQuests:quest']?.data?.events));
+  }
+
+  // 3. Dungeon status & daily combat log (aligned to UTC day, with legacy local-date tolerance)
+  const dungeonStatus = cache?.dungeonStatus?.data || cache?.dungeonGetInfo?.data;
+  const dungeonUpdated = cache?.dungeonStatus?.updatedAt || cache?.dungeonGetInfo?.updatedAt;
+  const isDungeonToday = isSameUtcDayOrUnstamped(dungeonUpdated, today);
+  if (isDungeonToday && dungeonStatus) {
+    const dungeonCombatLog = dungeonStatus.dailyCombatLog;
+    const isCombatLogToday = !dungeonCombatLog?.date
+      ? true
+      : (String(dungeonCombatLog.date) === today ||
+         new Date(dungeonCombatLog.date).toDateString() === new Date(now).toDateString());
+
+    const statusTitanite = Number(dungeonStatus.todayTitanite);
+    if (Number.isFinite(statusTitanite) && statusTitanite > 0) {
+      best = Math.max(best, statusTitanite);
+    }
+    if (isCombatLogToday) {
+      const logTitanite = Number(dungeonCombatLog?.todayTitanite);
+      if (Number.isFinite(logTitanite) && logTitanite > 0) {
+        best = Math.max(best, logTitanite);
+      }
+    }
+    if (best === 0) {
+      const fallbackActivity = Number(dungeonStatus.dungeonActivity);
+      if (Number.isFinite(fallbackActivity) && fallbackActivity > 0) {
+        best = fallbackActivity;
+      }
+    }
+  }
+
+  return best;
+}
+
+function resolveCampaignDayTotals(
+  cache: Record<string, any>,
+  dateStr: string,
+  includeLastResultFallback: boolean
+): { count: number; energy: number } {
+  // 1. Primary: compact daily aggregate written by rpcCache / CampaignRaidModal (< 1 KB)
+  const summaryDay = cache?.campaignDailySummary?.data?.days?.[dateStr];
+  const summaryCount = Number(summaryDay?.count) || 0;
+  const summaryEnergy = Number(summaryDay?.energy) || 0;
+
+  // 2. Legacy/test compatibility: campaignRaidReceipts array
+  let receiptCount = 0;
+  let receiptEnergy = 0;
+  const campaignReceipts = Array.isArray(cache?.campaignRaidReceipts?.data)
+    ? cache.campaignRaidReceipts.data
+    : [];
+  const seenReceiptKeys = new Set<string>();
+  for (const r of campaignReceipts) {
+    if (!r) continue;
+    const timeVal = r.at || r.timestamp || r.updatedAt;
+    if (!timeVal) continue;
+    const dStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    if (dStr === dateStr) {
+      const dedupKey = r.ident ? `id:${r.ident}` : `ts:${timeVal}:${r.missionId ?? ''}:${r.times ?? 1}`;
+      if (seenReceiptKeys.has(dedupKey)) continue;
+      seenReceiptKeys.add(dedupKey);
+      const times = Number(r.times) || 1;
+      const energy = Number.isFinite(Number(r.energySpent)) && Number(r.energySpent) > 0
+        ? Number(r.energySpent)
+        : times * CAMPAIGN_ENERGY_COST;
+      receiptCount += times;
+      receiptEnergy += energy;
+    }
+  }
+
+  let count = Math.max(summaryCount, receiptCount);
+  let energy = Math.max(summaryEnergy, receiptEnergy);
+
+  // 3. Fallback: single lastCampaignRaidResult only if summary/receipts have not already counted it
+  if (includeLastResultFallback && count === 0) {
+    const lastRaid = cache?.lastCampaignRaidResult;
+    if (lastRaid && !lastRaid.data?.failed && lastRaid.data?.success !== false) {
+      const timeVal = lastRaid.updatedAt || lastRaid.at;
+      if (timeVal) {
+        const dStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+        if (dStr === dateStr) {
+          const times = Number(lastRaid.data?.times ?? lastRaid.times ?? 1);
+          const raidEnergy = Number.isFinite(Number(lastRaid.data?.energySpent)) && Number(lastRaid.data.energySpent) > 0
+            ? Number(lastRaid.data.energySpent)
+            : times * CAMPAIGN_ENERGY_COST;
+          count = times;
+          energy = raidEnergy;
+        }
+      }
+    }
+  }
+
+  return { count, energy };
+}
 
 /**
  * Aggregates daily activity and automation efficiency metrics from cache for today:
@@ -216,36 +369,10 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     gameAutoJoinCount = Math.max(gameAutoJoinCount, unassignedRallies);
   }
 
-  // 5. Campaign Raids
-  let campaignCount = 0;
-  const campaignReceipts = Array.isArray(cache?.campaignRaidReceipts?.data)
-    ? cache.campaignRaidReceipts.data
-    : [];
-
-  const seenCampaignTimes = new Set<string>();
-  for (const r of campaignReceipts) {
-    if (!r) continue;
-    const timeVal = r.at || r.timestamp || r.updatedAt;
-    if (!timeVal) continue;
-    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
-    if (dateStr === today) {
-      const times = Number(r.times) || 1;
-      campaignCount += times;
-      seenCampaignTimes.add(String(timeVal));
-    }
-  }
-
-  const lastRaid = cache?.lastCampaignRaidResult;
-  if (lastRaid) {
-    const timeVal = lastRaid.updatedAt || lastRaid.at;
-    if (timeVal) {
-      const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
-      if (dateStr === today && !seenCampaignTimes.has(String(timeVal))) {
-        const times = Number(lastRaid.data?.times ?? lastRaid.times ?? 1);
-        campaignCount += times;
-      }
-    }
-  }
+  // 5. Campaign Raids (from compact campaignDailySummary + legacy fallback)
+  const campaignTotals = resolveCampaignDayTotals(cache, today, true);
+  const campaignCount = campaignTotals.count;
+  const campaignEnergySpentFromCache = campaignTotals.energy;
 
   // 6. Solo Monsters Hunted
   let monstersCount = Math.max(monsterReports, marchMonsters);
@@ -314,9 +441,10 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   const isDungeonToday = dungeonUpdated ? formatUtcDay(Date.parse(dungeonUpdated)) === today : true;
 
   const dungeonCombatLog = dungeonStatus?.dailyCombatLog;
-  const isCombatLogToday = dungeonCombatLog?.date
-    ? new Date(dungeonCombatLog.date).toDateString() === new Date(now).toDateString()
-    : true;
+  const isCombatLogToday = !dungeonCombatLog?.date
+    ? true
+    : (String(dungeonCombatLog.date) === today ||
+       new Date(dungeonCombatLog.date).toDateString() === new Date(now).toDateString());
 
   let dungeonBattlesToday = 0;
   if (isCombatLogToday && dungeonCombatLog) {
@@ -341,17 +469,7 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     dungeonBattlesToday = Math.max(dungeonBattlesToday, historyBattlesToday);
   }
 
-  let personalTitaniteToday = 0;
-  if (isDungeonToday && dungeonStatus) {
-    personalTitaniteToday = Number(
-      dungeonStatus.todayTitanite ??
-      dungeonStatus.dungeonActivity ??
-      (isCombatLogToday ? dungeonCombatLog?.todayTitanite : 0) ??
-      0
-    );
-  } else if (dungeonStatus?.todayTitanite != null) {
-    personalTitaniteToday = Number(dungeonStatus.todayTitanite) || 0;
-  }
+  const personalTitaniteToday = resolvePersonalTitaniteToday(cache, now);
 
   // 9. Frontier Progression
   const frontierProgress = cache?.eternalStoryDailyProgress?.data;
@@ -364,7 +482,9 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
 
   // 10. Energy Consumption Calculations
   // Only host/organized rallies consume World Energy (joining rallies costs 0 World Energy)
-  const campaignEnergySpent = campaignCount * CAMPAIGN_ENERGY_COST;
+  const campaignEnergySpent = campaignEnergySpentFromCache > 0
+    ? campaignEnergySpentFromCache
+    : campaignCount * CAMPAIGN_ENERGY_COST;
   const worldEnergySpent =
     organizedRalliesCount * RALLY_ENERGY_COST +
     monstersCount * MONSTER_ENERGY_COST +
@@ -430,7 +550,13 @@ export function getActivityStatsForDay(
     const frontierStages = Math.max(liveToday.frontierStagesToday, existing.frontierStagesToday || 0);
     const frontierCoins = Math.max(liveToday.frontierCoinsToday, existing.frontierCoinsToday || 0);
 
-    const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
+    const campaignEnergy = Math.max(
+      liveToday.campaignEnergySpent,
+      existing.campaignEnergySpent || 0,
+      campaign > 0 && liveToday.campaignEnergySpent === 0 && !(existing.campaignEnergySpent > 0)
+        ? campaign * CAMPAIGN_ENERGY_COST
+        : 0
+    );
     // Only host/organized rallies consume World Energy
     const worldEnergy =
       orgRallies * RALLY_ENERGY_COST +
@@ -470,20 +596,8 @@ export function getActivityStatsForDay(
   const monsterReports = Number(reportTypes.soloMobAttackResult || reportTypes.mobAttackResult || reportTypes.mobSoloAttackResult || 0);
   const campReports = Number(reportTypes.campBattleResult || reportTypes.brigandCampResult || reportTypes.winCampBattle || 0);
 
-  // Campaign receipts for that specific past date
-  let campaignCountFromReceipts = 0;
-  const campaignReceipts = Array.isArray(cache?.campaignRaidReceipts?.data)
-    ? cache.campaignRaidReceipts.data
-    : [];
-  for (const r of campaignReceipts) {
-    if (!r) continue;
-    const timeVal = r.at || r.timestamp || r.updatedAt;
-    if (!timeVal) continue;
-    const dStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
-    if (dStr === dateStr) {
-      campaignCountFromReceipts += Number(r.times) || 1;
-    }
-  }
+  // Campaign summary / receipts for that specific past date
+  const pastCampaignTotals = resolveCampaignDayTotals(cache, dateStr, false);
 
   let pastCreatedCount = 0;
   const createdHistory = Array.isArray(cache?.createdRalliesHistory?.data)
@@ -498,7 +612,7 @@ export function getActivityStatsForDay(
     }
   }
 
-  const campaign = Math.max(history?.campaignCount || 0, campaignCountFromReceipts);
+  const campaign = Math.max(history?.campaignCount || 0, pastCampaignTotals.count);
   const orgRallies = Math.max(history?.organizedRalliesCount || 0, pastCreatedCount);
   const extAuto = history?.extAutoJoinCount || 0;
   let gameAuto = history?.gameAutoJoinCount || 0;
@@ -527,7 +641,13 @@ export function getActivityStatsForDay(
   const frontierStages = history?.frontierStagesToday || 0;
   const frontierCoins = history?.frontierCoinsToday || 0;
 
-  const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
+  const campaignEnergy = Math.max(
+    history?.campaignEnergySpent || 0,
+    pastCampaignTotals.energy,
+    campaign > 0 && !(history?.campaignEnergySpent > 0) && pastCampaignTotals.energy === 0
+      ? campaign * CAMPAIGN_ENERGY_COST
+      : 0
+  );
   // Only host/organized rallies consume World Energy
   const worldEnergy =
     orgRallies * RALLY_ENERGY_COST +

@@ -1396,12 +1396,14 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 if (!casualties.includes(numId)) casualties.push(numId);
               }
             }
-            // Extract personal titanite progress if returned in quests
+            // Extract personal titanite progress if returned in quests (take max across 75/150/300+ quests)
             let todayTitanite = null;
             if (Array.isArray(rep.quests)) {
-              const tq = rep.quests.find((q) => [10031, 10032, 10108].includes(Number(q.id)));
-              if (tq && Number.isFinite(Number(tq.progress))) {
-                todayTitanite = Number(tq.progress);
+              for (const q of rep.quests) {
+                if ([10031, 10032, 10108].includes(Number(q?.id)) && Number.isFinite(Number(q?.progress))) {
+                  const val = Number(q.progress);
+                  todayTitanite = todayTitanite == null ? val : Math.max(todayTitanite, val);
+                }
               }
             }
             actions.push({
@@ -1747,6 +1749,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 data: {
                   missionId: call.args?.id,
                   times,
+                  energySpent: Math.abs(delta),
                   drops,
                   currentDrops: drops,
                   raw: resp,
@@ -2982,6 +2985,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           delete next.freeAlchemySpinReceipts;
           delete next.cinemaGiveRewardStatus;
           delete next.cinemaGiveRewardReceipts;
+          delete next.campaignDailySummary;
+          delete next.lastCampaignRaidResult;
           delete next.cinemaGetCounters;
           delete next.attentionBonusStatus;
           delete next.attentionBonusCollectStatus;
@@ -5775,10 +5780,17 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             };
           }
 
-          // Daily combat log tracking
-          const todayDate = entry.updatedAt ? new Date(entry.updatedAt).toDateString() : new Date().toDateString();
+          // Daily combat log tracking (UTC YYYY-MM-DD to align with activityStats & game reset)
+          const todayDate = entry.updatedAt
+            ? new Date(entry.updatedAt).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+          const prevLogDate = previous.dailyCombatLog?.date
+            ? (/^\d{4}-\d{2}-\d{2}$/.test(String(previous.dailyCombatLog.date))
+                ? String(previous.dailyCombatLog.date)
+                : new Date(previous.dailyCombatLog.date).toISOString().slice(0, 10))
+            : '';
           let dailyCombatLog;
-          if (isNewDay || !previous.dailyCombatLog || previous.dailyCombatLog.date !== todayDate) {
+          if (isNewDay || !previous.dailyCombatLog || prevLogDate !== todayDate) {
             dailyCombatLog = {
               date: todayDate,
               todayTitanite: entry.data.todayTitanite ?? 0,
@@ -5789,7 +5801,11 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           } else {
             dailyCombatLog = {
               ...previous.dailyCombatLog,
-              todayTitanite: entry.data.todayTitanite ?? previous.dailyCombatLog.todayTitanite ?? 0,
+              date: todayDate,
+              todayTitanite: Math.max(
+                Number(entry.data.todayTitanite) || 0,
+                Number(previous.dailyCombatLog.todayTitanite) || 0
+              ),
               casualtyBattles: [...normalizeArrayData(previous.dailyCombatLog.casualtyBattles)]
             };
           }
@@ -5799,11 +5815,10 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           if (entry.method === 'dungeonEndBattle' && entry.data.lastBattleResult) {
             const res = entry.data.lastBattleResult;
             dailyCombatLog.totalBattles = (dailyCombatLog.totalBattles || 0) + 1;
-            if (entry.data.todayTitanite != null) {
-              dailyCombatLog.todayTitanite = entry.data.todayTitanite;
-            } else if (res.reward?.dungeonActivity != null) {
-              dailyCombatLog.todayTitanite = (dailyCombatLog.todayTitanite || 0) + Number(res.reward.dungeonActivity);
-            }
+            const gainedTitanite = res.reward?.dungeonActivity != null ? Number(res.reward.dungeonActivity) || 0 : 0;
+            const prevTitanite = Number(dailyCombatLog.todayTitanite) || 0;
+            const questTitanite = entry.data.todayTitanite != null ? Number(entry.data.todayTitanite) || 0 : 0;
+            dailyCombatLog.todayTitanite = Math.max(prevTitanite + gainedTitanite, questTitanite);
             const casualties = normalizeArrayData(res.casualties);
             if (casualties.length === 0 && res.win) {
               dailyCombatLog.flawlessCount = (dailyCombatLog.flawlessCount || 0) + 1;
@@ -6498,6 +6513,44 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             next.lastCampaignRaidResult = entry;
             changed = true;
             continue;
+          }
+
+          // Update compact daily campaign summary (< 1 KB, <= 7 UTC days, <= 30 dedup idents, no drops stored)
+          {
+            const raidTs = entry.updatedAt ? Date.parse(entry.updatedAt) : Date.now();
+            const utcDay = Number.isFinite(raidTs)
+              ? new Date(raidTs).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10);
+            const rawIdent = String(entry.data?.ident || `${entry.updatedAt || raidTs}:${entry.data?.missionId ?? ''}:${entry.data?.times ?? 1}`);
+            const prevSummary = next.campaignDailySummary?.data || {};
+            const recentIdents: string[] = Array.isArray(prevSummary.recentIdents) ? [...prevSummary.recentIdents] : [];
+            if (!recentIdents.includes(rawIdent)) {
+              const callTimes = Math.max(1, Number(entry.data?.times) || 1);
+              const callEnergy = Number.isFinite(Number(entry.data?.energySpent)) && Number(entry.data.energySpent) > 0
+                ? Number(entry.data.energySpent)
+                : callTimes * 6;
+              const days: Record<string, { count: number; energy: number }> = { ...(prevSummary.days || {}) };
+              const existingDay = days[utcDay] || { count: 0, energy: 0 };
+              days[utcDay] = {
+                count: (Number(existingDay.count) || 0) + callTimes,
+                energy: (Number(existingDay.energy) || 0) + callEnergy
+              };
+              const sortedDays = Object.keys(days).sort();
+              while (sortedDays.length > 7) {
+                const oldest = sortedDays.shift();
+                if (oldest) delete days[oldest];
+              }
+              recentIdents.push(rawIdent);
+              if (recentIdents.length > 30) recentIdents.splice(0, recentIdents.length - 30);
+              next.campaignDailySummary = {
+                key: 'campaignDailySummary',
+                method: entry.method,
+                feature: null,
+                group: 'internal',
+                data: { days, recentIdents },
+                updatedAt: entry.updatedAt
+              };
+            }
           }
 
           if (next.missionGetAll?.data && entry.data?.missionId) {

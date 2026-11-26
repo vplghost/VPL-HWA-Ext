@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getTodayActivityStats } from '../src/utils/activityStats.ts';
+import {
+  getTodayActivityStats,
+  getActivityStatsForDay,
+  resolvePersonalTitaniteToday,
+} from '../src/utils/activityStats.ts';
 
 const testNow = Date.parse('2026-11-18T10:00:00Z');
 
@@ -303,4 +307,81 @@ test('getTodayActivityStats attributes unassigned rally losses from summary to a
   // Summary had 2 losses during rallies with no leader loss specified -> assigned to autoJoinLosses
   assert.equal(stats.autoJoinLosses, 2);
   assert.equal(stats.rallyLosses, 0);
+});
+
+test('getTodayActivityStats & getActivityStatsForDay preserve actual campaign energy from campaignDailySummary', () => {
+  const cache = {
+    campaignDailySummary: {
+      updatedAt: '2026-11-18T09:30:00Z',
+      data: {
+        days: {
+          '2026-11-18': { count: 8, energy: 88 }, // 3x16 Heroic + 5x8 Normal = 88 (NOT 8*6 = 48)
+          '2026-11-17': { count: 5, energy: 60 }, // 5x12 Heroic = 60
+        },
+        recentIdents: ['m1', 'm2'],
+      },
+    },
+  };
+
+  const live = getTodayActivityStats(cache, testNow);
+  assert.equal(live.campaignCount, 8);
+  assert.equal(live.campaignEnergySpent, 88);
+  assert.equal(live.totalEnergySpent, 88);
+
+  // Merging with older stored history must preserve actual 88 energy (not overwrite with 8*6=48)
+  const mergedToday = getActivityStatsForDay(cache, '2026-11-18', {
+    '2026-11-18': { ...live, campaignCount: 6, campaignEnergySpent: 64, totalEnergySpent: 64 },
+  }, testNow);
+  assert.equal(mergedToday.campaignCount, 8);
+  assert.equal(mergedToday.campaignEnergySpent, 88);
+  assert.equal(mergedToday.totalEnergySpent, 88);
+
+  // Past day resolution also uses actual energy from summary
+  const pastDay = getActivityStatsForDay(cache, '2026-11-17', {}, testNow);
+  assert.equal(pastDay.campaignCount, 5);
+  assert.equal(pastDay.campaignEnergySpent, 60);
+});
+
+test('resolvePersonalTitaniteToday uses uncapped guildStatus & max across Titanite quests even when dungeonStatus.todayTitanite is 0', () => {
+  const cache = {
+    accountStatus: { data: { id: 100 } },
+    dungeonStatus: {
+      updatedAt: '2026-11-18T08:00:00Z',
+      data: {
+        todayTitanite: 0, // Initialized to 0 by dungeonGetInfo
+        dailyCombatLog: { date: '2026-11-18', todayTitanite: 0, totalBattles: 0 },
+      },
+    },
+    questGetAll: {
+      updatedAt: '2026-11-18T08:05:00Z',
+      data: [
+        { id: 10031, progress: 75 },  // Capped at 75
+        { id: 10032, progress: 150 }, // Capped at 150
+      ],
+    },
+    guildStatus: {
+      updatedAt: '2026-11-18T08:10:00Z',
+      data: {
+        accountId: '100',
+        members: {
+          100: { stats: { todayDungeonActivity: 245 } }, // Uncapped personal titanite
+        },
+      },
+    },
+  };
+
+  assert.equal(resolvePersonalTitaniteToday(cache, testNow), 245);
+  assert.equal(getTodayActivityStats(cache, testNow).personalTitaniteToday, 245);
+
+  // Without guildStatus, picks max across quests (150, not stuck at quest 10031's 75)
+  const noGuild = { ...cache, guildStatus: undefined };
+  assert.equal(resolvePersonalTitaniteToday(noGuild, testNow), 150);
+
+  // Yesterday's guildStatus/quests are ignored on a new UTC day
+  const staleCache = {
+    ...cache,
+    guildStatus: { ...cache.guildStatus, updatedAt: '2026-11-17T23:59:00Z' },
+    questGetAll: { ...cache.questGetAll, updatedAt: '2026-11-17T23:59:00Z' },
+  };
+  assert.equal(resolvePersonalTitaniteToday(staleCache, testNow), 0);
 });

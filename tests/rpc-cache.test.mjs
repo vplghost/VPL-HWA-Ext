@@ -146,6 +146,42 @@ test('MobNotFound on attackMob and createRally evicts dead mobId from solo and r
   assert.deepEqual(state.experimentalRallySearch.data.mobs.map((m) => m.mobId), ['alive-boss']);
 });
 
+test('missionRaid batch accumulates compact campaignDailySummary with actual energy and dedupes by ident', () => {
+  // Batch of 3 separate missionRaid calls (extension multi-raid on a 16-energy Heroic mission)
+  const batch1 = record(
+    [
+      { name: 'missionRaid', ident: 'mraid_0_1', args: { id: 135, times: 1 } },
+      { name: 'missionRaid', ident: 'mraid_1_1', args: { id: 135, times: 1 } },
+      { name: 'missionRaid', ident: 'mraid_2_1', args: { id: 135, times: 1 } },
+    ],
+    [
+      { ident: 'mraid_0_1', result: { response: { 0: { experience: 16, gold: 100 } } } },
+      { ident: 'mraid_1_1', result: { response: { 0: { experience: 16, gold: 100 } } } },
+      { ident: 'mraid_2_1', result: { response: { 0: { experience: 16, gold: 100 } } } },
+    ],
+    '2026-11-26T10:00:00.000Z'
+  );
+  // Second raid on a different 8-energy normal mission (x5)
+  const batch2 = record(
+    [{ name: 'missionRaid', ident: 'mraid_other_1', args: { id: 101, times: 5 } }],
+    [{ ident: 'mraid_other_1', result: { response: {
+      0: { experience: 8 }, 1: { experience: 8 }, 2: { experience: 8 }, 3: { experience: 8 }, 4: { experience: 8 }
+    } } }],
+    '2026-11-26T10:05:00.000Z'
+  );
+  let state = cache.merge({}, [batch1]).cache;
+  // Replay batch1 -> must not double count
+  state = cache.merge(state, [batch1]).cache;
+  // Merge batch2 -> must accumulate across missions
+  state = cache.merge(state, [batch2]).cache;
+
+  const day = state.campaignDailySummary?.data?.days?.['2026-11-26'];
+  assert.equal(day?.count, 8);        // 3 + 5
+  assert.equal(day?.energy, 88);      // 3*16 (48) + 5*8 (40) = 88
+  assert.equal(state.campaignRaidReceipts, undefined); // No fat receipt array stored
+  assert.ok((state.campaignDailySummary.data.recentIdents?.length || 0) <= 30);
+});
+
 test('world map chunk supplies map ID and experimental actions record RPC errors', () => {
   const chunk = record([{ name: 'getChunks', feature: 'globalMap', ident: 'map',
     args: { mapId: 'map-1' } }], [{ ident: 'map', result: {
