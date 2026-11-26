@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.340 — 2026-11-26
+
+### Added
+
+- **One-Click "Move to First" (`⤒`) Button Across All Reorderable Lists (`listReorder.ts`, `backgroundRuntime.ts`, `BuildingModal.vue`, `ResearchModal.vue`, `DungeonModal.vue`, `TowerModal.vue`, `SettingsTab.vue`, `tests/list-reorder.test.mjs`)**:
+  - Added pure helpers `moveItemToFirst()` and `computeQueueMoveTarget()` in `src/utils/listReorder.ts` and extended `backgroundRuntime.ts` queue `move` handling to support `direction: 'first'`.
+  - Added a compact `⤒` (`Move to first`) button disabled at index `0` to Building Queue, Research Queue, Titan Dungeon Pool Priority, Tower Buff Priority, and Settings Tab Order lists.
+
 ## 0.11.338 — 2026-11-26
 
 ### Fixed

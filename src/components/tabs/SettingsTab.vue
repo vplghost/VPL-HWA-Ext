@@ -569,7 +569,14 @@ async function saveTabs() {
   }
 }
 
-function moveTab(index: number, direction: 'up' | 'down') {
+function moveTab(index: number, direction: 'up' | 'down' | 'first') {
+  if (direction === 'first') {
+    if (index <= 0 || index >= tabSettings.value.length) return;
+    const item = tabSettings.value.splice(index, 1)[0];
+    if (item) tabSettings.value.unshift(item);
+    saveTabs();
+    return;
+  }
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
   if (targetIndex < 0 || targetIndex >= tabSettings.value.length) return;
   const item = tabSettings.value.splice(index, 1)[0];
@@ -739,6 +746,17 @@ async function toggleRecording() {
           </label>
 
           <div class="flex items-center gap-1">
+            <button
+              :id="`settings-tab-move-first-${idx}`"
+              type="button"
+              class="cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              :disabled="idx === 0"
+              title="Move to first"
+              aria-label="Move to first"
+              @click="moveTab(idx, 'first')"
+            >
+              ⤒
+            </button>
             <button
               type="button"
               class="cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"

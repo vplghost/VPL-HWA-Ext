@@ -13,6 +13,7 @@ import { getTitanMetadata } from '@/src/utils/metadata';
 import { getTitanRole, titanMetadata } from '@/src/data/titanMetadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
+import { moveItemToFirst } from '@/src/utils/listReorder';
 import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { executeDungeonAutomationStep } from '@/src/services/queues/dungeonAutomationRunner';
@@ -384,6 +385,21 @@ function movePoolTitan(titanId: number, delta: -1 | 1) {
     orderedPools: {
       ...(autoSettings.value.orderedPools || {}),
       [elemKey]: list,
+    },
+  };
+  void saveDungeonAutoSettings();
+}
+
+function movePoolTitanFirst(titanId: number) {
+  const elemKey = activePoolTab.value;
+  const list = getOrderedPoolIds(elemKey);
+  const idx = list.indexOf(titanId);
+  if (idx <= 0) return;
+  autoSettings.value = {
+    ...autoSettings.value,
+    orderedPools: {
+      ...(autoSettings.value.orderedPools || {}),
+      [elemKey]: moveItemToFirst(list, idx),
     },
   };
   void saveDungeonAutoSettings();
@@ -838,6 +854,17 @@ function handleImgError(e: Event) {
                   </div>
 
                   <div class="flex items-center gap-0.5 shrink-0">
+                    <button
+                      :id="`dungeon-pool-move-first-${pt.id}`"
+                      type="button"
+                      :disabled="isAutomating || pIdx === 0"
+                      class="cursor-pointer px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-[10px] font-bold"
+                      title="Move to first"
+                      aria-label="Move to first"
+                      @click="movePoolTitanFirst(pt.id)"
+                    >
+                      ⤒
+                    </button>
                     <button
                       :id="`dungeon-pool-move-up-${pt.id}`"
                       type="button"

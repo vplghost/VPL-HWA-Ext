@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { moveItemToFirst, computeQueueMoveTarget } from '../src/utils/listReorder.ts';
+
+const root = resolve(process.cwd());
+
+test('moveItemToFirst moves target element to index 0 immutably and handles edge bounds safely', () => {
+  const input = ['a', 'b', 'c', 'd'];
+  assert.deepEqual(moveItemToFirst(input, 2), ['c', 'a', 'b', 'd']);
+  assert.deepEqual(input, ['a', 'b', 'c', 'd'], 'Must not mutate original array');
+  assert.deepEqual(moveItemToFirst(input, 3), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(moveItemToFirst(input, 0), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(moveItemToFirst(input, -1), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(moveItemToFirst(input, 99), ['a', 'b', 'c', 'd']);
+});
+
+test('computeQueueMoveTarget supports up, down, and first directions accurately', () => {
+  assert.equal(computeQueueMoveTarget(3, 5, 'first'), 0);
+  assert.equal(computeQueueMoveTarget(0, 5, 'first'), 0);
+  assert.equal(computeQueueMoveTarget(3, 5, 'up'), 2);
+  assert.equal(computeQueueMoveTarget(0, 5, 'up'), 0);
+  assert.equal(computeQueueMoveTarget(3, 5, 'down'), 4);
+  assert.equal(computeQueueMoveTarget(4, 4, 'down'), 4);
+});
+
+test('All 5 reorderable Vue lists expose Move to first buttons and backgroundRuntime supports direction=first', async () => {
+  const checks = [
+    ['src/components/dialogs/BuildingModal.vue', 'building-queue-move-first-'],
+    ['src/components/dialogs/ResearchModal.vue', 'research-queue-move-first-'],
+    ['src/components/dialogs/DungeonModal.vue', 'dungeon-pool-move-first-'],
+    ['src/components/dialogs/TowerModal.vue', 'tower-buff-move-first-'],
+    ['src/components/tabs/SettingsTab.vue', 'settings-tab-move-first-'],
+  ];
+
+  for (const [relPath, idPrefix] of checks) {
+    const src = await readFile(resolve(root, relPath), 'utf8');
+    assert.ok(src.includes(idPrefix), `${relPath} must render #${idPrefix}* button`);
+    assert.ok(src.includes('title="Move to first"'), `${relPath} must have English Move to first tooltip`);
+  }
+
+  const bgSrc = await readFile(resolve(root, 'src/background/backgroundRuntime.ts'), 'utf8');
+  assert.ok(bgSrc.includes('computeQueueMoveTarget'), 'backgroundRuntime must use computeQueueMoveTarget for queue move actions');
+});

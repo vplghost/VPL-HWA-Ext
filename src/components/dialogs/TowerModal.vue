@@ -194,9 +194,16 @@ function onDrop(targetId: number) {
   draggedBuffId = null;
 }
 
-function moveBuff(id: number, direction: 'prev' | 'next') {
+function moveBuff(id: number, direction: 'prev' | 'next' | 'first') {
   const idx = buffOrder.value.indexOf(id);
   if (idx === -1) return;
+  if (direction === 'first') {
+    if (idx === 0) return;
+    buffOrder.value.splice(idx, 1);
+    buffOrder.value.unshift(id);
+    saveTowerSettings();
+    return;
+  }
   const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
   if (targetIdx < 0 || targetIdx >= buffOrder.value.length) return;
   buffOrder.value.splice(idx, 1);
@@ -728,6 +735,17 @@ watch(() => props.modelValue, (open) => {
 
             <!-- Move buttons -->
             <div class="flex items-center ml-1 border-l border-current/20 pl-1 gap-0.5">
+              <button
+                :id="`tower-buff-move-first-${id}`"
+                type="button"
+                :disabled="idx === 0"
+                class="hover:opacity-100 opacity-60 text-[9px] px-0.5 cursor-pointer disabled:opacity-20"
+                title="Move to first"
+                aria-label="Move to first"
+                @click.stop="moveBuff(id, 'first')"
+              >
+                ⤒
+              </button>
               <button
                 type="button"
                 :disabled="idx === 0"

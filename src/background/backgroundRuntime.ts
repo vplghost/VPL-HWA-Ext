@@ -8,6 +8,7 @@
 import { rpcCacheService } from '../core/cache/index.ts';
 import { buildingQueueService } from '../services/queues/buildingQueue.ts';
 import researchQueueService from '../services/queues/researchQueue.ts';
+import { computeQueueMoveTarget } from '../utils/listReorder.ts';
 import { raidQueueService } from '../services/queues/raidQueue.ts';
 import { monsterQueueService } from '../services/queues/monsterQueue.ts';
 import { raidEnergyAutoService } from '../services/queues/raidEnergyAuto.ts';
@@ -1223,7 +1224,7 @@ export async function runCityQueueMutation(type: string, message: any, customChr
       if (index < 0) throw new Error('Queue changed before this action. Refresh and try again.');
       const item = queue.items.splice(index, 1)[0];
       if (action === 'move') {
-        const target = Math.max(0, Math.min(queue.items.length, index + (message.direction === 'up' ? -1 : 1)));
+        const target = computeQueueMoveTarget(index, queue.items.length, message.direction);
         queue.items.splice(target, 0, item);
       }
     } else if (action === 'clear') queue.items = [];

@@ -254,7 +254,7 @@ const queueTimeline = computed(() => {
   };
 });
 
-function moveQueueItem(idx: number, direction: 'up' | 'down') {
+function moveQueueItem(idx: number, direction: 'up' | 'down' | 'first') {
   const item = researchQueue.value.items[idx];
   if (item) void commandQueue('move', { item: { ...item }, direction });
 }
@@ -897,6 +897,22 @@ async function refreshResearch() {
                 </div>
 
                 <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    :id="`research-queue-move-first-${idx}`"
+                    type="button"
+                    title="Move to first"
+                    aria-label="Move to first"
+                    :disabled="idx === 0"
+                    class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
+                    :class="
+                      idx === 0
+                        ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                        : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
+                    "
+                    @click="moveQueueItem(Number(idx), 'first')"
+                  >
+                    ⤒
+                  </button>
                   <button
                     type="button"
                     title="Move up"
