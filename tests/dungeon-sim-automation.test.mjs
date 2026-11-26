@@ -283,7 +283,19 @@ describe('Dungeon Simulator & Automation Engine', () => {
           defenders: {},
           endArgs: {
             result: { win: true, stars: 3 },
-            progress: [{ duration: 12.5 }]
+            progress: [{
+              duration: 12.5,
+              seed,
+              attackers: {
+                heroes: {
+                  '4000': { hp: 1000000, energy: 500, isDead: false },
+                  '4001': { hp: 1000000, energy: 500, isDead: false },
+                  '4052': { hp: 1000000, energy: 500, isDead: false },
+                  '4004': { hp: 1000000, energy: 500, isDead: false },
+                  '4002': { hp: 1000000, energy: 500, isDead: false },
+                },
+              },
+            }],
           }
         })
       };
@@ -603,7 +615,20 @@ describe('Dungeon Simulator & Automation Engine', () => {
               '4004': { hp: 760000, maxHp: 1000000, energy: 600, isDead: false, hpDelta: -40000 },
             },
             defenders: {},
-            endArgs: { doorMarker: 0, seed },
+            endArgs: {
+              doorMarker: 0,
+              result: { win: true, stars: 2 },
+              progress: [{
+                seed,
+                attackers: {
+                  heroes: {
+                    '4001': { hp: 700000, energy: 600, isDead: false },
+                    '4002': { hp: 750000, energy: 600, isDead: false },
+                    '4004': { hp: 760000, energy: 600, isDead: false },
+                  },
+                },
+              }],
+            },
           };
         }
         // Door 1 (Fire): wins with 2 casualties (worse than Door 0)
@@ -619,7 +644,19 @@ describe('Dungeon Simulator & Automation Engine', () => {
             '4013': { hp: 600000, maxHp: 1000000, energy: 400, isDead: false, hpDelta: -200000 },
           },
           defenders: {},
-          endArgs: { doorMarker: 1, seed },
+          endArgs: {
+            doorMarker: 1,
+            result: { win: true, stars: 1 },
+            progress: [{
+              seed,
+              attackers: {
+                heroes: {
+                  '4012': { hp: 500000, energy: 400, isDead: false },
+                  '4013': { hp: 600000, energy: 400, isDead: false },
+                },
+              },
+            }],
+          },
         };
       };
 
@@ -702,6 +739,76 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.equal(step.stopped, true);
       assert.match(step.stopReason || '', /No winnable door found/);
       assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), false);
+    });
+
+    it('P1-14: blocks dungeonEndBattle and retreats cleanly if endArgs.progress[0].attackers.heroes is empty (prevents full-team wipe)', async () => {
+      const dispatchedCalls = [];
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 910,
+              respawnFloor: 906,
+              currentFloorDoors: [{ attackerType: 'water', power: 300000 }],
+              states: {
+                titans: {
+                  '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4052': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        dispatchedCalls.push(...calls);
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 55555 } } }] };
+        }
+        return { results: [{ result: { response: {} } }] };
+      };
+
+      // Corrupted simulator output: claims win:true & 3 stars, but progress[0].attackers.heroes is EMPTY {}
+      // (which the server would interpret as all 5 titans dead = full team wipe!)
+      const simulateFn = async (_raw, seed) => ({
+        win: true,
+        stars: 3,
+        duration: 15,
+        seed,
+        attackers: {
+          '4000': { hp: 1000000, maxHp: 1000000, energy: 500, isDead: false, hpDelta: 0 },
+          '4001': { hp: 1000000, maxHp: 1000000, energy: 500, isDead: false, hpDelta: 0 },
+          '4052': { hp: 1000000, maxHp: 1000000, energy: 500, isDead: false, hpDelta: 0 },
+          '4004': { hp: 1000000, maxHp: 1000000, energy: 500, isDead: false, hpDelta: 0 },
+          '4002': { hp: 1000000, maxHp: 1000000, energy: 500, isDead: false, hpDelta: 0 },
+        },
+        defenders: {},
+        endArgs: {
+          result: { win: true, stars: 3 },
+          progress: [{ seed, attackers: { heroes: {} }, defenders: { heroes: {} } }],
+        },
+      });
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        simulateFn,
+        safetyThresholdPct: 20,
+        singleDoorBestOf10: false,
+      });
+
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason || '', /0 surviving titans|wipe/i);
+      assert.equal(
+        dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'),
+        false,
+        'CRITICAL: dungeonEndBattle MUST NEVER be sent when progress[0].attackers.heroes is empty'
+      );
+      assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonGetInfo'), true);
     });
   });
 

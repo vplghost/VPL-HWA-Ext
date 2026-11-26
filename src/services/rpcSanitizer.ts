@@ -107,10 +107,80 @@ export interface OutgoingRpcValidationResult {
   error?: string;
 }
 
+export interface DungeonEndBattleValidationOptions {
+  expectedTeamIds?: number[];
+  expectedSeed?: number | null;
+  requireAllAlive?: boolean;
+}
+
 /**
- * Outgoing safety gate for multi-team RPC calls (`customArena_startBattle` with
- * `type: 'GrandArena'`, and `battle_teamSet` on `MULTI_TEAM_KEYS`) so extension
- * code can never dispatch a flat 1D array or corrupted team matrix to the server.
+ * Hard safety guard for outgoing `dungeonEndBattle` payloads.
+ * Per Hero Wars Alliance server convention, any deployed titan omitted from
+ * `progress[0].attackers.heroes` is recorded as DEAD (`hp: 0, isDead: true`).
+ * Blocks full-team-wipe payloads (`win: true` with 0 surviving titans),
+ * missing/malformed progress, undeclared casualties on 3-star runs, and seed mismatches.
+ */
+export function validateDungeonEndBattleArgs(
+  endArgs: any,
+  options: DungeonEndBattleValidationOptions = {}
+): OutgoingRpcValidationResult {
+  if (!endArgs || typeof endArgs !== 'object') {
+    return { ok: false, error: 'Blocked outgoing dungeonEndBattle: missing endArgs payload.' };
+  }
+  const progress = endArgs.progress;
+  if (!Array.isArray(progress) || progress.length === 0 || !progress[0] || typeof progress[0] !== 'object') {
+    return { ok: false, error: 'Blocked outgoing dungeonEndBattle: missing progress[0] battle state.' };
+  }
+  const heroes = progress[0]?.attackers?.heroes;
+  if (!heroes || typeof heroes !== 'object' || Array.isArray(heroes)) {
+    return {
+      ok: false,
+      error: 'Blocked outgoing dungeonEndBattle: progress[0].attackers.heroes is missing (server would wipe all titans).',
+    };
+  }
+
+  const aliveIds = new Set<number>();
+  for (const [idStr, h] of Object.entries(heroes) as Array<[string, any]>) {
+    if (h && typeof h === 'object' && h.isDead !== true && Number(h.hp) > 0) {
+      const id = Number(idStr);
+      if (Number.isInteger(id) && id > 0) aliveIds.add(id);
+    }
+  }
+
+  if (endArgs.result?.win === true && aliveIds.size === 0) {
+    return {
+      ok: false,
+      error: 'Blocked outgoing dungeonEndBattle: win=true with 0 surviving titans in progress[0].attackers.heroes (would wipe entire team).',
+    };
+  }
+
+  if (options.requireAllAlive && Array.isArray(options.expectedTeamIds) && options.expectedTeamIds.length > 0) {
+    const missingOrDead = options.expectedTeamIds.filter((id) => !aliveIds.has(Number(id)));
+    if (missingOrDead.length > 0) {
+      return {
+        ok: false,
+        error: `Blocked outgoing dungeonEndBattle: titan(s) [${missingOrDead.join(', ')}] missing or dead in progress[0].attackers.heroes despite requireAllAlive.`,
+      };
+    }
+  }
+
+  if (options.expectedSeed != null && Number.isFinite(Number(options.expectedSeed))) {
+    const payloadSeed = progress[0]?.seed;
+    if (payloadSeed != null && Number(payloadSeed) !== Number(options.expectedSeed)) {
+      return {
+        ok: false,
+        error: `Blocked outgoing dungeonEndBattle: seed mismatch (payload=${payloadSeed}, active=${options.expectedSeed}).`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Outgoing safety gate for multi-team & critical RPC calls (`customArena_startBattle` with
+ * `type: 'GrandArena'`, `battle_teamSet` on `MULTI_TEAM_KEYS`, `heroChest_openChest`,
+ * `rune_upgradeHeroRune`, and `dungeonEndBattle`).
  */
 export function validateOutgoingMultiTeamRpcCalls(calls: any[]): OutgoingRpcValidationResult {
   if (!Array.isArray(calls)) return { ok: true };
@@ -186,6 +256,11 @@ export function validateOutgoingMultiTeamRpcCalls(calls: any[]): OutgoingRpcVali
           error: 'Blocked outgoing rune_upgradeHeroRune: alternatePrice must be explicitly false (Rune Stones only) to prevent accidental Emerald spend.',
         };
       }
+    }
+
+    if (name === 'dungeonEndBattle') {
+      const check = validateDungeonEndBattleArgs(args);
+      if (!check.ok) return check;
     }
   }
   return { ok: true };

@@ -1633,21 +1633,49 @@ export function installInterceptor(customWindow?: any): void {
         }
 
         // Map attackers and defenders state from progress
+        // CRITICAL SAFETY: If Unity failed to serialize progress.attackers.heroes, throw immediately
+        // instead of falling back to pre-battle HP (server treats omitted titans as dead -> team wipe).
+        if (
+          !parsedProgress ||
+          typeof parsedProgress !== 'object' ||
+          !parsedProgress.attackers ||
+          typeof parsedProgress.attackers.heroes !== 'object' ||
+          Array.isArray(parsedProgress.attackers.heroes)
+        ) {
+          throw new Error('Unity simulation returned missing or malformed battle progress (attackers.heroes unavailable)');
+        }
+
         const attackersOut: Record<string, any> = {};
         const rawAttackers = rawBattle?.attackers || {};
-        const progAttackers = parsedProgress?.attackers?.heroes || {};
+        const progAttackers = parsedProgress.attackers.heroes;
 
         for (const [idStr, rawAttacker] of Object.entries(rawAttackers) as any) {
-          const progHero = progAttackers[idStr] || {};
           const maxHp = Number(rawAttacker.hp || rawAttacker.maxHp || 1000000);
-          const finalHp = Number(progHero.hp != null ? progHero.hp : (rawAttacker.state?.hp != null ? rawAttacker.state.hp : maxHp));
           const initHp = Number(rawAttacker.state?.hp != null ? rawAttacker.state.hp : maxHp);
-          const hpDelta = finalHp - initHp;
+          const hasProgEntry = Object.prototype.hasOwnProperty.call(progAttackers, idStr);
+
+          if (!hasProgEntry) {
+            // Per Hero Wars Alliance server convention, any deployed titan omitted from
+            // progress[0].attackers.heroes is DEAD (hp: 0, isDead: true). Never fall back to initHp!
+            attackersOut[idStr] = {
+              hp: 0,
+              maxHp,
+              energy: 0,
+              isDead: true,
+              hpDelta: -initHp,
+            };
+            continue;
+          }
+
+          const progHero = progAttackers[idStr] || {};
+          const finalHp = Math.max(0, Number(progHero.hp != null ? progHero.hp : 0));
+          const isDead = Boolean(progHero.isDead === true || finalHp <= 0);
+          const hpDelta = (isDead ? 0 : finalHp) - initHp;
           attackersOut[idStr] = {
-            hp: finalHp,
+            hp: isDead ? 0 : finalHp,
             maxHp,
-            energy: Number(progHero.energy || rawAttacker.state?.energy || 0),
-            isDead: Boolean(progHero.isDead || finalHp <= 0),
+            energy: isDead ? 0 : Number(progHero.energy ?? rawAttacker.state?.energy ?? 0),
+            isDead,
             hpDelta
           };
         }

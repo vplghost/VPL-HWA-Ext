@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.342 — 2026-11-26
+
+### Fixed
+
+- **Critical Titan Dungeon Full-Team Wipe Guard on `dungeonEndBattle` (`interceptor.ts`, `rpcSanitizer.ts`, `dungeonAutomationRunner.ts`, `DungeonSimModal.vue`, `tests/rpc-sanitizer.test.mjs`, `tests/dungeon-sim-automation.test.mjs`)**:
+  - Fixed `interceptor.ts` `EXTRACT_BATTLE_RESULT` to throw immediately when Unity `parsedProgress.attackers.heroes` is missing/malformed and to map any omitted deployed titan as DEAD (`hp: 0, isDead: true`) instead of silently falling back to pre-battle HP.
+  - Added hard outgoing guard `validateDungeonEndBattleArgs()` in `rpcSanitizer.ts` (wired into `validateOutgoingMultiTeamRpcCalls()`, `dungeonAutomationRunner.ts`, and `DungeonSimModal.vue`) that blocks any `dungeonEndBattle` with empty/missing `progress[0].attackers.heroes`, `win: true` with 0 surviving titans, missing titans on `requireAllAlive` runs, or mismatched seeds — forcing a clean retreat without submitting `dungeonEndBattle`.
+  - Fixed Force-Majeure Door 0 re-sync to simulate strictly on the fresh `dungeonStartBattle` server seed (real manual-retreat buffer) rather than reusing a stale seed.
+
 ## 0.11.340 — 2026-11-26
 
 ### Added

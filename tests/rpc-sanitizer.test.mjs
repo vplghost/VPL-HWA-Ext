@@ -5,6 +5,7 @@ import {
   hasTeamGetAllRequest,
   sanitizeTeamGetAllRpcPayload,
   validateOutgoingMultiTeamRpcCalls,
+  validateDungeonEndBattleArgs,
 } from '../src/services/rpcSanitizer.ts';
 import { createControlPayload } from '../src/content/bridge.ts';
 
@@ -196,4 +197,34 @@ test('validateOutgoingMultiTeamRpcCalls blocks flat 1D arrays on GrandArena and 
     ]).ok,
     false
   );
+
+  // P1-14: Hard wipe guard for dungeonEndBattle
+  const validDungeonEnd = {
+    result: { win: true, stars: 3 },
+    progress: [{
+      seed: 1835711033,
+      attackers: {
+        heroes: {
+          '4000': { isDead: false, hp: 2793026, energy: 415 },
+          '4001': { isDead: false, hp: 1415240, energy: 700 },
+        },
+      },
+    }],
+  };
+  assert.equal(validateDungeonEndBattleArgs(validDungeonEnd, { expectedTeamIds: [4000, 4001], expectedSeed: 1835711033, requireAllAlive: true }).ok, true);
+  assert.equal(validateOutgoingMultiTeamRpcCalls([{ name: 'dungeonEndBattle', args: validDungeonEnd }]).ok, true);
+
+  // Blocked: win=true with empty attackers.heroes (full team wipe on server!)
+  const wipePayload = {
+    result: { win: true, stars: 3 },
+    progress: [{ seed: 123, attackers: { heroes: {} } }],
+  };
+  assert.equal(validateDungeonEndBattleArgs(wipePayload).ok, false);
+  assert.equal(validateOutgoingMultiTeamRpcCalls([{ name: 'dungeonEndBattle', args: wipePayload }]).ok, false);
+
+  // Blocked: requireAllAlive with an omitted titan
+  assert.equal(validateDungeonEndBattleArgs(validDungeonEnd, { expectedTeamIds: [4000, 4001, 4002], requireAllAlive: true }).ok, false);
+
+  // Blocked: seed mismatch
+  assert.equal(validateDungeonEndBattleArgs(validDungeonEnd, { expectedSeed: 999999 }).ok, false);
 });

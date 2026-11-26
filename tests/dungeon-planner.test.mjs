@@ -198,7 +198,21 @@ test('executeDungeonAutomationStep runs Best-of-10 on single-door <=5 earth room
         '4024': { hp: 380000, maxHp: 400000, energy: 600, isDead: false, hpDelta: -20000 },
       },
       defenders: {},
-      endArgs: { result: { win: true, stars: 3 }, progress: [{ seed }] },
+      endArgs: {
+        result: { win: true, stars: 3 },
+        progress: [{
+          seed,
+          attackers: {
+            heroes: {
+              '4020': { hp: 850000, energy: 700, isDead: false },
+              '4021': { hp: 680000, energy: 600, isDead: false },
+              '4022': { hp: 780000, energy: 600, isDead: false },
+              '4023': { hp: 790000, energy: 600, isDead: false },
+              '4024': { hp: 380000, energy: 600, isDead: false },
+            },
+          },
+        }],
+      },
     };
   };
 

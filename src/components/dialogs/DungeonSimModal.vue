@@ -28,6 +28,7 @@ import {
   type DungeonAutoSettings,
   type DungeonClearedRoomEntry,
 } from '@/src/services/dungeonPlanner';
+import { validateDungeonEndBattleArgs } from '@/src/services/rpcSanitizer';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -509,6 +510,15 @@ async function handleSubmitOfficial() {
   errorMessage.value = null;
 
   try {
+    // 0. Hard outgoing wipe guard before submitting dungeonEndBattle
+    const guard = validateDungeonEndBattleArgs(simResult.value.endArgs, {
+      expectedTeamIds: selectedTitanIds.value,
+      requireAllAlive: simResult.value.stars === 3,
+    });
+    if (!guard.ok) {
+      throw new Error(guard.error || 'Invalid dungeonEndBattle payload blocked to protect titans.');
+    }
+
     // 1. Submit dungeonEndBattle
     const endRpcRes = await dispatchRpc([{ name: 'dungeonEndBattle', args: simResult.value.endArgs }]);
     const firstEnd = endRpcRes?.results?.[0];

@@ -26,6 +26,7 @@ import {
   type DungeonOutcomeScore,
   type DungeonClearedRoomEntry,
 } from '../dungeonPlanner.ts';
+import { validateDungeonEndBattleArgs } from '../rpcSanitizer.ts';
 
 export interface DungeonAutomationOptions {
   cache: any;
@@ -73,6 +74,7 @@ interface DoorCandidateContext {
 
 interface SimulatedDoorCandidate {
   ctx: DoorCandidateContext;
+  startSeed: number;
   outcome: SimResultPayload;
   score: DungeonOutcomeScore;
   metrics: HpLossMetrics;
@@ -276,10 +278,11 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // Helper to start & simulate a single door candidate via Unity WASM
+  // Helper to start & simulate a single door candidate via Unity WASM.
+  // Calling dungeonStartBattle without submitting dungeonEndBattle acts as the real game's manual retreat buffer.
   const startAndSimulateDoor = async (
     ctx: DoorCandidateContext,
-    overrideSeed?: number
+    disableBestOfTen = false
   ): Promise<{ result?: SimulatedDoorCandidate; error?: string }> => {
     const startRes = await dispatchRpc([
       {
@@ -298,10 +301,10 @@ export async function executeDungeonAutomationStep(
       };
     }
 
-    const seed = overrideSeed ?? (Number(startPayload.seed) || Math.floor(Math.random() * 1000000000));
+    const seed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
     const frontlineId = ctx.squadPick.frontlineId ?? ctx.squadPick.squadIds[0] ?? 0;
     const useBestOfTen =
-      overrideSeed == null &&
+      !disableBestOfTen &&
       singleDoorBestOf10 &&
       (shouldUseBestOfTen(doors, ctx.squadPick.aliveEligibleIds) ||
         (forceMajeureEligible && ctx.squadPick.isPoolDepleted));
@@ -336,6 +339,7 @@ export async function executeDungeonAutomationStep(
     return {
       result: {
         ctx,
+        startSeed: seed,
         outcome,
         score,
         metrics,
@@ -414,9 +418,9 @@ export async function executeDungeonAutomationStep(
   }
 
   // Session sync guard: if force-majeure compared 2 doors and Door 0 beat Door 1,
-  // re-start Door 0 on server so `dungeonEndBattle` matches the active battle session!
+  // re-start Door 0 on server and simulate using the FRESH server seed (real manual-retreat buffer).
   if (chosen.ctx.doorIdx !== lastStartedDoorIdx) {
-    const resyncAttempt = await startAndSimulateDoor(chosen.ctx, chosen.outcome.seed);
+    const resyncAttempt = await startAndSimulateDoor(chosen.ctx, true);
     if (resyncAttempt.error || !resyncAttempt.result || !resyncAttempt.result.outcome.win) {
       if (cache?.value?.dungeonStatus?.data) {
         cache.value.dungeonStatus.data.activeBattle = null;
@@ -438,6 +442,26 @@ export async function executeDungeonAutomationStep(
   const bestOfTenReport = chosen.bestOfTenReport;
   const squadPick = chosen.ctx.squadPick;
   const doorElem = chosen.ctx.doorElement;
+
+  // Hard outgoing payload safety guard: NEVER dispatch dungeonEndBattle with empty/malformed
+  // progress[0].attackers.heroes or 0 surviving titans (server treats omitted titans as dead -> wipe).
+  const endArgsCheck = validateDungeonEndBattleArgs(outcome.endArgs, {
+    expectedTeamIds: bestDoor.teamIds,
+    expectedSeed: bestOfTenReport ? null : chosen.startSeed,
+    requireAllAlive: !acceptedViaForceMajeure,
+  });
+  if (!endArgsCheck.ok) {
+    if (cache?.value?.dungeonStatus?.data) {
+      cache.value.dungeonStatus.data.activeBattle = null;
+    }
+    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+    return {
+      stopped: true,
+      stopReason: `${endArgsCheck.error} Battle retreated without loss.`,
+      chosenEvaluation: bestDoor,
+      evaluations,
+    };
+  }
 
   // 3. Submit official battle outcome
   const endRes = await dispatchRpc([
