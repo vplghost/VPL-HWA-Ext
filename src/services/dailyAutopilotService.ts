@@ -324,6 +324,7 @@ export interface PlannedDailyStep {
   label: string;
   highRisk: boolean;
   shouldRun: boolean;
+  alreadyDone?: boolean;
   skipReason?: string;
 }
 
@@ -343,35 +344,47 @@ export function buildDailyExecutionPlan(
     const highRisk = HIGH_RISK_ACTIVITIES.has(id);
     const label = DAILY_STEP_LABELS[id];
 
-    if (settings.skippedSteps[id] === true) {
-      return { id, label, highRisk, shouldRun: false, skipReason: 'Skipped in settings' };
-    }
-    if (highRisk && settings.skipHighRiskByDefault && settings.skippedSteps[id] !== false) {
-      return { id, label, highRisk, shouldRun: false, skipReason: 'High-risk skipped by default' };
-    }
-
-    // Skip activities already verified done today
+    // Prioritize verified already-done state over settings skip so completed cards stay `done`
     if (id === 'tower' && towerActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, skipReason: 'Already cleared today' };
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'Already cleared today' };
     }
     if (id === 'arena' && arenaActivityState(c, false, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, skipReason: '0 battles left today' };
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 free tokens left today' };
     }
     if (id === 'grand-arena' && arenaActivityState(c, true, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, skipReason: '0 battles left today' };
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 free tokens left today' };
     }
     if (id === 'dungeon' && dungeonActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, skipReason: 'Completed today' };
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'Completed today' };
     }
     if (id === 'frontier' && frontierActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, skipReason: 'No chest ready' };
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'No chest ready' };
     }
     if (id === 'hydra') {
       const hydraEntry = c.clanBoss_getAll;
       const hydra = observedToday(hydraEntry, now, c.questResetStatus?.data?.nextDayAt) ? hydraEntry.data : null;
       if (hydra && Number(hydra.tries) === 0 && Number(hydra.superTries) === 0) {
-        return { id, label, highRisk, shouldRun: false, skipReason: '0 Hydra tries left today' };
+        return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 Hydra tries left today' };
       }
+    }
+
+    if (settings.skippedSteps[id] === true) {
+      return {
+        id,
+        label,
+        highRisk,
+        shouldRun: false,
+        skipReason: 'Skipped in settings (enable in Settings > Daily Autopilot or click Retry)',
+      };
+    }
+    if (highRisk && settings.skipHighRiskByDefault && settings.skippedSteps[id] !== false) {
+      return {
+        id,
+        label,
+        highRisk,
+        shouldRun: false,
+        skipReason: 'High-risk skipped by default (uncheck in Settings > Daily Autopilot or click Retry)',
+      };
     }
 
     return { id, label, highRisk, shouldRun: true };
@@ -657,53 +670,113 @@ export function formatShortTime(ms: number | undefined): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+export interface MergedActivityMetadata {
+  state: ExtendedActivityState;
+  skipReason?: string;
+  errorReason?: string;
+  statusTooltip: string;
+}
+
+function hasLiveCardDetail(detail: string | undefined): boolean {
+  if (!detail) return false;
+  const norm = detail.trim().toLowerCase();
+  return norm.length > 0 && norm !== 'waiting for game data';
+}
+
 /**
  * Overlays autopilot runtime status (`running`, `waiting`, `skipped`, `error`, `done`)
  * onto a base Daily Activity row for display in `ActivityGoals.vue`.
+ *
+ * Priority rules:
+ * 1. A card's verified `done` state ALWAYS takes precedence over autopilot `skipped` / `idle` / `pending`.
+ * 2. Live card progress (`Floor X / 50`, `Rank X · N/5 free`) is preserved on `running`, `skipped`, and `error`
+ *    while skip/error reasons are surfaced in `skipReason` / `errorReason` and `statusTooltip` for debugging.
  */
-export function mergeActivityWithAutopilotState<T extends { id: string; state: string; detail: string }>(
+export function mergeActivityWithAutopilotState<T extends { id: string; state: string; detail: string; title?: string }>(
   row: T,
   stepRuntime?: DailyAutopilotStepRuntime | null
-): T & { state: ExtendedActivityState } {
-  if (!stepRuntime || stepRuntime.status === 'idle' || stepRuntime.status === 'pending') {
-    return row as T & { state: ExtendedActivityState };
-  }
-  if (stepRuntime.status === 'running') {
-    return {
-      ...row,
-      state: 'running',
-      detail: stepRuntime.detail || 'Running autopilot step…',
-    };
-  }
-  if (stepRuntime.status === 'waiting') {
-    const until = formatShortTime(stepRuntime.waitingUntil);
-    return {
-      ...row,
-      state: 'waiting',
-      detail: stepRuntime.detail || (until ? `Waiting · next return ${until}` : 'Waiting for timer'),
-    };
-  }
-  if (stepRuntime.status === 'error') {
-    return {
-      ...row,
-      state: 'error',
-      detail: stepRuntime.error ? `Error: ${stepRuntime.error}` : 'Autopilot step failed',
-    };
-  }
-  if (stepRuntime.status === 'skipped') {
-    return {
-      ...row,
-      state: 'skipped',
-      detail: stepRuntime.detail || 'Skipped by autopilot settings',
-    };
-  }
-  if (stepRuntime.status === 'done') {
-    const at = formatShortTime(stepRuntime.completedAt);
+): T & MergedActivityMetadata {
+  const title = row.title || DAILY_STEP_LABELS[row.id as DailyActivityId] || row.id;
+
+  // Priority 1: Card's own verified completion always overrides autopilot skipped/idle/pending
+  if (row.state === 'done' && (!stepRuntime || stepRuntime.status !== 'running')) {
+    const at = formatShortTime(stepRuntime?.completedAt);
     return {
       ...row,
       state: 'done',
-      detail: at ? `${stepRuntime.detail || row.detail} · ${at}` : (stepRuntime.detail || row.detail),
+      statusTooltip: `${title}: ${row.detail}${at ? ` (Completed ${at})` : ''}`,
     };
   }
-  return row as T & { state: ExtendedActivityState };
+
+  if (!stepRuntime || stepRuntime.status === 'idle' || stepRuntime.status === 'pending') {
+    return {
+      ...row,
+      state: row.state as ExtendedActivityState,
+      statusTooltip: `${title}: ${row.detail}`,
+    };
+  }
+
+  if (stepRuntime.status === 'running') {
+    const liveDetail = hasLiveCardDetail(row.detail)
+      ? `Running · ${row.detail}`
+      : (stepRuntime.detail || 'Running autopilot step…');
+    return {
+      ...row,
+      state: 'running',
+      detail: liveDetail,
+      statusTooltip: `${title}: ${liveDetail}`,
+    };
+  }
+
+  if (stepRuntime.status === 'waiting') {
+    const until = formatShortTime(stepRuntime.waitingUntil);
+    const waitDetail = stepRuntime.detail || (until ? `Waiting · next return ${until}` : 'Waiting for timer');
+    return {
+      ...row,
+      state: 'waiting',
+      detail: waitDetail,
+      statusTooltip: `${title}: ${waitDetail}`,
+    };
+  }
+
+  if (stepRuntime.status === 'error') {
+    const errorReason = stepRuntime.error || 'Autopilot step failed';
+    return {
+      ...row,
+      state: 'error',
+      detail: hasLiveCardDetail(row.detail) ? row.detail : `Error: ${errorReason}`,
+      errorReason,
+      statusTooltip: `Error: ${errorReason} · Click Retry to re-run or click card to open ${title}`,
+    };
+  }
+
+  if (stepRuntime.status === 'skipped') {
+    const skipReason = stepRuntime.detail || 'Skipped by autopilot settings';
+    return {
+      ...row,
+      state: 'skipped',
+      detail: hasLiveCardDetail(row.detail) ? row.detail : skipReason,
+      skipReason,
+      statusTooltip: `Skipped: ${skipReason} · Click Retry to run now or click card to open ${title}`,
+    };
+  }
+
+  if (stepRuntime.status === 'done') {
+    const at = formatShortTime(stepRuntime.completedAt);
+    const doneDetail = hasLiveCardDetail(row.detail)
+      ? row.detail
+      : (stepRuntime.detail || row.detail);
+    return {
+      ...row,
+      state: 'done',
+      detail: at ? `${doneDetail} · ${at}` : doneDetail,
+      statusTooltip: `${title}: ${doneDetail}${at ? ` · ${at}` : ''}`,
+    };
+  }
+
+  return {
+    ...row,
+    state: row.state as ExtendedActivityState,
+    statusTooltip: `${title}: ${row.detail}`,
+  };
 }

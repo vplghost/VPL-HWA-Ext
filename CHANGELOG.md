@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.336 — 2026-11-26
+
+### Changed
+
+- **Dashboard Daily Activities & Autopilot Status Priority, Tooltips & Live Progress (`dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `activityState.ts`, `ActivityGoals.vue`, `tests/daily-autopilot.test.mjs`)**:
+  - Prioritized verified card `done` status over autopilot `skipped` in `mergeActivityWithAutopilotState()` and tagged already-completed daily steps with `alreadyDone: true` in `buildDailyExecutionPlan()` so completed cards never regress to `SKIPPED`.
+  - Preserved live card details on `running`, `skipped`, and `error` states while surfacing exact `skipReason` / `errorReason` in card and status badge tooltips (`statusTooltip`), plus added a quick per-card Retry button (`#btn-activity-retry-<id>`) wired to `runSingleStep()`.
+  - Connected `executeStep('tower')` to the background Tower runner (`tower-run-start`) and `executeStep('arena')` to live `arenaGetAll` verification.
+  - Enhanced live progress details for long activities: Tower reads `floorData.floorNumber ?? floorNumber` (`Floor X / 23` + progress bar) and Arena/Grand Arena display `Rank X · N/5 free` (+ progress bar).
+
 ## 0.11.334 — 2026-11-26
 
 ### Changed

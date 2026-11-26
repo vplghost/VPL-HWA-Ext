@@ -13,6 +13,7 @@ import {
   HIGH_RISK_ACTIVITIES,
 } from '../src/services/dailyAutopilotService.ts';
 import { rpcCacheService } from '../src/core/cache/rpcCache.ts';
+import { towerActivityState, arenaActivityState } from '../src/composables/activityState.ts';
 
 const root = resolve(process.cwd());
 
@@ -185,13 +186,68 @@ test('computeFreeGiftStripItems splits all 7 free gift groups with isolated erro
   assert.equal(merged.heroChest_getInfo?.data?.opensCount, 114);
 });
 
-test('mergeActivityWithAutopilotState supports running, waiting, skipped, error, and done statuses', () => {
-  const base = { id: 'expeditions', state: 'pending', detail: '1 active' };
-  assert.equal(mergeActivityWithAutopilotState(base, { status: 'running', detail: 'Collecting' }).state, 'running');
+test('mergeActivityWithAutopilotState supports running, waiting, skipped, error, and done statuses and prioritizes card done over autopilot skipped', () => {
+  const base = { id: 'expeditions', title: 'Expeditions', state: 'pending', detail: '1 active' };
+  const running = mergeActivityWithAutopilotState(base, { status: 'running', detail: 'Collecting' });
+  assert.equal(running.state, 'running');
+  assert.match(running.detail, /Running · 1 active/, 'Must preserve live card detail while running');
   assert.equal(mergeActivityWithAutopilotState(base, { status: 'waiting', waitingUntil: Date.now() + 60000 }).state, 'waiting');
-  assert.equal(mergeActivityWithAutopilotState(base, { status: 'error', error: 'Timeout' }).state, 'error');
-  assert.equal(mergeActivityWithAutopilotState(base, { status: 'skipped', detail: 'High-risk skipped' }).state, 'skipped');
+  const errored = mergeActivityWithAutopilotState(base, { status: 'error', error: 'Timeout' });
+  assert.equal(errored.state, 'error');
+  assert.equal(errored.errorReason, 'Timeout');
+  assert.match(errored.statusTooltip, /Timeout/);
+
+  const skipped = mergeActivityWithAutopilotState(
+    { id: 'arena', title: 'Arena', state: 'pending', detail: 'Rank 42 · 3/5 free (3 battles left today)' },
+    { status: 'skipped', detail: 'High-risk skipped by default' }
+  );
+  assert.equal(skipped.state, 'skipped');
+  assert.equal(skipped.detail, 'Rank 42 · 3/5 free (3 battles left today)', 'Skipped state must preserve live card progress');
+  assert.equal(skipped.skipReason, 'High-risk skipped by default');
+  assert.match(skipped.statusTooltip, /Skipped: High-risk skipped by default/);
+
   assert.equal(mergeActivityWithAutopilotState(base, { status: 'done', completedAt: Date.now() }).state, 'done');
+
+  // Card's own verified `done` state MUST win over autopilot `skipped`
+  const doneCard = { id: 'tower', title: 'Tower', state: 'done', detail: 'Cleared today' };
+  const mergedDone = mergeActivityWithAutopilotState(doneCard, { status: 'skipped', detail: 'Already cleared today' });
+  assert.equal(mergedDone.state, 'done');
+  assert.equal(mergedDone.detail, 'Cleared today');
+});
+
+test('towerActivityState and arenaActivityState expose clear live floor/free-token details and progress', () => {
+  const now = Date.UTC(2026, 10, 26, 5, 0, 0);
+  const ts = new Date(now - 1000).toISOString();
+
+  // Tower reads floorData.floorNumber as well as floorNumber
+  const tower = towerActivityState({ towerStatus: { updatedAt: ts, data: { floorData: { floorNumber: 18 } } } }, now);
+  assert.equal(tower.state, 'pending');
+  assert.equal(tower.detail, 'Floor 18 / 23');
+
+  // Arena displays remaining free tokens (X/5 free) and progress %
+  const arena = arenaActivityState(
+    {
+      'resource:refillable:6': { updatedAt: ts, data: { amount: 3 } },
+      arenaGetAll: { updatedAt: ts, data: { arenaPlace: 42 } },
+    },
+    false,
+    now
+  );
+  assert.equal(arena.state, 'pending');
+  assert.match(arena.detail, /Rank 42 · 3\/5 free/);
+  assert.equal(arena.progress, 40);
+
+  // Already-done activities are marked alreadyDone in buildDailyExecutionPlan rather than generic skip
+  const plan = buildDailyExecutionPlan(
+    {},
+    {
+      towerStatus: { updatedAt: ts, data: { isCleared: true } },
+      'resource:refillable:6': { updatedAt: ts, data: { amount: 0 } },
+    },
+    now
+  );
+  assert.equal(plan.find((s) => s.id === 'tower')?.alreadyDone, true);
+  assert.equal(plan.find((s) => s.id === 'arena')?.alreadyDone, true);
 });
 
 test('ActivityGoals, FreeGiftsStrip, and SettingsTab wire Daily Autopilot controls cleanly', async () => {
@@ -199,6 +255,10 @@ test('ActivityGoals, FreeGiftsStrip, and SettingsTab wire Daily Autopilot contro
   assert.ok(activitySrc.includes('id="btn-daily-autopilot-toggle"'));
   assert.ok(activitySrc.includes('id="daily-autopilot-status"'));
   assert.ok(activitySrc.includes('<FreeGiftsStrip'));
+  assert.ok(activitySrc.includes('`activity-card-${act.id}`'));
+  assert.ok(activitySrc.includes('`activity-status-${act.id}`'));
+  assert.ok(activitySrc.includes('`btn-activity-retry-${act.id}`'));
+  assert.ok(activitySrc.includes('act.statusTooltip'));
 
   const stripSrc = await readFile(resolve(root, 'src/components/dashboard/FreeGiftsStrip.vue'), 'utf8');
   assert.ok(stripSrc.includes('id="dashboard-free-gifts-strip"'));

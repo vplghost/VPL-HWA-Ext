@@ -2,6 +2,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import {
   DAILY_AUTOPILOT_SETTINGS_KEY,
   DAILY_AUTOPILOT_STATE_KEY,
+  DAILY_STEP_LABELS,
   getDefaultDailyAutopilotSettings,
   normalizeDailyAutopilotSettings,
   createDefaultDailyRuntimeState,
@@ -16,6 +17,7 @@ import {
   type DailyActivityId,
   type FreeGiftId,
 } from '../services/dailyAutopilotService.ts';
+import { towerActivityState, arenaActivityState } from './activityState.ts';
 import { getAttentionBonusAvailability } from '../utils/freeChestHelper.ts';
 import { freeAlchemyAvailability } from '../utils/freeAlchemySpin.ts';
 
@@ -315,11 +317,108 @@ export function useDailyAutopilot(
       return;
     }
 
-    // Tower & High-Risk combat modes delegate safely to their dedicated dialogs/orchestrators
+    if (stepId === 'tower') {
+      const tower = towerActivityState(cacheRef.value, Date.now());
+      if (tower.state === 'done') {
+        runtimeState.steps.tower = {
+          status: 'done',
+          detail: tower.detail,
+          completedAt: Date.now(),
+        };
+        return;
+      }
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        const res: any = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage({ kind: 'tower-run-start' }, (response) => {
+              const err = chrome.runtime.lastError;
+              resolve(err ? { ok: false, error: err.message } : (response || { ok: true }));
+            });
+          } catch (e: any) {
+            resolve({ ok: false, error: e?.message || String(e) });
+          }
+        });
+        if (res?.ok === false && res?.error) {
+          throw new Error(res.error);
+        }
+        const liveTower = towerActivityState(cacheRef.value, Date.now());
+        runtimeState.steps.tower = {
+          status: liveTower.state === 'done' ? 'done' : 'running',
+          detail: liveTower.detail || 'Tower runner started',
+          ...(liveTower.state === 'done' ? { completedAt: Date.now() } : {}),
+        };
+        return;
+      }
+      runtimeState.steps.tower = {
+        status: 'skipped',
+        detail: 'Background Tower runner unavailable — open Tower dialog to run manually',
+      };
+      return;
+    }
+
+    if (stepId === 'arena') {
+      const arena = arenaActivityState(cacheRef.value, false, Date.now());
+      if (arena.state === 'done') {
+        runtimeState.steps.arena = {
+          status: 'done',
+          detail: arena.detail,
+          completedAt: Date.now(),
+        };
+        return;
+      }
+      await dispatchRpc([{ name: 'arenaGetAll', args: {} }]);
+      const refreshed = arenaActivityState(cacheRef.value, false, Date.now());
+      if (refreshed.state === 'done') {
+        runtimeState.steps.arena = {
+          status: 'done',
+          detail: refreshed.detail,
+          completedAt: Date.now(),
+        };
+        return;
+      }
+      runtimeState.steps.arena = {
+        status: 'skipped',
+        detail: `${refreshed.detail} — open Arena dialog to select opponent & run WASM battle safely`,
+      };
+      return;
+    }
+
+    // Remaining high-risk combat modes delegate safely to their dedicated dialogs/orchestrators
+    const label = DAILY_STEP_LABELS[stepId] || stepId;
     runtimeState.steps[stepId] = {
       status: 'skipped',
-      detail: 'Open dedicated dialog to run combat safely',
+      detail: `Open ${label} dialog to run combat safely`,
     };
+  }
+
+  async function runSingleStep(stepId: DailyActivityId): Promise<void> {
+    if (runtimeState.running || !dispatchRpc) return;
+    abortRequested = false;
+    const label = DAILY_STEP_LABELS[stepId] || stepId;
+    runtimeState.running = true;
+    runtimeState.activeStepId = stepId;
+    runtimeState.summary = `Running: ${label}`;
+    runtimeState.steps[stepId] = { status: 'running', detail: `Running ${label}…` };
+    persistRuntime();
+
+    try {
+      await executeStep(stepId);
+    } catch (err: any) {
+      runtimeState.steps[stepId] = {
+        status: 'error',
+        error: err?.message || String(err),
+      };
+    } finally {
+      runtimeState.running = false;
+      runtimeState.activeStepId = null;
+      const finishedTime = formatShortTime(Date.now());
+      const st = runtimeState.steps[stepId];
+      runtimeState.summary =
+        st?.status === 'error'
+          ? `${label} failed at ${finishedTime}`
+          : `${label} · ${st?.status || 'done'} (${finishedTime})`;
+      persistRuntime();
+    }
   }
 
   async function startAutopilot() {
@@ -344,10 +443,19 @@ export function useDailyAutopilot(
         if (abortRequested) break;
         const step = plan[i]!;
         if (!step.shouldRun) {
-          runtimeState.steps[step.id] = {
-            status: 'skipped',
-            detail: step.skipReason || 'Skipped',
-          };
+          if (step.alreadyDone) {
+            runtimeState.steps[step.id] = {
+              status: 'done',
+              detail: step.skipReason || 'Completed today',
+              completedAt: Date.now(),
+            };
+            doneCount++;
+          } else {
+            runtimeState.steps[step.id] = {
+              status: 'skipped',
+              detail: step.skipReason || 'Skipped',
+            };
+          }
           persistRuntime();
           continue;
         }
@@ -409,6 +517,7 @@ export function useDailyAutopilot(
     saveSettings,
     startAutopilot,
     stopAutopilot,
+    runSingleStep,
     runSingleFreeGift,
   };
 }

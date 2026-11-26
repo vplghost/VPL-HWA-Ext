@@ -31,10 +31,13 @@ export function towerActivityState(cache: Record<string, any>, now = Date.now())
       event.win === true && Number(event.floor) === Number(data.floorNumber) &&
       (!event.at || observedToday({ updatedAt: event.at }, now, cache.questResetStatus?.data?.nextDayAt)) &&
       (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle'))));
-  const floor = current.find((data) => data.floorNumber != null)?.floorNumber;
+  const floor = current
+    .map((data) => data.floorData?.floorNumber ?? data.floorNumber ?? data.floor)
+    .find((val) => val != null);
+  const floorNum = floor != null && Number.isFinite(Number(floor)) ? Number(floor) : null;
   return {
     state: cleared ? 'done' as const : 'pending' as const,
-    detail: cleared ? 'Cleared today' : floor ? `Floor ${floor} / ${TOWER_FLOOR_COUNT}` : 'Ready to enter',
+    detail: cleared ? 'Cleared today' : floorNum != null ? `Floor ${floorNum} / ${TOWER_FLOOR_COUNT}` : 'Ready to enter',
   };
 }
 
@@ -44,10 +47,15 @@ export function arenaActivityState(cache: Record<string, any>, grand = false, no
   const arena = observedToday(cache.arenaGetAll, now, cache.questResetStatus?.data?.nextDayAt) ? cache.arenaGetAll.data : null;
   const rank = arena?.[grand ? 'grandPlace' : 'arenaPlace'] ?? '—';
   const known = Number.isInteger(amount) && amount >= 0;
+  const maxFreeTokens = 5;
+  const progress = known
+    ? Math.min(100, Math.max(0, Math.round(((maxFreeTokens - Math.min(maxFreeTokens, amount)) / maxFreeTokens) * 100)))
+    : undefined;
   return {
     state: !known ? 'unknown' as const : amount === 0 ? 'done' as const : 'pending' as const,
-    detail: known ? `Rank ${rank} · ${amount} battles left today`
+    detail: known ? `Rank ${rank} · ${amount}/${maxFreeTokens} free (${amount} battles left today)`
       : arena ? `Rank ${rank} · Battles remaining unavailable` : 'Waiting for game data',
+    ...(progress != null ? { progress } : {}),
   };
 }
 

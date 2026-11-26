@@ -30,6 +30,9 @@ interface ActivityRow {
   detail: string;
   isInteractive?: boolean;
   progress?: number;
+  skipReason?: string;
+  errorReason?: string;
+  statusTooltip?: string;
 }
 
 const activities = computed<ActivityRow[]>(() => {
@@ -38,11 +41,18 @@ const activities = computed<ActivityRow[]>(() => {
 
   // Tower
   const towerState = towerActivityState(cache.value, now.value);
+  const towerFloorMatch = towerState.detail.match(/Floor\s+(\d+)\s*\/\s*(\d+)/i);
+  const towerProgress = towerState.state === 'done'
+    ? 100
+    : towerFloorMatch
+      ? Math.min(100, Math.round((Number(towerFloorMatch[1]) / Math.max(1, Number(towerFloorMatch[2]))) * 100))
+      : undefined;
   rows.push({
     id: 'tower',
     title: 'Tower',
     icon: '🗼',
     ...towerState,
+    ...(towerProgress != null ? { progress: towerProgress } : {}),
     isInteractive: true,
   });
 
@@ -122,6 +132,34 @@ function toggleAutopilot() {
   }
 }
 
+const AUTOPILOT_STEP_IDS = new Set([
+  'freebies',
+  'expeditions',
+  'frontier',
+  'quests',
+  'tower',
+  'hydra',
+  'arena',
+  'grand-arena',
+  'dungeon',
+]);
+
+function canRetryActivity(act: ActivityRow): boolean {
+  return Boolean(
+    autopilot &&
+    typeof autopilot.runSingleStep === 'function' &&
+    props.hasGameTab &&
+    !autopilot.runtimeState.running &&
+    (act.state === 'skipped' || act.state === 'error') &&
+    AUTOPILOT_STEP_IDS.has(act.id)
+  );
+}
+
+function runSingleActivity(id: string) {
+  if (!autopilot || typeof autopilot.runSingleStep !== 'function') return;
+  void autopilot.runSingleStep(id as any);
+}
+
 function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
   else if (act.id === 'arena') openModal('arena');
@@ -176,13 +214,14 @@ function handleActivityClick(act: ActivityRow) {
       <div
         v-for="act in activities"
         :key="act.id"
-        class="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-xs transition-all"
+        :id="`activity-card-${act.id}`"
+        class="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between gap-2 text-xs transition-all"
         :class="
           act.isInteractive
             ? 'cursor-pointer hover:border-violet-400 hover:bg-violet-50/40 dark:hover:border-violet-500/60 dark:hover:bg-slate-800 shadow-2xs hover:shadow-xs'
             : ''
         "
-        :title="act.isInteractive ? `Click to open ${act.title}` : undefined"
+        :title="act.statusTooltip || (act.isInteractive ? `Click to open ${act.title}` : undefined)"
         @click="act.isInteractive && handleActivityClick(act)"
       >
         <div class="flex items-center gap-2 min-w-0">
@@ -192,26 +231,42 @@ function handleActivityClick(act: ActivityRow) {
               <span>{{ act.title }}</span>
               <span v-if="act.isInteractive" class="text-[10px] text-violet-500 font-normal">↗</span>
             </div>
-            <div class="text-[10px] text-slate-400 truncate">{{ act.detail }}</div>
+            <div class="text-[10px] text-slate-400 truncate" :title="act.detail">{{ act.detail }}</div>
             <progress v-if="act.progress != null" :value="act.progress" max="100" class="h-1.5 w-full min-w-32 accent-violet-600" :aria-label="`${act.title} progress`" />
           </div>
         </div>
 
-        <span
-          class="shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
-          :class="{
-            'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300': act.state === 'done',
-            'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 animate-pulse': act.state === 'pending',
-            'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 animate-pulse': act.state === 'running',
-            'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300': act.state === 'waiting',
-            'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300': act.state === 'error',
-            'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400': act.state === 'skipped',
-            'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400': act.state === 'info',
-            'bg-slate-50 dark:bg-slate-900 text-slate-400': act.state === 'unknown',
-          }"
-        >
-          {{ act.state }}
-        </span>
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            v-if="canRetryActivity(act)"
+            :id="`btn-activity-retry-${act.id}`"
+            type="button"
+            class="cursor-pointer size-5 rounded flex items-center justify-center text-[10px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 dark:bg-indigo-950/70 dark:hover:bg-indigo-900 dark:text-indigo-300 transition-colors"
+            :title="`Run ${act.title} now${act.skipReason ? ` (${act.skipReason})` : ''}`"
+            :aria-label="`Run ${act.title} now`"
+            @click.stop="runSingleActivity(act.id)"
+          >
+            ↻
+          </button>
+
+          <span
+            :id="`activity-status-${act.id}`"
+            class="shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+            :title="act.statusTooltip || act.detail"
+            :class="{
+              'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300': act.state === 'done',
+              'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 animate-pulse': act.state === 'pending',
+              'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 animate-pulse': act.state === 'running',
+              'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300': act.state === 'waiting',
+              'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300': act.state === 'error',
+              'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400': act.state === 'skipped',
+              'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400': act.state === 'info',
+              'bg-slate-50 dark:bg-slate-900 text-slate-400': act.state === 'unknown',
+            }"
+          >
+            {{ act.state }}
+          </span>
+        </div>
       </div>
     </div>
 
