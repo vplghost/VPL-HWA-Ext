@@ -19,6 +19,7 @@ import {
   createDefaultDailyRuntimeState,
   resolveDailyResetAnchor,
   buildDailyExecutionPlan,
+  isDailyActivityAlreadyDone,
   computeExpeditionNextWakeMs,
   computeHeroicChestNextWakeMs,
   computeRealmProductionPending,
@@ -357,11 +358,17 @@ export function useDailyAutopilot(
 
     if (stepId === 'quests') {
       await dispatchRpc([{ name: 'questGetAll', args: {} }, { name: 'mailGetAll', args: {} }]);
-      runtimeState.steps.quests = {
-        status: 'done',
-        detail: 'Quests & mail synced',
-        completedAt: Date.now(),
-      };
+      const questCheck = isDailyActivityAlreadyDone('quests', cacheRef.value, Date.now());
+      runtimeState.steps.quests = questCheck.done
+        ? {
+            status: 'done',
+            detail: questCheck.detail || 'All daily quests completed',
+            completedAt: Date.now(),
+          }
+        : {
+            status: 'skipped',
+            detail: 'Quests & mail synced (remaining quests require action)',
+          };
       return;
     }
 
@@ -483,6 +490,15 @@ export function useDailyAutopilot(
 
   async function runSingleStep(stepId: DailyActivityId): Promise<void> {
     if (runtimeState.running || !dispatchRpc) return;
+    const doneCheck = isDailyActivityAlreadyDone(stepId, cacheRef.value, Date.now());
+    if (doneCheck.done) {
+      runtimeState.steps[stepId] = {
+        status: 'done',
+        detail: doneCheck.detail || 'Completed today',
+      };
+      persistRuntime();
+      return;
+    }
     abortRequested = false;
     const label = DAILY_STEP_LABELS[stepId] || stepId;
     runtimeState.running = true;
@@ -537,9 +553,19 @@ export function useDailyAutopilot(
             runtimeState.steps[step.id] = {
               status: 'done',
               detail: step.skipReason || 'Completed today',
-              completedAt: Date.now(),
             };
             doneCount++;
+          } else if (step.waiting) {
+            if (step.id === 'expeditions' && step.waitingUntil && typeof chrome !== 'undefined' && chrome.alarms?.create) {
+              try {
+                chrome.alarms.create('daily-autopilot-expedition-wake', { when: step.waitingUntil });
+              } catch (_) {}
+            }
+            runtimeState.steps[step.id] = {
+              status: 'waiting',
+              ...(step.waitingUntil ? { waitingUntil: step.waitingUntil } : {}),
+              detail: step.skipReason || 'Waiting for timer',
+            };
           } else {
             runtimeState.steps[step.id] = {
               status: 'skipped',

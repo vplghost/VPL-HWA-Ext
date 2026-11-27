@@ -474,8 +474,8 @@ const unregisterTowerRunner =
           }
           const finalState = towerActivityState(cache.value, Date.now());
           return {
-            status: 'done',
-            detail: finalState.detail || towerAutomationMessage.value || 'Tower run finished',
+            status: finalState.state === 'done' ? 'done' : 'skipped',
+            detail: finalState.detail || towerAutomationMessage.value || 'Tower run stopped before final boss',
           };
         },
         async stop() {

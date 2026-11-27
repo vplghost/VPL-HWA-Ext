@@ -562,6 +562,15 @@ async function startAutomation() {
 
       if (step.stopped) {
         autoStatusMessage.value = step.stopReason || 'Automation stopped.';
+        const reasonLower = String(step.stopReason || '').toLowerCase();
+        if (reasonLower.includes('no winnable') || reasonLower.includes('no surviving')) {
+          void updateCacheLocally((draft) => {
+            if (draft.dungeonStatus?.data) {
+              draft.dungeonStatus.data.unwinnableFloor = floorNumber.value;
+              draft.dungeonStatus.data.unwinnableDate = getTodayDateKey();
+            }
+          });
+        }
         break;
       }
 

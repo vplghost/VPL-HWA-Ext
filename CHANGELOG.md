@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.384 — 2026-11-27
+
+### Changed
+
+- **Dashboard Dead-Import Cleanup & Compact Unified Top Action Bar (`DashboardTab.vue`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Removed 4 unused legacy Freebies component imports from `DashboardTab.vue` (retaining standalone files and `FreeGiftsStrip.vue` as the Single Source of Truth).
+  - Compacted Quick Actions into a single-row `#dashboard-top-actions` bar with a 1-click `#dashboard-top-autopilot-btn` shortcut (showing ready free gift count) and an inline zero-layout-shift `#dashboard-refresh-all-btn` status indicator.
+
+### Fixed
+
+- **Daily Autopilot Skip Already-Done / Unwinnable Activities & Accurate Card States (`activityState.ts`, `dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `TowerModal.vue`, `DungeonModal.vue`, `tests/daily-autopilot.test.mjs`)**:
+  - Updated `towerActivityState()` to inspect all today-observed Tower entries (preventing a newer `magicTower_briefInfo` from dropping a cleared Floor 23 boss back to `pending`) and updated `dungeonActivityState()` + `DungeonModal.vue` to mark exhausted or unwinnable floors as `done` for today.
+  - Added `isDailyActivityAlreadyDone()` covering all activities (including `expeditions` done/waiting, `freebies`, and `quests`), preventing `startAutopilot()` and `runSingleStep()` from re-running done steps or flashing `ExpeditionsModal` when waiting.
+  - Protected `mergeActivityWithAutopilotState()` so already-`done` cards never flip to `running`/`skipped`/`error` and still-`pending` cards never receive a false `DONE` badge after a sync-only step.
+
 ## 0.11.382 — 2026-11-27
 
 ### Added

@@ -5,17 +5,32 @@ import IncomeOverview from './IncomeOverview.vue';
 import TroopsOverview from './TroopsOverview.vue';
 import QueuesOverview from './QueuesOverview.vue';
 import ActivityGoals from './ActivityGoals.vue';
-import FreeAlchemySpinButton from './FreeAlchemySpinButton.vue';
-import FreeBoxButton from './FreeBoxButton.vue';
-import FreeChestButton from './FreeChestButton.vue';
-import ClaimAllFreebiesButton from './ClaimAllFreebiesButton.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { useGameConnection } from '@/src/composables/useGameConnection';
+import { useNow } from '@/src/composables/useNow';
+import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 
 const { dispatchRpc, cache } = useRpcCache();
 const { openModal } = useModals();
 const { hasGameTab, alertMessage, isRefreshing, reloadGameTab } = useGameConnection();
+const now = typeof useNow === 'function' ? useNow() : ref(Date.now());
+const autopilot =
+  typeof useDailyAutopilot === 'function'
+    ? useDailyAutopilot(cache, dispatchRpc, now)
+    : null;
+const availableFreebiesCount = computed(() => {
+  if (!autopilot) return 0;
+  return autopilot.freeGiftItems.value.filter((item) => item.clickable && item.state === 'available').length;
+});
+function toggleTopAutopilot() {
+  if (!autopilot) return;
+  if (autopilot.runtimeState.running) {
+    autopilot.stopAutopilot();
+  } else {
+    void autopilot.startAutopilot();
+  }
+}
 
 const raidQueueState = ref<any>(null);
 const monsterQueueState = ref<any>(null);
@@ -154,22 +169,19 @@ async function refreshAllDashboard() {
       </button>
     </div>
 
-    <!-- Quick Actions Banner -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-      <div class="flex items-center gap-2">
-        <span class="text-lg">⚡</span>
-        <div>
-          <h3 class="font-bold text-xs text-slate-800 dark:text-slate-100">Quick Actions</h3>
-          <p class="text-[10px] text-slate-400">Launch rallies, start gathering, hunt monsters, or farm gear</p>
-        </div>
-      </div>
+    <!-- Compact Unified Top Action Bar -->
+    <div
+      id="dashboard-top-actions"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-2xs"
+    >
+      <div id="dashboard-actions" class="flex flex-wrap items-center gap-1.5">
+        <span class="text-sm select-none mr-0.5" title="Quick Actions">⚡</span>
 
-      <div id="dashboard-actions" class="flex flex-wrap items-center gap-2">
         <!-- Guild Raid -->
         <button
           id="open-raid-dialog"
           type="button"
-          class="relative cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          class="relative cursor-pointer px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
           @click="openModal('raid')"
         >
           <span>⚔️</span> <span>Guild Raid</span>
@@ -189,7 +201,7 @@ async function refreshAllDashboard() {
         <button
           id="open-gather-dialog"
           type="button"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          class="cursor-pointer px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
           @click="openModal('gathering')"
         >
           <span>⛏️</span> <span>Gathering</span>
@@ -199,7 +211,7 @@ async function refreshAllDashboard() {
         <button
           id="open-monster-dialog"
           type="button"
-          class="relative cursor-pointer px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          class="relative cursor-pointer px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
           @click="openModal('monster')"
         >
           <span>👹</span> <span>Solo Monster</span>
@@ -218,7 +230,7 @@ async function refreshAllDashboard() {
         <button
           id="open-brigand-dialog"
           type="button"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          class="cursor-pointer px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
           @click="openModal('brigand')"
         >
           <span>⛺</span> <span>Brigand Camp</span>
@@ -228,26 +240,61 @@ async function refreshAllDashboard() {
         <button
           id="open-campaign-dialog"
           type="button"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          class="cursor-pointer px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
           @click="openModal('campaign')"
         >
           <span>🗺️</span> <span>Campaign Raid</span>
         </button>
+      </div>
 
-        <!-- Refresh All -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Quick Daily Autopilot Shortcut -->
         <button
+          v-if="autopilot"
+          id="dashboard-top-autopilot-btn"
           type="button"
-          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ml-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Refresh Energy, World Energy and dashboard snapshots"
+          :disabled="!hasGameTab"
+          class="relative cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+          :class="
+            autopilot.runtimeState.running
+              ? 'bg-rose-600 hover:bg-rose-500 text-white'
+              : 'bg-violet-600 hover:bg-violet-500 text-white'
+          "
+          :title="autopilot.runtimeState.running ? 'Stop Daily Autopilot' : 'Run Daily Routine Autopilot'"
+          @click="toggleTopAutopilot"
+        >
+          <span>{{ autopilot.runtimeState.running ? '⏹ Stop' : '▶ Autopilot' }}</span>
+          <span
+            v-if="!autopilot.runtimeState.running && availableFreebiesCount > 0"
+            class="px-1 py-0.2 rounded-full bg-emerald-400 text-slate-950 text-[9px] font-bold leading-none"
+            :title="`${availableFreebiesCount} free gift group(s) ready`"
+          >
+            {{ availableFreebiesCount }}
+          </span>
+        </button>
+
+        <!-- Refresh All + inline non-jumping status -->
+        <button
+          id="dashboard-refresh-all-btn"
+          type="button"
+          class="cursor-pointer px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :title="dashboardRefreshMessage || 'Refresh Energy, World Energy and dashboard snapshots'"
           :disabled="dashboardRefreshing || !hasGameTab"
           @click="refreshAllDashboard"
         >
-          {{ dashboardRefreshing ? '↻ Requesting…' : '↻ Refresh All' }}
+          {{ dashboardRefreshing ? '↻ Syncing…' : '↻ Refresh All' }}
         </button>
+
+        <span
+          v-if="dashboardRefreshMessage"
+          role="status"
+          class="max-w-56 truncate text-[11px] text-slate-500 dark:text-slate-400"
+          :title="dashboardRefreshMessage"
+        >
+          {{ dashboardRefreshMessage }}
+        </span>
       </div>
     </div>
-
-    <p v-if="dashboardRefreshMessage" role="status" class="text-xs text-slate-500 dark:text-slate-400">{{ dashboardRefreshMessage }}</p>
 
     <!-- Top Resource Summary -->
     <ResourceSummary />

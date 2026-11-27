@@ -207,7 +207,8 @@ test('mergeActivityWithAutopilotState supports running, waiting, skipped, error,
   assert.equal(skipped.skipReason, 'High-risk skipped by default');
   assert.match(skipped.statusTooltip, /Skipped: High-risk skipped by default/);
 
-  assert.equal(mergeActivityWithAutopilotState(base, { status: 'done', completedAt: Date.now() }).state, 'done');
+  assert.equal(mergeActivityWithAutopilotState({ id: 'frontier', title: 'Frontier', state: 'info', detail: 'AFK chest checked' }, { status: 'done', completedAt: Date.now() }).state, 'done');
+  assert.equal(mergeActivityWithAutopilotState(base, { status: 'done', completedAt: Date.now() }).state, 'pending', 'Pending card with live remaining work must not be forced to false done');
 
   // Card's own verified `done` state MUST win over autopilot `skipped`
   const doneCard = { id: 'tower', title: 'Tower', state: 'done', detail: 'Cleared today' };
@@ -367,4 +368,60 @@ test('rpcCache preserves/updates lastCollectDate and computeRealmProductionPendi
   assert.ok(bgSrc.includes('hwa-auto-realm-resources'));
   assert.ok(bgSrc.includes('realm-resources-tick'));
   assert.ok(bgSrc.includes('runRealmResourcesClaim'));
+});
+
+
+test('P1-21: Tower (boss floor 23 cleared across older entry) & Dungeon (exhausted or unwinnable) are marked done and excluded from Autopilot plan', async () => {
+  const { towerActivityState, dungeonActivityState } = await import('../src/composables/activityState.ts');
+  const now = Date.parse('2026-11-27T14:00:00Z');
+  const t1 = '2026-11-27T13:50:00Z';
+  const t2 = '2026-11-27T13:55:00Z';
+
+  // Tower cleared at floor 23 in towerStatus, while newer magicTower_briefInfo has no rooms/isCleared
+  const cache = {
+    towerStatus: {
+      updatedAt: t1,
+      data: {
+        floorNumber: 23,
+        rooms: [{ type: 'boss_battle', state: 'room_completed' }],
+      },
+    },
+    magicTower_briefInfo: {
+      updatedAt: t2,
+      data: { floorNumber: 23 },
+    },
+    dungeonStatus: {
+      updatedAt: t2,
+      data: {
+        floorNumber: 120,
+        dungeonActivity: 150,
+        unwinnableFloor: 120,
+        unwinnableDate: '2026-11-27',
+        currentFloorDoors: [{ attackerType: 'water' }],
+      },
+    },
+  };
+
+  assert.equal(towerActivityState(cache, now).state, 'done', 'Tower must remain done when floor 23 boss was completed today');
+  assert.equal(dungeonActivityState(cache, now).state, 'done', 'Dungeon must be done when current floor is marked unwinnable today');
+
+  const plan = buildDailyExecutionPlan({ skipHighRiskByDefault: false }, cache, now);
+  const towerStep = plan.find((s) => s.id === 'tower');
+  const dungeonStep = plan.find((s) => s.id === 'dungeon');
+  assert.equal(towerStep?.shouldRun, false);
+  assert.equal(towerStep?.alreadyDone, true);
+  assert.equal(dungeonStep?.shouldRun, false);
+  assert.equal(dungeonStep?.alreadyDone, true);
+});
+
+test('P1-21: mergeActivityWithAutopilotState never mutates done cards and never forces false done on pending cards', () => {
+  const doneRow = { id: 'tower', title: 'Tower', state: 'done', detail: 'Cleared today' };
+  const mergedDone = mergeActivityWithAutopilotState(doneRow, { status: 'running', detail: 'Running Tower…' });
+  assert.equal(mergedDone.state, 'done', 'Already-done card must never flip to running');
+  assert.equal(mergedDone.detail, 'Cleared today');
+
+  const pendingRow = { id: 'quests', title: 'Daily Quests', state: 'pending', detail: '3 daily quests remaining · 1 ready' };
+  const mergedPending = mergeActivityWithAutopilotState(pendingRow, { status: 'done', detail: 'Quests synced', completedAt: Date.now() });
+  assert.equal(mergedPending.state, 'pending', 'Pending card must NOT flip to false done after sync');
+  assert.equal(mergedPending.detail, '3 daily quests remaining · 1 ready');
 });

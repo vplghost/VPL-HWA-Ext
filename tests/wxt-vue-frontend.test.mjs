@@ -1457,3 +1457,13 @@ test('P2-34: DungeonModal orders fixed sections above dynamic status/doors/comba
   assert.ok(idxTooltip > idxCombatLog, 'Floating Combat Log hover card must be outside the combat log flow');
   assert.match(src, /id="dungeon-log-card-tooltip"[\s\S]{0,200}fixed z-\[120\] pointer-events-none/);
 });
+
+
+test('P2-29: DashboardTab removes dead Freebies imports and renders compact single-row #dashboard-top-actions with Autopilot shortcut', async () => {
+  const dashSrc = await readFile(join(root, 'src/components/dashboard/DashboardTab.vue'), 'utf8');
+  assert.doesNotMatch(dashSrc, /FreeAlchemySpinButton|FreeBoxButton|FreeChestButton|ClaimAllFreebiesButton/);
+  assert.ok(dashSrc.includes('id="dashboard-top-actions"'));
+  assert.ok(dashSrc.includes('id="dashboard-top-autopilot-btn"'));
+  assert.ok(dashSrc.includes('id="dashboard-refresh-all-btn"'));
+  assert.doesNotMatch(dashSrc, /<p v-if="dashboardRefreshMessage"/);
+});

@@ -15,7 +15,10 @@ import {
   dungeonActivityState,
   frontierActivityState,
   observedToday,
+  readyQuestCount,
 } from '../composables/activityState.ts';
+import { expeditionActivity, expeditionPlan } from '../utils/expeditions.ts';
+import { dailyQuests } from '../data/questData.ts';
 import { freeAlchemyAvailability, freeAlchemyTimer } from '../utils/freeAlchemySpin.ts';
 import { getAttentionBonusAvailability, formatCooldownTimer } from '../utils/freeChestHelper.ts';
 import { ratePerMinute } from '../data/productionData.ts';
@@ -329,7 +332,96 @@ export interface PlannedDailyStep {
   highRisk: boolean;
   shouldRun: boolean;
   alreadyDone?: boolean;
+  waiting?: boolean;
+  waitingUntil?: number;
   skipReason?: string;
+}
+
+export interface DailyActivityDoneCheck {
+  done: boolean;
+  waiting?: boolean;
+  waitingUntil?: number;
+  detail?: string;
+}
+
+/**
+ * Checks whether a Daily Autopilot activity is already completed (or waiting on timers with 0 actionable work)
+ * so Autopilot never re-runs done activities or flashes modals pointlessly.
+ */
+export function isDailyActivityAlreadyDone(
+  id: DailyActivityId,
+  cache: Record<string, any> | null | undefined,
+  now = Date.now()
+): DailyActivityDoneCheck {
+  const c = cache || {};
+
+  if (id === 'tower') {
+    const st = towerActivityState(c, now);
+    if (st.state === 'done') return { done: true, detail: st.detail || 'Already cleared today' };
+  }
+  if (id === 'arena') {
+    const st = arenaActivityState(c, false, now);
+    if (st.state === 'done') return { done: true, detail: st.detail || '0 free tokens left today' };
+  }
+  if (id === 'grand-arena') {
+    const st = arenaActivityState(c, true, now);
+    if (st.state === 'done') return { done: true, detail: st.detail || '0 free tokens left today' };
+  }
+  if (id === 'dungeon') {
+    const st = dungeonActivityState(c, now);
+    if (st.state === 'done') return { done: true, detail: st.detail || 'Completed today' };
+  }
+  if (id === 'frontier') {
+    const st = frontierActivityState(c, now);
+    if (st.state === 'done') return { done: true, detail: st.detail || 'No chest ready' };
+  }
+  if (id === 'hydra') {
+    const hydraEntry = c.clanBoss_getAll;
+    const hydra = observedToday(hydraEntry, now, c.questResetStatus?.data?.nextDayAt) ? hydraEntry.data : null;
+    if (hydra && Number(hydra.tries) === 0 && Number(hydra.superTries) === 0) {
+      return { done: true, detail: '0 Hydra tries left today' };
+    }
+  }
+  if (id === 'expeditions') {
+    const expState = expeditionActivity(c, now);
+    if (expState.state === 'done') {
+      return { done: true, detail: expState.detail || 'All expeditions completed today' };
+    }
+    const nextWake = computeExpeditionNextWakeMs(c, now);
+    const hasStartable = expeditionPlan(c, now).length > 0;
+    if (expState.state !== 'unknown' && expState.state !== 'pending' && !hasStartable && nextWake) {
+      return {
+        done: false,
+        waiting: true,
+        waitingUntil: nextWake,
+        detail: expState.detail || `Waiting · next return ${formatShortTime(nextWake)}`,
+      };
+    }
+  }
+  if (id === 'freebies') {
+    const items = computeFreeGiftStripItems(c, now, { hasGameTab: true });
+    const hasKnown = items.some((i) => i.state !== 'unavailable');
+    const actionable = items.filter((i) => i.clickable && i.state === 'available');
+    if (hasKnown && actionable.length === 0) {
+      return { done: true, detail: 'All freebies claimed' };
+    }
+  }
+  if (id === 'quests') {
+    const questEntry = c.questGetAll ?? c.quest_getAll;
+    const questsKnown = observedToday(questEntry, now, c.questResetStatus?.data?.nextDayAt);
+    if (questsKnown) {
+      const pendingClaims = readyQuestCount(c);
+      const dailies = typeof dailyQuests === 'function' ? dailyQuests(c, now) : null;
+      const remainingDailies = Array.isArray(dailies)
+        ? dailies.filter((q: any) => q.state === 'inProgress').length
+        : 0;
+      if (pendingClaims === 0 && remainingDailies === 0) {
+        return { done: true, detail: 'All daily quests completed' };
+      }
+    }
+  }
+
+  return { done: false };
 }
 
 /**
@@ -348,28 +440,21 @@ export function buildDailyExecutionPlan(
     const highRisk = HIGH_RISK_ACTIVITIES.has(id);
     const label = DAILY_STEP_LABELS[id];
 
-    // Prioritize verified already-done state over settings skip so completed cards stay `done`
-    if (id === 'tower' && towerActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'Already cleared today' };
+    // Prioritize verified already-done / waiting state over settings skip so completed cards stay `done`
+    const doneCheck = isDailyActivityAlreadyDone(id, c, now);
+    if (doneCheck.done) {
+      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: doneCheck.detail || 'Completed today' };
     }
-    if (id === 'arena' && arenaActivityState(c, false, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 free tokens left today' };
-    }
-    if (id === 'grand-arena' && arenaActivityState(c, true, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 free tokens left today' };
-    }
-    if (id === 'dungeon' && dungeonActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'Completed today' };
-    }
-    if (id === 'frontier' && frontierActivityState(c, now).state === 'done') {
-      return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: 'No chest ready' };
-    }
-    if (id === 'hydra') {
-      const hydraEntry = c.clanBoss_getAll;
-      const hydra = observedToday(hydraEntry, now, c.questResetStatus?.data?.nextDayAt) ? hydraEntry.data : null;
-      if (hydra && Number(hydra.tries) === 0 && Number(hydra.superTries) === 0) {
-        return { id, label, highRisk, shouldRun: false, alreadyDone: true, skipReason: '0 Hydra tries left today' };
-      }
+    if (doneCheck.waiting) {
+      return {
+        id,
+        label,
+        highRisk,
+        shouldRun: false,
+        waiting: true,
+        waitingUntil: doneCheck.waitingUntil,
+        skipReason: doneCheck.detail || 'Waiting for timer',
+      };
     }
 
     if (settings.skippedSteps[id] === true) {
@@ -838,8 +923,9 @@ export function mergeActivityWithAutopilotState<T extends { id: string; state: s
 ): T & MergedActivityMetadata {
   const title = row.title || DAILY_STEP_LABELS[row.id as DailyActivityId] || row.id;
 
-  // Priority 1: Card's own verified completion always overrides autopilot skipped/idle/pending
-  if (row.state === 'done' && (!stepRuntime || stepRuntime.status !== 'running')) {
+  // Priority 1: Card's own verified `done` state ALWAYS takes precedence over every autopilot status
+  // (never flip a completed card to running, skipped, waiting, or error, and preserve its live detail).
+  if (row.state === 'done') {
     const at = formatShortTime(stepRuntime?.completedAt);
     return {
       ...row,
@@ -906,6 +992,15 @@ export function mergeActivityWithAutopilotState<T extends { id: string; state: s
     const doneDetail = hasLiveCardDetail(row.detail)
       ? row.detail
       : (stepRuntime.detail || row.detail);
+    // Never force a false `done` badge when live game data still shows the activity is `pending`
+    if (row.state === 'pending') {
+      return {
+        ...row,
+        state: 'pending',
+        detail: doneDetail,
+        statusTooltip: `${title}: ${doneDetail}${at ? ` · Checked ${at}` : ''}`,
+      };
+    }
     return {
       ...row,
       state: 'done',

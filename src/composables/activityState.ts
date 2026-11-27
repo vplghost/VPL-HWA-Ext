@@ -16,22 +16,40 @@ export function observedToday(entry: any, now = Date.now(), nextReset?: number):
 }
 
 export function towerActivityState(cache: Record<string, any>, now = Date.now()) {
-  const entries = [cache.towerStatus, cache.towerSession, cache.magicTower_briefInfo]
+  const entries = [cache.towerStatus, cache.towerSession, cache.magicTower_briefInfo, cache.magicTower_getAll]
     .filter((entry) => observedToday(entry, now, cache.questResetStatus?.data?.nextDayAt));
   if (!entries.length) return { state: 'unknown' as const, detail: 'Waiting for game data' };
-  // A new run/snapshot takes precedence over an older completed session.
+  // A newer reset (e.g. floor < TOWER_FLOOR_COUNT or explicit isCleared=false) beats an older completed session,
+  // while a newer briefInfo still at the final floor without rooms preserves an earlier final-boss completion today.
   const newest = Math.max(...entries.map((entry) => new Date(entry.updatedAt).getTime()));
   const current = entries.filter((entry) => new Date(entry.updatedAt).getTime() === newest)
     .map((entry) => entry.data ?? entry);
-  const cleared = current.some((data) => data.isCleared === true || data.completed === true ||
+  const allTodayData = entries.map((entry) => entry.data ?? entry).filter((d) => d && typeof d === 'object');
+  const isEntryCleared = (data: any) =>
+    data.isCleared === true ||
+    data.completed === true ||
+    data.isCompleted === true ||
     ['win', 'completed'].includes(data.state) ||
     (Number(data.floorData?.floorNumber ?? data.floorNumber) === TOWER_FLOOR_COUNT &&
       normalizeArray(data.floorData?.rooms ?? data.rooms).some((room: any) => room?.type === 'boss_battle' && room.state === 'room_completed')) ||
     (Number(data.floorNumber) === TOWER_FLOOR_COUNT && normalizeArray(data.history).some((event: any) => event?.action === 'endBattle' &&
       event.win === true && Number(event.floor) === Number(data.floorNumber) &&
       (!event.at || observedToday({ updatedAt: event.at }, now, cache.questResetStatus?.data?.nextDayAt)) &&
-      (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle'))));
-  const floor = current
+      (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle')));
+  const newestFloorRaw = current
+    .map((data) => data.floorData?.floorNumber ?? data.floorNumber ?? data.floor)
+    .find((val) => val != null);
+  const newestFloorNum = newestFloorRaw != null && Number.isFinite(Number(newestFloorRaw)) ? Number(newestFloorRaw) : null;
+  const newestExplicitlyReset = current.some(
+    (data) =>
+      data.isCleared === false ||
+      data.completed === false ||
+      (newestFloorNum != null && newestFloorNum < TOWER_FLOOR_COUNT)
+  );
+  const cleared =
+    current.some(isEntryCleared) ||
+    (!newestExplicitlyReset && newestFloorNum === TOWER_FLOOR_COUNT && allTodayData.some(isEntryCleared));
+  const floor = [...current, ...allTodayData]
     .map((data) => data.floorData?.floorNumber ?? data.floorNumber ?? data.floor)
     .find((val) => val != null);
   const floorNum = floor != null && Number.isFinite(Number(floor)) ? Number(floor) : null;
@@ -66,8 +84,19 @@ export function dungeonActivityState(cache: Record<string, any>, now = Date.now(
   const dungeon = entry.data || {};
   const detail = `${Number(dungeon.dungeonActivity) || 0} activity points · Floor ${dungeon.floorNumber ?? '—'}`;
   if (dungeon.activeBattle) return { state: 'pending' as const, detail: `${detail} · Battle in progress` };
+  const todayUtc = new Date(now).toISOString().slice(0, 10);
+  const unwinnableToday =
+    dungeon.unwinnableDate === todayUtc &&
+    dungeon.unwinnableFloor != null &&
+    Number(dungeon.unwinnableFloor) === Number(dungeon.floorNumber);
+  if (unwinnableToday) {
+    return {
+      state: 'done' as const,
+      detail: `${detail} · No winnable doors left today`,
+    };
+  }
   const log = dungeon.dailyCombatLog;
-  const foughtToday = (log?.date === new Date(now).toDateString() && Number(log.totalBattles) > 0) ||
+  const foughtToday = (log?.date && (log.date === new Date(now).toDateString() || String(log.date) === todayUtc) && Number(log.totalBattles) > 0) ||
     (entry.method === 'dungeonEndBattle' && dungeon.lastBattleResult != null);
   const doors = dungeon.currentFloorDoors;
   if (!Array.isArray(doors) || !doors.length) {
