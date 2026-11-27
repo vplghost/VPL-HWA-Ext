@@ -5,6 +5,13 @@ import CampaignMissionPicker from './CampaignMissionPicker.vue';
 import MissionDropTooltip from './MissionDropTooltip.vue';
 import pickerData from '@/src/data/campaign-picker.json';
 import { useCampaignMissionHistory } from '@/src/composables/useCampaignMissionHistory';
+import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
+import {
+  planFavoriteSoulStoneSweep,
+  clampReserveEnergy,
+  DEFAULT_SOUL_SWEEP_RESERVE_ENERGY,
+  SOUL_SWEEP_RESERVE_STORAGE_KEY,
+} from '@/src/services/heroSoulSweepService';
 import {
   findRecipeNode,
   recipeMissions,
@@ -56,6 +63,89 @@ const missionId = ref(135);
 const isRaidRunning = ref(false);
 const abortCampaignRaidLoop = ref(false);
 const loopStatusMsg = ref('');
+
+const favoriteHeroes =
+  typeof useStoredFavorites === 'function'
+    ? useStoredFavorites('favoriteHeroes')
+    : ref(new Set<string>());
+const soulSweepReserve = ref(
+  typeof DEFAULT_SOUL_SWEEP_RESERVE_ENERGY === 'number' ? DEFAULT_SOUL_SWEEP_RESERVE_ENERGY : 30
+);
+const isSweepingSouls = ref(false);
+
+if (typeof chrome !== 'undefined' && chrome.storage?.local?.get && typeof SOUL_SWEEP_RESERVE_STORAGE_KEY === 'string') {
+  chrome.storage.local.get(SOUL_SWEEP_RESERVE_STORAGE_KEY).then((res: any) => {
+    if (res?.[SOUL_SWEEP_RESERVE_STORAGE_KEY] != null && typeof clampReserveEnergy === 'function') {
+      soulSweepReserve.value = clampReserveEnergy(res[SOUL_SWEEP_RESERVE_STORAGE_KEY]);
+    }
+  }).catch(() => {});
+}
+
+async function saveSoulSweepReserve() {
+  if (typeof clampReserveEnergy === 'function') {
+    soulSweepReserve.value = clampReserveEnergy(soulSweepReserve.value);
+  }
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set && typeof SOUL_SWEEP_RESERVE_STORAGE_KEY === 'string') {
+    try {
+      await chrome.storage.local.set({ [SOUL_SWEEP_RESERVE_STORAGE_KEY]: soulSweepReserve.value });
+    } catch (_) {}
+  }
+}
+
+const soulSweepPlan = computed(() =>
+  typeof planFavoriteSoulStoneSweep === 'function'
+    ? planFavoriteSoulStoneSweep(cache.value, Array.from(favoriteHeroes.value), {
+        reserveEnergy: soulSweepReserve.value,
+        disabledMissionIds: disabledMissionsToday.value,
+      })
+    : {
+        eligibleHeroCount: 0,
+        totalMissions: 0,
+        totalAvailableRaids: 0,
+        totalAvailableEnergy: 0,
+        plannedRaids: 0,
+        plannedEnergy: 0,
+        currentEnergy: 0,
+        reserveEnergy: soulSweepReserve.value,
+        missions: [],
+        skippedReason: null,
+      }
+);
+
+async function runFavoriteSoulSweep() {
+  if (isRaidRunning.value || isSweepingSouls.value) return;
+  const plan = soulSweepPlan.value;
+  if (plan.plannedRaids <= 0) {
+    loopStatusMsg.value = plan.skippedReason || 'No eligible favorite Heroic missions to sweep.';
+    return;
+  }
+  isRaidRunning.value = true;
+  isSweepingSouls.value = true;
+  abortCampaignRaidLoop.value = false;
+  let totalDone = 0;
+  try {
+    for (const m of plan.missions) {
+      if (abortCampaignRaidLoop.value) break;
+      if (m.plannedRaids <= 0) continue;
+      missionId.value = m.missionId;
+      loopStatusMsg.value = `Sweeping ${m.heroName} (Mission #${m.missionId}, ${m.plannedRaids}x)…`;
+      const res = await executeSingleRaid(m.plannedRaids);
+      if (!res?.ok) {
+        loopStatusMsg.value = res?.error || `Stopped on Mission #${m.missionId}.`;
+        break;
+      }
+      totalDone += m.plannedRaids;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!abortCampaignRaidLoop.value && totalDone > 0) {
+      loopStatusMsg.value = `✓ Favorite Soul-Stone Sweep complete (${totalDone} raids).`;
+    }
+  } finally {
+    isSweepingSouls.value = false;
+    isRaidRunning.value = false;
+    abortCampaignRaidLoop.value = false;
+  }
+}
 
 const resolveMissionTries = (numId: any, missionData: any) => {
   return getMissionTries(numId, missionData);
@@ -1541,6 +1631,49 @@ const hasDropItems = computed(() => {
                 >
                   +{{ sessionFarmedCount }} Farmed
                 </span>
+              </div>
+            </div>
+
+            <!-- Favorite Heroes Daily Soul-Stone Sweeper -->
+            <div
+              id="campaign-soul-sweep-panel"
+              class="flex items-center justify-between flex-wrap gap-2 p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-2xs"
+            >
+              <div class="flex items-center flex-wrap gap-2">
+                <span class="font-bold text-amber-800 dark:text-amber-300">⭐ Favorite Soul Stones</span>
+                <span class="text-slate-600 dark:text-slate-300">
+                  <template v-if="soulSweepPlan.totalMissions > 0">
+                    {{ soulSweepPlan.eligibleHeroCount }} heroes · {{ soulSweepPlan.totalMissions }} missions ({{ soulSweepPlan.totalAvailableRaids }} tries)
+                  </template>
+                  <template v-else>
+                    {{ soulSweepPlan.skippedReason || 'No eligible missions' }}
+                  </template>
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300 font-medium" title="Keep at least this much Campaign Energy reserved (never spends Emeralds)">
+                  <span>Reserve:</span>
+                  <input
+                    id="campaign-soul-reserve-input"
+                    v-model.number="soulSweepReserve"
+                    type="number"
+                    min="0"
+                    max="200"
+                    :disabled="isRaidRunning"
+                    class="w-12 rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 px-1 py-0.5 text-center font-mono text-2xs font-bold"
+                    @change="saveSoulSweepReserve"
+                  />
+                  <span>⚡</span>
+                </label>
+                <button
+                  id="campaign-soul-sweep-btn"
+                  type="button"
+                  :disabled="isRaidRunning || soulSweepPlan.plannedRaids <= 0"
+                  class="cursor-pointer px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-2xs transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                  @click="runFavoriteSoulSweep"
+                >
+                  {{ isSweepingSouls ? 'Sweeping…' : `Sweep All (${soulSweepPlan.plannedRaids} raids · ${soulSweepPlan.plannedEnergy}⚡)` }}
+                </button>
               </div>
             </div>
 

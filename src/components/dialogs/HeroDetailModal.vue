@@ -23,6 +23,10 @@ import { getSkillPoints, getSkillPointsCap, getGold } from '@/src/utils/resource
 import pickerData from '@/src/data/campaign-picker.json';
 import { getHeroSoulMissions } from '@/src/data/campaignData';
 import {
+  planRecursiveGearCraftAndEquip,
+  buildRecursiveGearCraftEquipCalls,
+} from '@/src/services/heroSoulSweepService';
+import {
   getArtifactUpgradePlan,
   type ArtifactUpgradePlan,
 } from '@/src/utils/artifactHelper';
@@ -810,7 +814,43 @@ const equipmentSlots = computed<EquipmentSlotStatus[]>(() => {
 
 const isCrafting = ref<Record<number, boolean>>({});
 const isEquipping = ref<Record<number, boolean>>({});
+const isBatchEquipping = ref(false);
 const isPromoting = ref(false);
+
+const recursiveGearPlan = computed(() =>
+  planRecursiveGearCraftAndEquip(
+    equipmentSlots.value,
+    cache.value?.inventoryGet?.data || {},
+    currentGold.value
+  )
+);
+
+const recursiveGearPlanTooltip = computed(() => {
+  const plan = recursiveGearPlan.value;
+  if (plan.readySlotCount <= 0) return '';
+  const craftDesc = plan.craftSteps.length
+    ? `Craft: ${plan.craftSteps.map((s) => `${s.name} x${s.amount}`).join(' → ')}`
+    : 'No crafting needed';
+  const equipDesc = `Equip: ${plan.equipSlots.map((e) => `Slot ${e.slotNum} (${e.itemName})`).join(', ')}`;
+  const goldDesc = plan.totalGoldCost > 0 ? `Gold: ${formatNumber(plan.totalGoldCost)}` : 'Gold: 0';
+  return `${craftDesc} | ${equipDesc} | ${goldDesc}`;
+});
+
+async function handleCraftAndEquipAllReady() {
+  if (!activeHero.value || isBatchEquipping.value) return;
+  const plan = recursiveGearPlan.value;
+  if (plan.readySlotCount <= 0 || !plan.canAffordGold) return;
+  const calls = buildRecursiveGearCraftEquipCalls(activeHero.value.id, plan);
+  if (!calls.length) return;
+  isBatchEquipping.value = true;
+  try {
+    await dispatchRpc(calls);
+  } catch (err) {
+    console.error('Failed to batch craft & equip gear:', err);
+  } finally {
+    isBatchEquipping.value = false;
+  }
+}
 
 const canPromote = computed(() => {
   if (!activeHero.value || equipmentSlots.value.length < 6) return false;
@@ -2077,6 +2117,32 @@ function handleSoulStoneFarm() {
               >
                 <span v-if="isPromoting" class="animate-spin text-xs inline-block">↻</span>
                 <span>{{ isPromoting ? 'Promoting...' : 'Promote Now' }}</span>
+              </button>
+            </div>
+
+            <!-- 1-Click Recursive Craft & Equip Ready Banner (never auto-promotes) -->
+            <div
+              v-if="!canPromote && recursiveGearPlan.readySlotCount > 0"
+              class="p-2.5 rounded-lg border border-indigo-200 bg-indigo-50/80 dark:border-indigo-800/70 dark:bg-indigo-950/30 flex items-center justify-between gap-2 text-xs flex-wrap"
+            >
+              <div class="text-indigo-900 dark:text-indigo-200 flex items-center gap-2 flex-wrap">
+                <span class="font-bold">🛠️ {{ recursiveGearPlan.readySlotCount }} slot{{ recursiveGearPlan.readySlotCount > 1 ? 's' : '' }} ready</span>
+                <span v-if="recursiveGearPlan.craftSteps.length > 0" class="text-2xs text-slate-600 dark:text-slate-300">
+                  ({{ recursiveGearPlan.craftSteps.length }} craft step{{ recursiveGearPlan.craftSteps.length > 1 ? 's' : '' }} · {{ formatNumber(recursiveGearPlan.totalGoldCost) }} Gold)
+                </span>
+                <span v-if="!recursiveGearPlan.canAffordGold" class="text-2xs font-semibold text-rose-600 dark:text-rose-400">
+                  Insufficient Gold
+                </span>
+              </div>
+              <button
+                id="hero-equip-all-ready-btn"
+                type="button"
+                :disabled="isBatchEquipping || !recursiveGearPlan.canAffordGold"
+                :title="recursiveGearPlanTooltip"
+                class="cursor-pointer px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                @click="handleCraftAndEquipAllReady"
+              >
+                {{ isBatchEquipping ? 'Equipping…' : `Craft & Equip Ready (${recursiveGearPlan.readySlotCount})` }}
               </button>
             </div>
 

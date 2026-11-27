@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.370 — 2026-11-27
+
+### Added
+
+- **Favorite Heroes Daily Soul-Stone Sweeper (Reserve Energy + Autopilot) & 1-Click Recursive Gear Craft-Equip (`heroSoulSweepService.ts`, `dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `CampaignRaidModal.vue`, `HeroDetailModal.vue`, `tests/hero-soul-sweep.test.mjs`)**:
+  - Added pure planner `planFavoriteSoulStoneSweep()` skipping 6★ and `canEvolve` heroes, filtering 3★ Heroic missions with remaining daily tries, prioritizing heroes closest to their next star, and respecting configurable `reserveEnergy` (default `30⚡`, zero Emerald/Bottle spend).
+  - Integrated optional `'soul-sweep'` step (`Favorite Soul Stones`) into `Daily Routine Autopilot` with clean auto-skip when ineligible or at/below reserve energy.
+  - Added `#campaign-soul-sweep-panel`, `#campaign-soul-reserve-input`, and `#campaign-soul-sweep-btn` to `CampaignRaidModal.vue`.
+  - Added `planRecursiveGearCraftAndEquip()` and `buildRecursiveGearCraftEquipCalls()` with shared virtual inventory accounting (atomic per-slot rollback, strict bottom-up `inventoryCraftFragments`/`inventoryCraftRecipe` → `heroInsertItem` order, Gold cost preview, never auto-promoting) and `#hero-equip-all-ready-btn` in `HeroDetailModal.vue`.
+
 ## 0.11.368 — 2026-11-27
 
 ### Changed

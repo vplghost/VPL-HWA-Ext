@@ -1,5 +1,10 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import {
+  planFavoriteSoulStoneSweep,
+  DEFAULT_SOUL_SWEEP_RESERVE_ENERGY,
+  SOUL_SWEEP_RESERVE_STORAGE_KEY,
+} from '../services/heroSoulSweepService.ts';
+import {
   DAILY_AUTOPILOT_SETTINGS_KEY,
   DAILY_AUTOPILOT_STATE_KEY,
   DAILY_STEP_LABELS,
@@ -328,6 +333,48 @@ export function useDailyAutopilot(
       runtimeState.steps.quests = {
         status: 'done',
         detail: 'Quests & mail synced',
+        completedAt: Date.now(),
+      };
+      return;
+    }
+
+    if (stepId === 'soul-sweep') {
+      let favIds: Array<string | number> = [];
+      let reserveEnergy = DEFAULT_SOUL_SWEEP_RESERVE_ENERGY;
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+        try {
+          const stored: any = await chrome.storage.local.get(['favoriteHeroes', SOUL_SWEEP_RESERVE_STORAGE_KEY]);
+          if (Array.isArray(stored?.favoriteHeroes)) favIds = stored.favoriteHeroes;
+          if (stored?.[SOUL_SWEEP_RESERVE_STORAGE_KEY] != null) reserveEnergy = Number(stored[SOUL_SWEEP_RESERVE_STORAGE_KEY]);
+        } catch (_) {}
+      }
+      const plan = planFavoriteSoulStoneSweep(cacheRef.value, favIds, { reserveEnergy });
+      if (plan.plannedRaids <= 0) {
+        runtimeState.steps['soul-sweep'] = {
+          status: 'skipped',
+          detail: plan.skippedReason || 'No eligible favorite Heroic missions.',
+        };
+        return;
+      }
+      let completedRaids = 0;
+      for (const m of plan.missions) {
+        if (m.plannedRaids <= 0) continue;
+        const calls: Array<{ name: string; args?: any; ident?: string }> = [];
+        for (let k = 0; k < m.plannedRaids; k++) {
+          calls.push({
+            name: 'missionRaid',
+            args: { id: m.missionId, times: 1 },
+            ident: `autoss_${m.missionId}_${k}_${Date.now()}`,
+          });
+        }
+        const res = await dispatchRpc(calls);
+        if (res?.ok === false) break;
+        completedRaids += m.plannedRaids;
+      }
+      await dispatchRpc([{ name: 'inventoryGet' }, { name: 'userGetInfo' }]);
+      runtimeState.steps['soul-sweep'] = {
+        status: 'done',
+        detail: `Swept ${completedRaids} Heroic raids (${plan.plannedEnergy}⚡, reserve ${plan.reserveEnergy}⚡)`,
         completedAt: Date.now(),
       };
       return;
