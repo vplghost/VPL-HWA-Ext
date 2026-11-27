@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.388 — 2026-11-27
+
+### Added
+
+- **Auto Free Heroic Chest (Video) Collector & 2-Column Auto Freebies Card (`SettingsTab.vue`, `useHeroicChestVideoAutomation.ts`, `backgroundRuntime.ts`, `tests/heroic-chest-video-auto.test.mjs`)**:
+  - Added `#setting-auto-heroic-chest-video` inside `#settings-auto-collectors-section` (**Auto Freebies & Resource Collectors**) and refactored the 4 collectors into a balanced 2-column grid (`#settings-auto-collectors-grid`, `grid-cols-1 md:grid-cols-2`).
+  - Added `runHeroicChestVideoOpen()` background scheduler using a single zero-polling alarm (`hwa-auto-heroic-chest-video`) synced to `heroChest_getInfo.videoCooldown + 5s`, automatically opening the free video chest with strict 0-Emerald payload (`count: 1, free: true, video: true, costId: ''`), 60s duplicate-open protection, and no blind opens when cache is missing.
+
 ## 0.11.387 — 2026-11-27
 
 ### Changed

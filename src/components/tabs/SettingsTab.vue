@@ -9,6 +9,7 @@ import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
+import { useHeroicChestVideoAutomation } from '@/src/composables/useHeroicChestVideoAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { applyTabPreset } from '@/src/utils/commandPalette';
@@ -315,6 +316,7 @@ async function compactStorageCache() {
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 const { enabled: autoRealmResourcesEnabled, status: autoRealmResourcesStatus, save: saveAutoRealmResources } = useRealmResourcesAutomation();
+const { enabled: autoHeroicChestVideoEnabled, status: autoHeroicChestVideoStatus, save: saveAutoHeroicChestVideo } = useHeroicChestVideoAutomation();
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
@@ -1114,31 +1116,45 @@ async function toggleRecording() {
         </p>
       </div>
 
-      <!-- 1. Auto Free Spin -->
-      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
-          <input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" @change="saveAutoFreeSpin" />
-          <span>Use free Alchemy spin when its timer expires</span>
-        </label>
-        <p v-if="autoFreeSpinStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFreeSpinStatus }}</p>
-      </div>
+      <div
+        id="settings-auto-collectors-grid"
+        class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800"
+      >
+        <!-- 1. Auto Free Spin -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1">
+          <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+            <input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" class="mt-0.5" @change="saveAutoFreeSpin" />
+            <span>Use free Alchemy spin when its timer expires</span>
+          </label>
+          <p v-if="autoFreeSpinStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFreeSpinStatus }}</p>
+        </div>
 
-      <!-- 2. Auto Frontier Rewards -->
-      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
-          <input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />
-          <span>Auto claim Frontier chest hourly (every 60 minutes)</span>
-        </label>
-        <p v-if="autoFrontierStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFrontierStatus }}</p>
-      </div>
+        <!-- 2. Auto Frontier Rewards -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1">
+          <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+            <input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" class="mt-0.5" @change="saveAutoFrontier" />
+            <span>Auto claim Frontier chest hourly (every 60 minutes)</span>
+          </label>
+          <p v-if="autoFrontierStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoFrontierStatus }}</p>
+        </div>
 
-      <!-- 3. Auto Realm Resources -->
-      <div class="space-y-0.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
-          <input id="setting-auto-realm-resources" v-model="autoRealmResourcesEnabled" type="checkbox" @change="saveAutoRealmResources" />
-          <span>Auto collect Realm resources hourly (every 60 minutes)</span>
-        </label>
-        <p v-if="autoRealmResourcesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoRealmResourcesStatus }}</p>
+        <!-- 3. Auto Realm Resources -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1">
+          <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+            <input id="setting-auto-realm-resources" v-model="autoRealmResourcesEnabled" type="checkbox" class="mt-0.5" @change="saveAutoRealmResources" />
+            <span>Auto collect Realm resources hourly (every 60 minutes)</span>
+          </label>
+          <p v-if="autoRealmResourcesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoRealmResourcesStatus }}</p>
+        </div>
+
+        <!-- 4. Auto Free Heroic Chest (Video) -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1">
+          <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+            <input id="setting-auto-heroic-chest-video" v-model="autoHeroicChestVideoEnabled" type="checkbox" class="mt-0.5" @change="saveAutoHeroicChestVideo" />
+            <span>Auto open Free Heroic Chest (Video) when cooldown expires</span>
+          </label>
+          <p v-if="autoHeroicChestVideoStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoHeroicChestVideoStatus }}</p>
+        </div>
       </div>
     </section>
 

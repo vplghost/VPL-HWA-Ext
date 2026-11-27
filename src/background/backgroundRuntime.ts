@@ -28,7 +28,7 @@ import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { buildAutoTrainCalls, getNextTroopTrainWakeAt, needsTroopTrainingRefresh, TROOP_DEFS } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
-import { computeRealmProductionPending } from '../services/dailyAutopilotService.ts';
+import { computeHeroicChestNextWakeMs, computeRealmProductionPending } from '../services/dailyAutopilotService.ts';
 import { extractDraftHeroSteps, extractDraftSwapHeroIds, extractDraftHeroDetails } from '../utils/draftHelper.ts';
 import { getRecorderStore } from './storage/recorderDb.ts';
 import { pruneRpcCache } from '../core/cache/cachePruner.ts';
@@ -1289,6 +1289,18 @@ export function setupQueueAlarms(customChrome?: any) {
         }).catch(() => {});
       }
     });
+    cr.alarms.get('hwa-auto-heroic-chest-video', (alarm: any) => {
+      if (!alarm) {
+        cr.storage?.local?.get(['autoHeroicChestVideoEnabled', 'autoHeroicChestVideoState', 'rpcCache']).then((st: any) => {
+          if (st?.autoHeroicChestVideoEnabled === true) {
+            const nextFromCache = computeHeroicChestNextWakeMs(st?.rpcCache, Date.now());
+            const next = nextFromCache ?? st.autoHeroicChestVideoState?.nextWakeAt;
+            const when = Number.isFinite(next) && next > Date.now() ? next : Date.now() + 15 * 1000;
+            cr.alarms.create('hwa-auto-heroic-chest-video', { when });
+          }
+        }).catch(() => {});
+      }
+    });
   } catch (_) {}
 }
 
@@ -2474,6 +2486,108 @@ export async function runRealmResourcesClaim(manual = false, customChrome?: any)
   }
 }
 
+export async function runHeroicChestVideoOpen(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'autoHeroicChestVideoEnabled',
+      'autoHeroicChestVideoState',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings'
+    ])) || {};
+  const cache = stored.rpcCache || {};
+  const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id;
+  const now = Date.now();
+  let state = stored.autoHeroicChestVideoState ? structuredClone(stored.autoHeroicChestVideoState) : null;
+  if (!stored.autoHeroicChestVideoEnabled) {
+    cr?.alarms?.clear?.('hwa-auto-heroic-chest-video');
+    if (!manual) return { ok: false, error: 'Auto heroic chest video is disabled.' };
+    if (state) {
+      state.nextWakeAt = 0;
+      state.status = 'Disabled';
+      await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    }
+    return { ok: true, disabled: true };
+  }
+  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
+  if (accountId == null) return { ok: false, error: 'Waiting for current game account.' };
+
+  if (state && String(state.accountId) !== String(accountId)) {
+    state = null;
+  }
+  state = state || { accountId, lastOpenAt: 0 };
+
+  const heroChest = cache.heroChest_getInfo?.data;
+  const nextWakeFromCache = computeHeroicChestNextWakeMs(cache, now);
+  if (nextWakeFromCache !== null && nextWakeFromCache > now) {
+    state.nextWakeAt = nextWakeFromCache;
+    state.lastError = undefined;
+    state.status = `Next open scheduled at ${new Date(nextWakeFromCache).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    cr?.alarms?.create?.('hwa-auto-heroic-chest-video', { when: Math.max(now + 1000, nextWakeFromCache) });
+    return { ok: true, scheduled: true, nextWakeAt: nextWakeFromCache };
+  }
+
+  const tab = await findActiveGameTab(cr);
+  if (!tab?.id) {
+    state.status = 'No active game tab found. Retrying later.';
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  // Never blind-open without an authoritative heroChest_getInfo snapshot in cache
+  if (!heroChest || heroChest.videoCooldown == null) {
+    const refreshMsg = rpcMessageForSettings(stored, [{ name: 'heroChest_getInfo', args: {} }]);
+    if (refreshMsg) {
+      await cr?.tabs?.sendMessage?.(tab.id, refreshMsg).catch(() => {});
+    }
+    const retryAt = now + 15 * 1000;
+    state.nextWakeAt = retryAt;
+    state.status = 'Checking Heroic Chest cooldown...';
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    cr?.alarms?.create?.('hwa-auto-heroic-chest-video', { when: retryAt });
+    return { ok: true, refreshed: true, nextWakeAt: retryAt };
+  }
+
+  // Guard against duplicate open dispatch within 60 seconds while waiting for heroChest_getInfo refresh
+  const DUPLICATE_GUARD_MS = 60 * 1000;
+  if (state.lastOpenAt && (now - state.lastOpenAt) < DUPLICATE_GUARD_MS) {
+    const retryAt = state.lastOpenAt + DUPLICATE_GUARD_MS;
+    state.nextWakeAt = retryAt;
+    state.status = `Opened recently · verifying cooldown at ${new Date(retryAt).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    cr?.alarms?.create?.('hwa-auto-heroic-chest-video', { when: Math.max(now + 1000, retryAt) });
+    return { ok: true, deduplicated: true, nextWakeAt: retryAt };
+  }
+
+  // Strict 0-Emerald free video open payload (also enforced by rpcSanitizer.validateOutgoingMultiTeamRpcCalls)
+  const calls = [
+    { name: 'heroChest_openChest', args: { count: 1, free: true, video: true, costId: '' } },
+    { name: 'heroChest_getInfo', args: {} }
+  ];
+  const dispatch = rpcMessageForSettings(stored, calls);
+  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  try {
+    await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+    state.lastOpenAt = now;
+    state.nextWakeAt = now + ONE_DAY_MS + 5000;
+    state.lastError = undefined;
+    state.status = `Opened free Heroic Chest (Video) at ${new Date(now).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    cr?.alarms?.create?.('hwa-auto-heroic-chest-video', { when: state.nextWakeAt });
+    return { ok: true, opened: true, nextWakeAt: state.nextWakeAt, queued: dispatch.kind === 'queue-rpc' };
+  } catch (err: any) {
+    state.lastError = err?.message || String(err);
+    state.status = `Open dispatch failed: ${state.lastError}`;
+    await cr?.storage?.local?.set({ autoHeroicChestVideoState: state });
+    return { ok: false, error: state.lastError };
+  }
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -3249,6 +3363,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runRealmResourcesClaim(false, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === 'hwa-auto-heroic-chest-video') {
+      pending = pending.then(() => runHeroicChestVideoOpen(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
@@ -3309,6 +3427,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (area === 'local' && ['autoFreeSpinEnabled', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       pending = pending.then(() => runFreeSpin(false, null, null, cr)).catch(() => {});
+    }
+    if (area === 'local' && 'autoHeroicChestVideoEnabled' in changes && changes.autoHeroicChestVideoEnabled?.newValue !== true) {
+      cr.alarms?.clear?.('hwa-auto-heroic-chest-video');
     }
     if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopTrainDispatch = null;
@@ -3411,6 +3532,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runRealmResourcesClaim(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'heroic-chest-video-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runHeroicChestVideoOpen(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -4547,6 +4678,13 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (sender.tab?.id && !defenseHold) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id, cr);
       if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id, cr, evaluatedDefense);
       if (sender.tab?.id) await runFreeSpin(false, record, sender.tab.id, cr);
+      if (
+        sender.tab?.id &&
+        cacheResult.changed &&
+        cacheResult.cache.heroChest_getInfo?.updatedAt === record.timestamp
+      ) {
+        await runHeroicChestVideoOpen(false, cr);
+      }
       await reconcileSpeedup(cacheResult.cache, cr);
       await reconcileMailClaim(cacheResult.cache, cr);
       scheduleMailExpiry(cacheResult.cache, cr);
@@ -4821,6 +4959,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     runFreeSpin: (manual?: boolean, record?: any, sourceTabId?: any) => runFreeSpin(manual, record, sourceTabId, cr),
     runFrontierRewardsClaim: (manual?: boolean) => runFrontierRewardsClaim(manual, cr),
     runRealmResourcesClaim: (manual?: boolean) => runRealmResourcesClaim(manual, cr),
+    runHeroicChestVideoOpen: (manual?: boolean) => runHeroicChestVideoOpen(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),
