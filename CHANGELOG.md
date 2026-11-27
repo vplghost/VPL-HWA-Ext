@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.390 — 2026-11-28
+
+### Changed
+
+- **Raid Dialog Compact 1-Row Params, Detached Auto-Raid Card & Zero-Jump Status Footer (`RaidModal.vue`, `tests/status-alert-banner.test.mjs`)**:
+  - Compacted Boss Level + Find, Target, and Rounds (`#raid-queue-count`) onto a single 12-column row (`#raid-params-row`) and removed redundant `"Boss"` prefixes from Level (`Lv. N`) and Target (`#N · (x, y)`) dropdown options.
+  - Detached **Auto raid when World Energy naturally reaches** into its own sibling card (`#raid-auto-energy-section`) outside Section 2 to eliminate nested borders.
+  - Moved action controls into a pinned `#raid-dialog-footer` outside `#raid-dialog-body` with `<StatusAlertBanner>` rendered below `#raid-dialog-actions` and top-anchored modal alignment so status banners never shift button positions.
+
 ## 0.11.389 — 2026-11-27
 
 ### Changed

@@ -521,7 +521,7 @@ async function stopRaidQueue() {
     aria-modal="true"
     aria-labelledby="raid-dialog-title"
     :style="{ zIndex: stackLevel }"
-    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    class="fixed inset-0 flex items-start justify-center pt-4 sm:pt-8 px-3 sm:px-4 pb-3 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div
@@ -585,7 +585,7 @@ async function stopRaidQueue() {
       </div>
 
       <!-- Dialog Body -->
-      <div id="raid-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]">
+      <div id="raid-dialog-body" class="p-4 space-y-3.5 overflow-y-auto flex-1 min-h-0">
         <!-- Section 1: Team & Troop Deployment -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -711,17 +711,17 @@ async function stopRaidQueue() {
             <span>⚙️</span> Boss Search & Raid Parameters
           </h3>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+          <div id="raid-params-row" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
             <!-- Boss Level with Find Button -->
-            <div>
+            <div class="sm:col-span-4">
               <label for="raid-boss-level" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Boss Level
+                Level
               </label>
               <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <select
                   id="raid-boss-level"
                   v-model.number="bossLevel"
-                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                   @change="savePreferences"
                 >
                   <option
@@ -730,35 +730,35 @@ async function stopRaidQueue() {
                     :value="lvl"
                     class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                   >
-                    Boss level {{ lvl }}
+                    Lv. {{ lvl }}
                   </option>
                 </select>
 
                 <button
                   type="button"
                   :disabled="isSearchingBosses"
-                  class="cursor-pointer px-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
+                  class="cursor-pointer px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
                   title="Search map for bosses at this level"
                   @click="findBosses"
                 >
-                  <span>{{ isSearchingBosses ? 'Searching...' : 'Find' }}</span>
+                  <span>{{ isSearchingBosses ? '...' : 'Find' }}</span>
                 </button>
               </div>
             </div>
 
             <!-- Target Boss Select -->
-            <div>
-              <label for="raid-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Target ({{ matchingBossConfig ? `${foundBosses.length} target(s) found` : 'Search level first' }})
+            <div class="sm:col-span-5">
+              <label for="raid-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 truncate">
+                Target ({{ matchingBossConfig ? `${foundBosses.length} found` : 'Search first' }})
               </label>
               <select
                 id="raid-target-select"
                 v-model="selectedMobId"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
                 <option v-if="foundBosses.length === 0" value="" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
-                  No targets found (Click "Find")
+                  None (Click Find)
                 </option>
                 <option
                   v-for="(target, idx) in foundBosses"
@@ -766,11 +766,35 @@ async function stopRaidQueue() {
                   :value="target.mobId"
                   class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  Boss {{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
+                  #{{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
             </div>
 
+            <!-- Raid Rounds -->
+            <div class="sm:col-span-3">
+              <label
+                for="raid-queue-count"
+                class="flex items-center justify-between gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1"
+                :title="currentWorldEnergy !== undefined ? `Max ${maxRaidRounds} rounds (${currentWorldEnergy} World Energy / ${RALLY_ENERGY_COST} per rally)` : 'Rounds for queue'"
+              >
+                <span>Rounds</span>
+                <span v-if="currentWorldEnergy !== undefined" class="text-[10px] font-mono text-indigo-600 dark:text-indigo-400">
+                  Max {{ maxRaidRounds }} · {{ currentWorldEnergy }}⚡
+                </span>
+              </label>
+              <input
+                id="raid-queue-count"
+                v-model.number="raidCount"
+                type="number"
+                min="1"
+                :max="maxRaidRounds"
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
             <!-- Rally Wait Seconds -->
             <div>
               <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
@@ -778,7 +802,7 @@ async function stopRaidQueue() {
               </label>
               <select
                 v-model.number="waitSeconds"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
                 <option :value="60" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">1 minute (60s)</option>
@@ -794,7 +818,7 @@ async function stopRaidQueue() {
                 Minimum Members
               </label>
               <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
-                <label class="flex flex-1 min-w-0 items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300" title="Cancel the rally in the last 10 seconds if members are below this minimum">
+                <label class="flex flex-1 min-w-0 items-center gap-2 px-2.5 py-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300" title="Cancel the rally in the last 10 seconds if members are below this minimum">
                   <input
                     id="raid-auto-cancel"
                     v-model="autoCancel"
@@ -817,24 +841,6 @@ async function stopRaidQueue() {
             </div>
           </div>
 
-          <!-- Raid Count -->
-          <div>
-            <label for="raid-queue-count" class="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-              <span>Rounds / Attack Count (for queue)</span>
-              <span v-if="currentWorldEnergy !== undefined" class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                Max {{ maxRaidRounds }} ({{ currentWorldEnergy }} ⚡ / {{ RALLY_ENERGY_COST }})
-              </span>
-            </label>
-            <input
-              id="raid-queue-count"
-              v-model.number="raidCount"
-              type="number"
-              min="1"
-              :max="maxRaidRounds"
-              class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
-            />
-          </div>
-
           <!-- Post-Queue Auto-Heal & Squad Lock Indicator -->
           <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
             <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -855,17 +861,22 @@ async function stopRaidQueue() {
               🔒 {{ activeRaidLock.heroIds?.length || 0 }} heroes &amp; {{ activeRaidLock.marchSlots || 1 }} march slot reserved from Auto Gather
             </span>
           </div>
+        </section>
 
-          <div class="rounded-lg border border-indigo-200 dark:border-indigo-900 p-3 space-y-2">
-            <label class="flex items-center gap-2 text-xs font-semibold">
-              <input id="raid-auto-energy" v-model="autoEnergyRaid" type="checkbox" @change="saveAutoRaid" />
-              Auto raid when World Energy naturally reaches
-              <input id="raid-energy-threshold" v-model.number="energyThreshold" type="number" min="25" max="200" aria-label="World Energy threshold" class="w-16 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-1" @change="saveAutoRaid" />
-            </label>
-            <p class="text-xs text-slate-500">Uses the team, boss level, raid count and rally settings above. Triggers only from below to exactly the threshold through natural regeneration; skips startup, item gains and energy already above the threshold.</p>
-            <p v-if="autoEnergyMessage" role="status" class="text-xs text-indigo-600 dark:text-indigo-300">{{ autoEnergyMessage }}</p>
-          </div>
-
+        <!-- Section 3: Detached Auto Raid by World Energy -->
+        <section
+          id="raid-auto-energy-section"
+          class="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-white dark:bg-slate-800/80 p-3.5 shadow-xs space-y-1.5"
+        >
+          <label class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-100 cursor-pointer">
+            <input id="raid-auto-energy" v-model="autoEnergyRaid" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 shrink-0" @change="saveAutoRaid" />
+            <span>⚡ Auto raid when World Energy naturally reaches</span>
+            <input id="raid-energy-threshold" v-model.number="energyThreshold" type="number" min="25" max="200" aria-label="World Energy threshold" class="w-16 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-mono" @change="saveAutoRaid" />
+          </label>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">
+            Uses the team, boss level, rounds and rally settings above. Triggers only from below to the threshold through natural regeneration; skips startup, item gains and energy already above the threshold.
+          </p>
+          <p v-if="autoEnergyMessage" role="status" class="text-xs text-indigo-600 dark:text-indigo-300">{{ autoEnergyMessage }}</p>
         </section>
 
         <!-- Map Missing Warning & Locate Action -->
@@ -914,17 +925,14 @@ async function stopRaidQueue() {
             </div>
           </div>
         </section>
+      </div>
 
-        <!-- Status Message Banner -->
-        <StatusAlertBanner
-          v-if="statusMessage"
-          :message="statusMessage"
-          :on-refresh="handleBannerRefresh"
-          refresh-title="Refresh marches and troops"
-        />
-
-        <!-- Section 3: Actions & Queue Controls -->
-        <div class="flex items-center justify-end gap-2 pt-2">
+      <!-- Pinned Zero-Jump Footer (Actions above Status Banner) -->
+      <div
+        id="raid-dialog-footer"
+        class="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 py-3 space-y-2"
+      >
+        <div id="raid-dialog-actions" class="flex items-center justify-end gap-2">
           <button
             type="button"
             :disabled="isRunning || isSearchingBosses"
@@ -953,6 +961,13 @@ async function stopRaidQueue() {
             ⏹ Stop Raid Queue
           </button>
         </div>
+
+        <StatusAlertBanner
+          v-if="statusMessage"
+          :message="statusMessage"
+          :on-refresh="handleBannerRefresh"
+          refresh-title="Refresh marches and troops"
+        />
       </div>
     </div>
   </div>

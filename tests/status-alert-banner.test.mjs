@@ -66,6 +66,14 @@ test('RaidModal integrates StatusAlertBanner with handleBannerRefresh dispatchin
   const raidModalSource = await readFile(new URL('../src/components/dialogs/RaidModal.vue', import.meta.url), 'utf8');
   assert.ok(raidModalSource.includes('<StatusAlertBanner'), 'RaidModal must mount StatusAlertBanner');
   assert.ok(raidModalSource.includes('handleBannerRefresh'), 'RaidModal must define handleBannerRefresh');
+  assert.match(raidModalSource, /id="raid-params-row"[\s\S]*?sm:grid-cols-12/, 'P2-40: RaidModal puts Level, Target, and Rounds on 1 row');
+  assert.match(raidModalSource, /Lv\. \{\{ lvl \}\}/, 'P2-40: Boss Level options omit redundant Boss word');
+  assert.doesNotMatch(raidModalSource, /Boss level \{\{ lvl \}\}/, 'P2-40: No redundant Boss level option text');
+  assert.match(raidModalSource, /#\{\{ Number\(idx\) \+ 1 \}\} ·/, 'P2-40: Target options omit redundant Boss word');
+  assert.match(raidModalSource, /<section[\s\S]*?id="raid-auto-energy-section"/, 'P2-40: Auto Raid Energy is a detached sibling section');
+  const actionsIdx = raidModalSource.indexOf('id="raid-dialog-actions"');
+  const bannerIdx = raidModalSource.indexOf('<StatusAlertBanner');
+  assert.ok(actionsIdx > 0 && bannerIdx > actionsIdx, 'P2-40: StatusAlertBanner renders below #raid-dialog-actions to prevent button jump');
 
   const runtime = await setupDialog('dialogs/RaidModal.vue', 'handleBannerRefresh, statusMessage');
   assert.equal(typeof runtime.handlers.handleBannerRefresh, 'function');
