@@ -351,3 +351,55 @@ export function evaluateDoorSafetyAndLoss(
     simOutcome: stateOutcome,
   };
 }
+
+/**
+ * Normalizes `progress[0].attackers.heroes` and `defenders.heroes` returned by Unity's
+ * `DataObject_asJson`.
+ *
+ * In Hero Wars: Alliance (PHP/Unity associative map convention), an empty map (0 surviving
+ * units) is frequently serialized as an empty JSON array `[]` or omitted.
+ * - On defeat (`win === false`), an empty/missing `attackers.heroes` represents a total wipe
+ *   (all attackers dead) and normalizes cleanly to `{}` so callers (Dual-Door, Best-of-10,
+ *   PvP/Arena Optimizer) treat it as a normal loss instead of crashing `EXTRACT_BATTLE_RESULT`.
+ * - On victory (`win === true`), missing/empty/malformed `attackers.heroes` is impossible and
+ *   MUST throw to preserve the P1-14 anti-wipe guard before `dungeonEndBattle`.
+ */
+export function resolveSimulatedProgressHeroes(
+  parsedProgress: any,
+  win: boolean,
+  rawJsonSnippet?: string
+): { attackersHeroes: Record<string, any>; defendersHeroes: Record<string, any> } {
+  const rawAtt = parsedProgress?.attackers?.heroes;
+  const rawDef = parsedProgress?.defenders?.heroes;
+
+  const defendersHeroes: Record<string, any> =
+    rawDef && typeof rawDef === 'object' && !Array.isArray(rawDef) ? rawDef : {};
+
+  if (rawAtt && typeof rawAtt === 'object' && !Array.isArray(rawAtt)) {
+    if (win && Object.keys(rawAtt).length === 0) {
+      throw new Error(
+        `Unity simulation returned empty attackers.heroes on a winning battle (win=true)${rawJsonSnippet ? ` [${rawJsonSnippet.slice(0, 140)}]` : ''}`
+      );
+    }
+    return { attackersHeroes: rawAtt, defendersHeroes };
+  }
+
+  // On defeat (total wipe), Unity/PHP serializes empty maps as `[]` or omits them.
+  const isEmptyOrMissingAtt =
+    rawAtt == null || (Array.isArray(rawAtt) && rawAtt.length === 0);
+  if (!win && isEmptyOrMissingAtt) {
+    return { attackersHeroes: {}, defendersHeroes };
+  }
+
+  const shape =
+    !parsedProgress
+      ? 'progress=null'
+      : !parsedProgress.attackers
+        ? 'attackers=missing'
+        : Array.isArray(rawAtt)
+          ? `attackers.heroes=Array(${rawAtt.length})`
+          : `attackers.heroes=${typeof rawAtt}`;
+  throw new Error(
+    `Unity simulation returned missing or malformed battle progress (attackers.heroes unavailable: win=${win}, ${shape})${rawJsonSnippet ? ` [${rawJsonSnippet.slice(0, 140)}]` : ''}`
+  );
+}

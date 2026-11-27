@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.364 — 2026-11-27
+
+### Fixed
+
+- **Unity Battle Simulation `EXTRACT_BATTLE_RESULT` Total-Wipe Crash (`interceptor.ts`, `dungeonBattleSim.ts`, `tests/dungeon-sim-automation.test.mjs`)**:
+  - Normalized empty/omitted `progress[0].attackers.heroes` (`[]` / `null` / `undefined`) to `{}` when Unity reports a defeat (`win === false`) so total-wipe simulations cleanly return `{ win: false, stars: 0, attackers: allDead }` instead of throwing `EXTRACT_BATTLE_RESULT` and aborting Dual-Door / Best-of-10 Dungeon automation.
+  - Normalized `defenders.heroes` array payloads safely and preserved the `p1-14` hard anti-wipe guard (throwing with diagnostic `win`/`stars`/`shape`/snippet details) whenever `win === true` has missing, empty, or malformed `attackers.heroes`.
+
 ## 0.11.362 — 2026-11-27
 
 ### Fixed

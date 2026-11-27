@@ -1621,9 +1621,10 @@ export function installInterceptor(customWindow?: any): void {
         const stars = Number(invoke('MultiBattleResult_get_stars', resultHandle, 0)) || 0;
         const progressListPtr = invokePtr('MultiBattleResult_get_progress', resultHandle, 0);
         let parsedProgress: any = null;
+        let pJsonStr: string | null = null;
         if (progressListPtr) {
           const pStrPtr = invokePtr('DataObject_asJson', progressListPtr, 0);
-          const pJsonStr = readString(pStrPtr);
+          pJsonStr = readString(pStrPtr);
           if (pJsonStr) {
             try {
               const pObj = JSON.parse(pJsonStr);
@@ -1632,22 +1633,39 @@ export function installInterceptor(customWindow?: any): void {
           }
         }
 
-        // Map attackers and defenders state from progress
-        // CRITICAL SAFETY: If Unity failed to serialize progress.attackers.heroes, throw immediately
-        // instead of falling back to pre-battle HP (server treats omitted titans as dead -> team wipe).
-        if (
-          !parsedProgress ||
-          typeof parsedProgress !== 'object' ||
-          !parsedProgress.attackers ||
-          typeof parsedProgress.attackers.heroes !== 'object' ||
-          Array.isArray(parsedProgress.attackers.heroes)
-        ) {
-          throw new Error('Unity simulation returned missing or malformed battle progress (attackers.heroes unavailable)');
+        // Map attackers and defenders state from progress.
+        // In HWA Unity/PHP DataObject_asJson, an empty map (0 survivors on total wipe) serializes as `[]` or is omitted.
+        // - When `!win`, normalize empty/missing `attackers.heroes` to `{}` so every deployed unit is marked dead (normal defeat).
+        // - When `win === true`, keep the P1-14 hard guard so malformed/empty progress NEVER reaches dungeonEndBattle.
+        const rawProgAttackers = parsedProgress?.attackers?.heroes;
+        const isPlainProgAttackers =
+          Boolean(rawProgAttackers) && typeof rawProgAttackers === 'object' && !Array.isArray(rawProgAttackers);
+        const isWipeEmptyAttackers =
+          !win && (rawProgAttackers == null || (Array.isArray(rawProgAttackers) && rawProgAttackers.length === 0));
+
+        if (!isPlainProgAttackers && !isWipeEmptyAttackers) {
+          const shape = !parsedProgress
+            ? 'progress=null'
+            : !parsedProgress.attackers
+              ? 'attackers=missing'
+              : Array.isArray(rawProgAttackers)
+                ? `attackers.heroes=Array(${rawProgAttackers.length})`
+                : `attackers.heroes=${typeof rawProgAttackers}`;
+          const snippet = pJsonStr ? ` [${pJsonStr.slice(0, 140)}]` : '';
+          throw new Error(
+            `Unity simulation returned missing or malformed battle progress (attackers.heroes unavailable: win=${win}, stars=${stars}, ${shape})${snippet}`
+          );
+        }
+        if (win && Object.keys(rawProgAttackers).length === 0) {
+          const snippet = pJsonStr ? ` [${pJsonStr.slice(0, 140)}]` : '';
+          throw new Error(
+            `Unity simulation returned empty attackers.heroes on a winning battle (win=true, stars=${stars})${snippet}`
+          );
         }
 
         const attackersOut: Record<string, any> = {};
         const rawAttackers = rawBattle?.attackers || {};
-        const progAttackers = parsedProgress.attackers.heroes;
+        const progAttackers = isPlainProgAttackers ? rawProgAttackers : {};
 
         for (const [idStr, rawAttacker] of Object.entries(rawAttackers) as any) {
           const maxHp = Number(rawAttacker.hp || rawAttacker.maxHp || 1000000);
@@ -1681,7 +1699,11 @@ export function installInterceptor(customWindow?: any): void {
         }
 
         const defendersOut: Record<string, any> = {};
-        const progDefenders = parsedProgress?.defenders?.heroes || {};
+        const rawProgDefenders = parsedProgress?.defenders?.heroes;
+        const progDefenders =
+          rawProgDefenders && typeof rawProgDefenders === 'object' && !Array.isArray(rawProgDefenders)
+            ? rawProgDefenders
+            : {};
         for (const [idStr, progDef] of Object.entries(progDefenders) as any) {
           defendersOut[idStr] = {
             hp: Number(progDef.hp || 0),

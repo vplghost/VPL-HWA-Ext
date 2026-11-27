@@ -7,6 +7,7 @@ import {
   evaluateDoorSafetyAndLoss,
   isTitanEligibleForDoor,
   DUAL_ELEMENT_TITANS,
+  resolveSimulatedProgressHeroes,
 } from '../src/utils/dungeonBattleSim.ts';
 import {
   resolveSquadForDoor,
@@ -870,6 +871,36 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.equal(res.squadIds[0], 4050);
       assert.equal(res.squadIds.length, 5);
       assert.equal(res.isPoolDepleted, true);
+    });
+  });
+
+  describe('P1-18: Unity EXTRACT_BATTLE_RESULT Total-Wipe Normalization', () => {
+    it('normalizes empty array attackers.heroes=[] and omitted attackers on defeat (win=false) instead of throwing', () => {
+      const fromEmptyArray = resolveSimulatedProgressHeroes(
+        { attackers: { heroes: [] }, defenders: { heroes: { '4010': { hp: 500000 } } } },
+        false
+      );
+      assert.deepEqual(fromEmptyArray.attackersHeroes, {});
+      assert.deepEqual(fromEmptyArray.defendersHeroes, { '4010': { hp: 500000 } });
+
+      const fromOmitted = resolveSimulatedProgressHeroes({ attackers: {}, defenders: { heroes: [] } }, false);
+      assert.deepEqual(fromOmitted.attackersHeroes, {});
+      assert.deepEqual(fromOmitted.defendersHeroes, {});
+    });
+
+    it('preserves P1-14 hard throw when win=true and attackers.heroes is empty [], {}, or missing', () => {
+      assert.throws(
+        () => resolveSimulatedProgressHeroes({ attackers: { heroes: [] } }, true),
+        /attackers\.heroes unavailable: win=true, attackers\.heroes=Array\(0\)/
+      );
+      assert.throws(
+        () => resolveSimulatedProgressHeroes({ attackers: { heroes: {} } }, true),
+        /empty attackers\.heroes on a winning battle/
+      );
+      assert.throws(
+        () => resolveSimulatedProgressHeroes(null, true),
+        /progress=null/
+      );
     });
   });
 });
