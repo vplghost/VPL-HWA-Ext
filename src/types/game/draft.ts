@@ -44,6 +44,25 @@ export interface DraftEnemyUser {
   avatarId?: number;
 }
 
+export interface DraftWinstreakInfo {
+  winStreakCount?: number;
+  defenceCount?: number;
+  isDefenceBroken?: boolean;
+  availableRestoreWinstreakCount?: number;
+  resetTime?: number;
+}
+
+export interface DraftMatchOutcomeSnapshot {
+  matchId: number | null;
+  win: boolean;
+  result: number;
+  resultDetails?: number | null;
+  userRating: number | null;
+  enemyRating: number | null;
+  ratingDelta: number | null;
+  draftBpExp: number;
+}
+
 export interface DraftSessionData {
   matchId: number | null;
   stageId: number | null; // 1: matching, 2: defense, 3: def submitted, 4: attack, 5: ready, 7: result
@@ -60,6 +79,8 @@ export interface DraftSessionData {
   enemyHeroes?: DraftHeroLiveStats[]; // Decrypted enemy team heroes from draftEnemy (Stage 2 / Stage 4)
   chosenDefenceHeroes: number[];
   chosenAttackHeroes: number[];
+  winstreak?: DraftWinstreakInfo | null;
+  lastMatchResult?: DraftMatchOutcomeSnapshot | null;
   rawCiphertext?: string | null;
   rawEnemyCiphertext?: string | null;
   rawDecrypted?: string | null;

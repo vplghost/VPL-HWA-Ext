@@ -254,10 +254,32 @@ export function installInterceptor(customWindow?: any): void {
     'cinemaGiveReward',
     'cinemaGetCounters',
     'refillable_skillpointsUseVideo',
-    'eternalStory_collectChest'
+    'eternalStory_collectChest',
+    'randomDraft_getInfo',
+    'randomDraft_register',
+    'randomDraft_startBattle'
   ]);
 
   function isHelperAction(call: any): boolean {
+    if (call?.name === 'randomDraft_saveDefence' || call?.name === 'randomDraft_saveAttack') {
+      const heroes = call?.args?.heroes;
+      return (
+        !call.feature &&
+        Object.keys(call.args || {}).length === 1 &&
+        Array.isArray(heroes) &&
+        heroes.length === 5 &&
+        heroes.every((id: any) => Number.isInteger(id) && id > 0) &&
+        new Set(heroes).size === 5
+      );
+    }
+    if (call?.name === 'randomDraft_result') {
+      return (
+        !call.feature &&
+        Object.keys(call.args || {}).length === 1 &&
+        Number.isInteger(call?.args?.matchId) &&
+        call.args.matchId > 0
+      );
+    }
     if (speedupService.kindFor(call)) {
       return Boolean(speedupService.validate(call) && /^[a-f0-9]{32}$/.test(call.ident || ''));
     }

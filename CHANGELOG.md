@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.378 — 2026-11-27
+
+### Added
+
+- **Legends Draft Headless Play — Start Match, 1-Click Pick Team + Explicit Confirm & Finish Battle (`draftPlayService.ts`, `LegendsDraftModal.vue`, `interceptor.ts`, `draftHandler.ts`, `useDraft.ts`, `tests/legends-draft-play.test.mjs`)**:
+  - Added pure service `src/services/draftPlayService.ts` with `validateDraftLineup()`, `mapTeamToRoundPicks()`, verified 6-RPC builders (`randomDraft_getInfo`, `randomDraft_register`, `randomDraft_saveDefence`, `randomDraft_saveAttack`, `randomDraft_startBattle`, `randomDraft_result`), `parseDraftMatchOutcome()`, `getDraftChipsCount()`, and `canStartDraftMatch()`.
+  - Allowlisted the 6 verified `randomDraft_*` RPCs in `src/content/interceptor.ts` with strict payload validation (5 unique positive hero IDs, positive `matchId`) and zero Emerald-spend RPCs.
+  - Upgraded `LegendsDraftModal.vue` with `#draft-action-toolbar` (Draft Chips, Win Streak, Refresh, Start New Match, Start Battle & Claim Result, Auto-finish toggle), clickable 5×3 candidate cards, 1-Click Pick Team (`#draft-apply-rec-*` & `#draft-quick-pick-top1-btn`, local-only selection without auto-submit), explicit `#draft-submit-lineup-btn` (`Confirm & Submit Defense/Attack`), `#draft-match-result-card`, and 3s stage-transition fallback polling.
+  - Added `buildSyntheticDraftBattle()` matching live Legends Draft max stats (`level: 120`, `color: 16`, max Lv.120 skills, `hero_runes: [40×5]`, `titanGiftLevel: 30`, 3× Lv.100 6★ artifacts, Lv.60 skins with object `skinsInfo`, `star = Math.max(3, hero.star)`, `type: 'drafts'`, mirror-hero isolation), **`Simulate Picked`** (`#draft-sim-picked-btn` & `#draft-sim-picked-result`), error tooltips on `Sim Error`, and preserved the 5-column Round matrix with disabled unpicked cards during `stageId = 3` waiting state.
+
 ## 0.11.376 — 2026-11-27
 
 ### Fixed

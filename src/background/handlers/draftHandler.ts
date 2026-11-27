@@ -80,23 +80,44 @@ export function handleDraftMessage(message: any, cr: any): boolean {
             const isNewMatch = message.data?.matchId != null && session.matchId != null && Number(message.data.matchId) !== Number(session.matchId);
             const prevDef = isNewMatch ? [] : normalizeDraftHeroIdList(session.chosenDefenceHeroes);
             const prevAtk = isNewMatch ? [] : normalizeDraftHeroIdList(session.chosenAttackHeroes);
-            const nextDef = normalizeDraftHeroIdList(dto?.chosenDefenceHeroes);
-            const nextAtk = normalizeDraftHeroIdList(dto?.chosenAttackHeroes);
+            const incomingStageId = message.data?.stageId != null ? Number(message.data.stageId) : session.stageId;
+            const prevSteps = isNewMatch ? [] : (Array.isArray(session.heroSteps) ? session.heroSteps : []);
+            const flatIncomingIds = heroSteps.flat();
+            // At stageId=3 (waiting for opponent after submitting Defense), server returns only the 5 chosen heroes
+            // instead of the full 15-hero 5x3 pool. Preserve the 5-column matrix so cards never collapse to 2 columns.
+            const isReducedSubmittedPayload =
+              !isNewMatch &&
+              prevSteps.length === 5 &&
+              heroSteps.length > 0 &&
+              heroSteps.length < 5 &&
+              flatIncomingIds.length <= 5;
+            const nextDefFromDto = normalizeDraftHeroIdList(dto?.chosenDefenceHeroes);
+            const nextAtkFromDto = normalizeDraftHeroIdList(dto?.chosenAttackHeroes);
+            const inferredDef =
+              nextDefFromDto.length > 0
+                ? nextDefFromDto
+                : (incomingStageId === 3 && flatIncomingIds.length === 5 ? flatIncomingIds : prevDef);
+            const inferredAtk =
+              nextAtkFromDto.length > 0
+                ? nextAtkFromDto
+                : (incomingStageId === 5 && flatIncomingIds.length === 5 ? flatIncomingIds : prevAtk);
             const prevDetails = isNewMatch ? {} : (session.heroDetails || {});
             session = {
               ...session,
               ...(message.data?.matchId != null ? { matchId: Number(message.data.matchId) } : {}),
               ...(message.data?.stageId != null ? { stageId: Number(message.data.stageId) } : {}),
-              heroSteps: hasCandidates ? heroSteps : (isNewMatch ? [] : (session.heroSteps || [])),
-              swapHeroIds: hasCandidates
-                ? swapHeroIds
-                : (isNewMatch ? [] : (session.swapHeroIds || [])),
+              heroSteps: isReducedSubmittedPayload
+                ? prevSteps
+                : (hasCandidates ? heroSteps : prevSteps),
+              swapHeroIds: isReducedSubmittedPayload
+                ? (session.swapHeroIds || [])
+                : (hasCandidates ? swapHeroIds : (isNewMatch ? [] : (session.swapHeroIds || []))),
               heroDetails: Object.keys(heroDetails).length > 0
                 ? { ...prevDetails, ...heroDetails }
                 : prevDetails,
               enemyHeroes: hasEnemy ? enemyHeroes : (isNewMatch ? [] : (session.enemyHeroes || [])),
-              chosenDefenceHeroes: nextDef.length > 0 ? nextDef : prevDef,
-              chosenAttackHeroes: nextAtk.length > 0 ? nextAtk : prevAtk,
+              chosenDefenceHeroes: inferredDef,
+              chosenAttackHeroes: inferredAtk,
               stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
               gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
               rawDecrypted: (hasCandidates || !session.rawDecrypted) ? (rawText || session.rawDecrypted || null) : session.rawDecrypted,
@@ -132,6 +153,22 @@ export function handleDraftMessage(message: any, cr: any): boolean {
               if (picked.length > 0) {
                 session = { ...session, chosenAttackHeroes: picked, updatedAt: Date.now() };
               }
+            } else if (action === 'randomDraft_result' && resp && typeof resp === 'object' && resp.result != null) {
+              session = {
+                ...session,
+                stageId: 7,
+                lastMatchResult: {
+                  matchId: resp.matchId != null ? Number(resp.matchId) : (session.matchId ?? null),
+                  win: Number(resp.result) === 0,
+                  result: Number(resp.result),
+                  resultDetails: resp.resultDetails != null ? Number(resp.resultDetails) : null,
+                  userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : (session.userRating ?? null),
+                  enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : (session.enemyRating ?? null),
+                  ratingDelta: resp.rating?.userDifRating != null ? Number(resp.rating.userDifRating) : null,
+                  draftBpExp: Number(resp.reward?.draftBpExp ?? 0) || 0,
+                },
+                updatedAt: Date.now(),
+              };
             }
             if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
               const isNewMatch = resp.matchId != null && Number(resp.matchId) !== Number(session.matchId);
@@ -162,6 +199,7 @@ export function handleDraftMessage(message: any, cr: any): boolean {
                 userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : session.userRating,
                 enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : session.enemyRating,
                 enemyUser: resp.enemyUser ? { ...resp.enemyUser } : session.enemyUser,
+                winstreak: resp.winstreak && typeof resp.winstreak === 'object' ? { ...resp.winstreak } : session.winstreak,
                 rawCiphertext: keepExistingCipher ? session.rawCiphertext : (incomingCipher || session.rawCiphertext),
                 rawEnemyCiphertext: keepExistingEnemyCipher ? session.rawEnemyCiphertext : (incomingEnemyCipher || session.rawEnemyCiphertext),
                 updatedAt: Date.now(),

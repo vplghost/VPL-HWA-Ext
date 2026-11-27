@@ -27,6 +27,8 @@ const createDefaultSession = (): DraftSessionData => ({
   enemyHeroes: [],
   chosenDefenceHeroes: [],
   chosenAttackHeroes: [],
+  winstreak: null,
+  lastMatchResult: null,
   rawCiphertext: null,
   rawEnemyCiphertext: null,
   rawDecrypted: null,
@@ -117,9 +119,24 @@ export function useDraft() {
 
     const extractedSteps = extractDraftHeroSteps(dto, rawText);
     const hasCandidates = extractedSteps.length > 0;
-    if (hasCandidates) {
+    const incomingStageId = extra?.stageId != null ? Number(extra.stageId) : draftSession.stageId;
+    const isSameMatch = extra?.matchId == null || draftSession.matchId == null || Number(extra.matchId) === Number(draftSession.matchId);
+    const flatIncomingIds = extractedSteps.flat();
+    const isReducedSubmittedPayload =
+      isSameMatch &&
+      Array.isArray(draftSession.heroSteps) &&
+      draftSession.heroSteps.length === 5 &&
+      extractedSteps.length > 0 &&
+      extractedSteps.length < 5 &&
+      flatIncomingIds.length <= 5;
+    if (hasCandidates && !isReducedSubmittedPayload) {
       draftSession.heroSteps = extractedSteps;
       draftSession.swapHeroIds = extractDraftSwapHeroIds(dto, rawText);
+    }
+    if (isReducedSubmittedPayload && incomingStageId === 3 && draftSession.chosenDefenceHeroes.length === 0 && flatIncomingIds.length === 5) {
+      draftSession.chosenDefenceHeroes = flatIncomingIds;
+    } else if (isReducedSubmittedPayload && incomingStageId === 5 && draftSession.chosenAttackHeroes.length === 0 && flatIncomingIds.length === 5) {
+      draftSession.chosenAttackHeroes = flatIncomingIds;
     }
     const extractedDetails = extractDraftHeroDetails(dto);
     if (Object.keys(extractedDetails).length > 0) {
@@ -185,6 +202,21 @@ export function useDraft() {
     } else if (action === 'randomDraft_saveAttack') {
       const picked = normalizeDraftHeroIdList(args?.heroes);
       if (picked.length > 0) draftSession.chosenAttackHeroes = picked;
+    } else if (action === 'randomDraft_result' && resp && typeof resp === 'object' && resp.result != null) {
+      draftSession.stageId = 7;
+      const phaseInfo = formatDraftPhase(7);
+      draftSession.phase = phaseInfo.phase;
+      draftSession.phaseLabel = phaseInfo.label;
+      draftSession.lastMatchResult = {
+        matchId: resp.matchId != null ? Number(resp.matchId) : (draftSession.matchId ?? null),
+        win: Number(resp.result) === 0,
+        result: Number(resp.result),
+        resultDetails: resp.resultDetails != null ? Number(resp.resultDetails) : null,
+        userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : (draftSession.userRating ?? null),
+        enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : (draftSession.enemyRating ?? null),
+        ratingDelta: resp.rating?.userDifRating != null ? Number(resp.rating.userDifRating) : null,
+        draftBpExp: Number(resp.reward?.draftBpExp ?? 0) || 0,
+      };
     }
 
     if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
@@ -231,6 +263,9 @@ export function useDraft() {
           clanTitle: resp.enemyUser.clanTitle,
           avatarId: resp.enemyUser.avatarId
         };
+      }
+      if (resp.winstreak && typeof resp.winstreak === 'object') {
+        draftSession.winstreak = { ...resp.winstreak };
       }
       if (typeof resp.draft === 'string' && resp.draft.length > 0) {
         const keepExisting = !isNewMatch && typeof draftSession.rawCiphertext === 'string' && draftSession.rawCiphertext.length > 40 && resp.draft.length <= 40;

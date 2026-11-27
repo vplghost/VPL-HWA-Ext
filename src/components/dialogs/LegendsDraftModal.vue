@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useDraft } from '@/src/composables/useDraft';
+import { useRpcCache } from '@/src/composables/useRpcCache';
 import { buildCandidateMatrix, buildDraftHeroCandidate, formatDraftPhase, normalizeDraftHeroIdList } from '@/src/utils/draftHelper';
 import {
   recommendTop3DraftTeams,
@@ -10,7 +11,21 @@ import {
   getClassBadgeClass,
   type DraftTeamRecommendation,
 } from '@/src/services/draftRecommendationService';
-import { buildSyntheticArenaBattle, type PvpHeroSnapshot } from '@/src/services/pvpTeamOptimizer';
+import {
+  DRAFT_AUTO_FINISH_STORAGE_KEY,
+  validateDraftLineup,
+  mapTeamToRoundPicks,
+  buildDraftGetInfoCall,
+  buildDraftRegisterCall,
+  buildDraftSaveLineupCall,
+  buildDraftStartBattleCall,
+  buildDraftResultCall,
+  parseDraftMatchOutcome,
+  getDraftChipsCount,
+  canStartDraftMatch,
+  buildSyntheticDraftBattle,
+  type DraftBattleHeroInput,
+} from '@/src/services/draftPlayService';
 import { simulateBattleWithUnity } from '@/src/utils/dungeonBattleSim';
 import type { DraftHeroCandidate } from '@/src/types/game/draft';
 
@@ -22,14 +37,24 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { draftSession, retryDecrypt } = useDraft();
+const { draftSession, bindRpcEvent, retryDecrypt } = useDraft();
+const { cache, dispatchRpc } = useRpcCache();
 
 const now = ref(Math.floor(Date.now() / 1000));
 let countdownTimer: any = null;
+let stagePollTimer: any = null;
 const showDiagnostics = ref(false);
 const showFullRawJson = ref(false);
 const copiedDiagnostics = ref(false);
 const retryingDecrypt = ref(false);
+
+// Headless interactive play state
+const selectedRoundPicks = ref<Array<number | null>>([null, null, null, null, null]);
+const isActionBusy = ref(false);
+const actionStatus = ref<string | null>(null);
+const actionError = ref<string | null>(null);
+const autoFinishBattle = ref(false);
+let lastAutoFinishedMatchId: number | null = null;
 
 function handleRetryDecrypt() {
   retryingDecrypt.value = true;
@@ -39,14 +64,30 @@ function handleRetryDecrypt() {
   }, 1500);
 }
 
+async function saveAutoFinishSetting() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({ [DRAFT_AUTO_FINISH_STORAGE_KEY]: autoFinishBattle.value });
+    } catch (_) {}
+  }
+}
+
 onMounted(() => {
   countdownTimer = setInterval(() => {
     now.value = Math.floor(Date.now() / 1000);
   }, 1000);
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    chrome.storage.local.get(DRAFT_AUTO_FINISH_STORAGE_KEY).then((stored: any) => {
+      if (typeof stored?.[DRAFT_AUTO_FINISH_STORAGE_KEY] === 'boolean') {
+        autoFinishBattle.value = stored[DRAFT_AUTO_FINISH_STORAGE_KEY];
+      }
+    }).catch(() => {});
+  }
 });
 
 onUnmounted(() => {
   if (countdownTimer) clearInterval(countdownTimer);
+  if (stagePollTimer) clearInterval(stagePollTimer);
 });
 
 // Format remaining time in seconds
@@ -84,11 +125,16 @@ const activePickedIds = computed<number[]>(() => {
 });
 
 // Matrix of candidate heroes: columns (rounds) x choices
+// If popup opened late at stageId=3 (only 5 submitted heroes available), spread 1 per Round 1..5 instead of collapsing to 2 columns.
 const candidateColumns = computed<DraftHeroCandidate[][]>(() => {
   if (!draftSession.heroSteps || draftSession.heroSteps.length === 0) {
     return [];
   }
-  return buildCandidateMatrix(draftSession.heroSteps, activePickedIds.value, draftSession.heroDetails);
+  const steps =
+    draftSession.heroSteps.length < 5 && draftSession.heroSteps.flat().length === 5
+      ? draftSession.heroSteps.flat().map((id) => [id])
+      : draftSession.heroSteps;
+  return buildCandidateMatrix(steps, activePickedIds.value, draftSession.heroDetails);
 });
 
 const swapCandidates = computed<DraftHeroCandidate[]>(() => {
@@ -183,35 +229,49 @@ function simCacheKey(team: DraftTeamRecommendation): string {
   return `${draftSession.matchId ?? 'x'}:${team.key}:vs:${enemyKey}`;
 }
 
+function pickedTeamCacheKey(): string {
+  const enemyKey = enemyCandidates.value.map((e) => e.id).join('-');
+  const pickedKey = lineupValidation.value.normalizedHeroes.join('-');
+  return `${draftSession.matchId ?? 'x'}:picked:${pickedKey}:vs:${enemyKey}`;
+}
+
 function getSimResult(team: DraftTeamRecommendation): DraftSimResult | null {
   return simResults.value[simCacheKey(team)] || null;
 }
 
-async function simulateRecommendedTeam(team: DraftTeamRecommendation) {
+const pickedTeamSimResult = computed<DraftSimResult | null>(() => {
+  if (!lineupValidation.value.valid) return null;
+  return simResults.value[pickedTeamCacheKey()] || null;
+});
+
+async function runDraftWasmSimulation(
+  cacheKey: string,
+  activeKeyTag: string,
+  attackerHeroes: DraftBattleHeroInput[]
+) {
   if (!canSimulateAttackRecommendations.value || simulatingTeamKey.value) return;
-  const cacheKey = simCacheKey(team);
-  simulatingTeamKey.value = team.key;
+  simulatingTeamKey.value = activeKeyTag;
   simProgressText.value = `0/${SIM_ROUNDS}`;
 
   try {
-    const heroMap = new Map<number, PvpHeroSnapshot>();
-    for (const h of [...team.heroes, ...enemyCandidates.value]) {
-      heroMap.set(h.id, {
-        id: h.id,
-        level: h.level ?? 120,
-        color: h.color ?? 16,
-        star: h.star ?? 4,
-        power: h.power ?? 180000,
-      });
-    }
-    const enemyIds = enemyCandidates.value.map((e) => e.id);
+    const defenderHeroes: DraftBattleHeroInput[] = enemyCandidates.value.map((e) => ({
+      id: e.id,
+      star: e.star,
+      power: e.power,
+      level: e.level,
+      color: e.color,
+    }));
     let wins = 0;
     const baseSeed = Date.now() >>> 0;
 
     for (let i = 0; i < SIM_ROUNDS; i++) {
       simProgressText.value = `${i + 1}/${SIM_ROUNDS}`;
       const seed = (baseSeed + i * 7919) >>> 0;
-      const payload = buildSyntheticArenaBattle(team.heroIds, enemyIds, heroMap, seed);
+      const payload = buildSyntheticDraftBattle(attackerHeroes, defenderHeroes, seed, {
+        playerHeroCache: cache.value?.heroGetAll?.data,
+        userId: cache.value?.userGetInfo?.data?.id,
+        matchId: draftSession.matchId,
+      });
       const outcome = await simulateBattleWithUnity(payload, seed);
       if (outcome?.win) wins++;
     }
@@ -240,6 +300,32 @@ async function simulateRecommendedTeam(team: DraftTeamRecommendation) {
   }
 }
 
+async function simulateRecommendedTeam(team: DraftTeamRecommendation) {
+  const attackers: DraftBattleHeroInput[] = team.heroes.map((h) => ({
+    id: h.id,
+    star: h.star,
+    power: h.power,
+    level: h.level,
+    color: h.color,
+  }));
+  await runDraftWasmSimulation(simCacheKey(team), team.key, attackers);
+}
+
+async function simulatePickedTeam() {
+  if (!canSimulateAttackRecommendations.value || !lineupValidation.value.valid || simulatingTeamKey.value) return;
+  const attackers: DraftBattleHeroInput[] = lineupValidation.value.normalizedHeroes.map((id) => {
+    const detail = draftSession.heroDetails?.[id];
+    return {
+      id,
+      star: detail?.star,
+      power: detail?.power,
+      level: detail?.level,
+      color: detail?.color,
+    };
+  });
+  await runDraftWasmSimulation(pickedTeamCacheKey(), '__picked__', attackers);
+}
+
 const poolHeadingLabel = computed(() => {
   if (draftSession.stageId === 2) {
     return 'Your Defense Pool — 15 Candidate Heroes (5 Pick Rounds × 3 Cards)';
@@ -252,6 +338,271 @@ const poolHeadingLabel = computed(() => {
 
 const totalCandidateCount = computed(() =>
   candidateColumns.value.reduce((sum, col) => sum + col.length, 0) + swapCandidates.value.length
+);
+
+// Headless interactive play helpers
+const draftChips = computed<number | null>(() => getDraftChipsCount(cache.value));
+const canStartMatch = computed(() => canStartDraftMatch(draftSession.stageId, draftChips.value));
+const winStreakCount = computed<number | null>(() => {
+  const ws = draftSession.winstreak?.winStreakCount;
+  return ws != null && Number.isFinite(Number(ws)) ? Number(ws) : null;
+});
+const activePickPhase = computed<'defense' | 'attack'>(() =>
+  draftSession.stageId === 4 || draftSession.phase === 'attack' ? 'attack' : 'defense'
+);
+const isPickableStage = computed(
+  () => (draftSession.stageId === 2 || draftSession.stageId === 4) && candidateColumns.value.length === 5
+);
+const hasSubmittedCurrentStage = computed(() =>
+  activePickPhase.value === 'attack'
+    ? normalizedAttackHeroIds.value.length === 5
+    : normalizedDefenceHeroIds.value.length === 5
+);
+const isReadyForBattle = computed(() => draftSession.stageId === 5);
+const isWaitingLocked = computed(
+  () => draftSession.stageId === 3 || (isPickableStage.value && hasSubmittedCurrentStage.value)
+);
+const isWaitingForServerStage = computed(() => {
+  if (draftSession.stageId === 1 || draftSession.stageId === 3 || draftSession.stageId === 6) return true;
+  if (draftSession.stageId === 2 && normalizedDefenceHeroIds.value.length === 5) return true;
+  if (draftSession.stageId === 4 && normalizedAttackHeroIds.value.length === 5) return true;
+  return false;
+});
+const selectedPickSet = computed<Set<number>>(
+  () => new Set(selectedRoundPicks.value.filter((id): id is number => Number.isInteger(id) && (id as number) > 0))
+);
+const pickedSlotCount = computed(() => selectedPickSet.value.size);
+const lineupValidation = computed(() =>
+  validateDraftLineup(selectedRoundPicks.value, draftSession.heroSteps || [], draftSession.swapHeroIds || [])
+);
+const selectedPreviewHeroes = computed<Array<DraftHeroCandidate | null>>(() =>
+  selectedRoundPicks.value.map((id) =>
+    id != null ? buildDraftHeroCandidate(id, selectedPickSet.value, draftSession.heroDetails) : null
+  )
+);
+
+function selectRoundCard(roundIdx: number, heroId: number) {
+  if (!isPickableStage.value || hasSubmittedCurrentStage.value || isActionBusy.value) return;
+  if (roundIdx < 0 || roundIdx >= 5) return;
+  const next = [...selectedRoundPicks.value];
+  next[roundIdx] = next[roundIdx] === heroId ? null : heroId;
+  selectedRoundPicks.value = next;
+  actionError.value = null;
+}
+
+/**
+ * 1-Click Pick Team: populates all 5 local round slots without auto-submitting RPC.
+ * The user must still click Confirm & Submit to dispatch the lineup.
+ */
+function applyRecommendedTeam(team: DraftTeamRecommendation) {
+  if (!isPickableStage.value || hasSubmittedCurrentStage.value || isActionBusy.value) return;
+  const mapped = mapTeamToRoundPicks(team.heroIds, draftSession.heroSteps || [], draftSession.swapHeroIds || []);
+  selectedRoundPicks.value = mapped;
+  highlightedTeamKey.value = team.key;
+  actionError.value = null;
+  actionStatus.value = `Picked #${team.rank} ${team.archetypeLabel} locally — click Confirm & Submit to send.`;
+}
+
+function quickPickBestTeam() {
+  if (recommendedTeams.value.length === 0) return;
+  let best = recommendedTeams.value[0];
+  if (canSimulateAttackRecommendations.value) {
+    let bestWinRate = -1;
+    for (const t of recommendedTeams.value) {
+      const sim = getSimResult(t);
+      if (sim && !sim.error && sim.total > 0 && sim.winRatePct > bestWinRate) {
+        bestWinRate = sim.winRatePct;
+        best = t;
+      }
+    }
+  }
+  applyRecommendedTeam(best);
+}
+
+function clearSelectedPicks() {
+  selectedRoundPicks.value = [null, null, null, null, null];
+  actionError.value = null;
+  actionStatus.value = null;
+}
+
+function extractRpcResponse(res: any, methodName: string): { ok: boolean; response?: any; error?: string } {
+  if (!res || res.ok === false) {
+    return { ok: false, error: res?.error || `${methodName} failed` };
+  }
+  const results = Array.isArray(res.results) ? res.results : [];
+  const item = results.find((r: any) => r?.name === methodName) || results[0];
+  if (item?.error) {
+    const errMsg = typeof item.error === 'string' ? item.error : (item.error?.description || item.error?.name || JSON.stringify(item.error));
+    return { ok: false, error: errMsg };
+  }
+  return { ok: true, response: item?.result?.response ?? item?.response };
+}
+
+async function refreshDraftStatus(silent = false) {
+  if (isActionBusy.value && !silent) return;
+  if (!silent) {
+    isActionBusy.value = true;
+    actionError.value = null;
+    actionStatus.value = 'Syncing Legends Draft status...';
+  }
+  try {
+    const res = await dispatchRpc([buildDraftGetInfoCall()]);
+    const parsed = extractRpcResponse(res, 'randomDraft_getInfo');
+    if (parsed.ok && parsed.response) {
+      bindRpcEvent(parsed.response, 'randomDraft_getInfo', {});
+      if (!silent) actionStatus.value = 'Draft status synced.';
+    } else if (!silent) {
+      actionError.value = parsed.error || 'Failed to refresh draft status.';
+    }
+  } catch (err: any) {
+    if (!silent) actionError.value = err?.message || String(err);
+  } finally {
+    if (!silent) isActionBusy.value = false;
+  }
+}
+
+async function startNewMatch() {
+  if (!canStartMatch.value || isActionBusy.value) return;
+  isActionBusy.value = true;
+  actionError.value = null;
+  actionStatus.value = 'Registering for a new Legends Draft match...';
+  selectedRoundPicks.value = [null, null, null, null, null];
+  try {
+    // Warm up dynamic XOR key from idle getInfo payload before registering
+    const preInfo = await dispatchRpc([buildDraftGetInfoCall()]);
+    const preParsed = extractRpcResponse(preInfo, 'randomDraft_getInfo');
+    if (preParsed.ok && preParsed.response) {
+      bindRpcEvent(preParsed.response, 'randomDraft_getInfo', {});
+    }
+
+    const regRes = await dispatchRpc([buildDraftRegisterCall()]);
+    const regParsed = extractRpcResponse(regRes, 'randomDraft_register');
+    if (!regParsed.ok) {
+      actionError.value = regParsed.error || 'Failed to register for Legends Draft.';
+      return;
+    }
+    bindRpcEvent(regParsed.response || [], 'randomDraft_register', {});
+    actionStatus.value = 'Searching for opponent...';
+
+    const postInfo = await dispatchRpc([buildDraftGetInfoCall()]);
+    const postParsed = extractRpcResponse(postInfo, 'randomDraft_getInfo');
+    if (postParsed.ok && postParsed.response) {
+      bindRpcEvent(postParsed.response, 'randomDraft_getInfo', {});
+    }
+  } catch (err: any) {
+    actionError.value = err?.message || String(err);
+  } finally {
+    isActionBusy.value = false;
+  }
+}
+
+async function confirmAndSubmitLineup() {
+  if (!isPickableStage.value || hasSubmittedCurrentStage.value || isActionBusy.value) return;
+  const check = lineupValidation.value;
+  if (!check.valid) {
+    actionError.value = check.error || 'Invalid 5-hero lineup.';
+    return;
+  }
+  const phase = activePickPhase.value;
+  const call = buildDraftSaveLineupCall(phase, check.normalizedHeroes);
+  isActionBusy.value = true;
+  actionError.value = null;
+  actionStatus.value = `Submitting ${phase === 'attack' ? 'Attack' : 'Defense'} lineup...`;
+  try {
+    const res = await dispatchRpc([call]);
+    const parsed = extractRpcResponse(res, call.name);
+    if (!parsed.ok) {
+      actionError.value = parsed.error || `Failed to submit ${phase} lineup.`;
+      return;
+    }
+    bindRpcEvent(parsed.response || [], call.name, call.args);
+    actionStatus.value = `${phase === 'attack' ? 'Attack' : 'Defense'} lineup submitted. Waiting for opponent...`;
+
+    const infoRes = await dispatchRpc([buildDraftGetInfoCall()]);
+    const infoParsed = extractRpcResponse(infoRes, 'randomDraft_getInfo');
+    if (infoParsed.ok && infoParsed.response) {
+      bindRpcEvent(infoParsed.response, 'randomDraft_getInfo', {});
+    }
+  } catch (err: any) {
+    actionError.value = err?.message || String(err);
+  } finally {
+    isActionBusy.value = false;
+  }
+}
+
+async function startAndFinishBattle() {
+  if (isActionBusy.value) return;
+  isActionBusy.value = true;
+  actionError.value = null;
+  actionStatus.value = 'Running Legends Draft battle...';
+  try {
+    const startRes = await dispatchRpc([buildDraftStartBattleCall()]);
+    const startParsed = extractRpcResponse(startRes, 'randomDraft_startBattle');
+    if (!startParsed.ok) {
+      actionError.value = startParsed.error || 'Failed to start Legends Draft battle.';
+      return;
+    }
+    const matchId = Number(startParsed.response?.battleReplay?.typeId ?? draftSession.matchId);
+    if (Number.isInteger(matchId) && matchId > 0) {
+      actionStatus.value = `Claiming Match #${matchId} result...`;
+      const resultRes = await dispatchRpc([buildDraftResultCall(matchId)]);
+      const resultParsed = extractRpcResponse(resultRes, 'randomDraft_result');
+      if (resultParsed.ok && resultParsed.response) {
+        bindRpcEvent(resultParsed.response, 'randomDraft_result', { matchId });
+        const outcome = parseDraftMatchOutcome(resultParsed.response);
+        if (outcome) {
+          actionStatus.value = outcome.win
+            ? `Victory! ${outcome.ratingDelta != null ? `(${outcome.ratingDelta >= 0 ? '+' : ''}${outcome.ratingDelta} rating)` : ''}`
+            : `Defeat ${outcome.ratingDelta != null ? `(${outcome.ratingDelta} rating)` : ''}`;
+        }
+      }
+    }
+    const infoRes = await dispatchRpc([buildDraftGetInfoCall()]);
+    const infoParsed = extractRpcResponse(infoRes, 'randomDraft_getInfo');
+    if (infoParsed.ok && infoParsed.response) {
+      bindRpcEvent(infoParsed.response, 'randomDraft_getInfo', {});
+    }
+  } catch (err: any) {
+    actionError.value = err?.message || String(err);
+  } finally {
+    isActionBusy.value = false;
+  }
+}
+
+watch(
+  [() => draftSession.matchId, () => draftSession.stageId],
+  () => {
+    selectedRoundPicks.value = [null, null, null, null, null];
+    actionError.value = null;
+    if (
+      props.modelValue &&
+      draftSession.stageId === 5 &&
+      autoFinishBattle.value &&
+      !isActionBusy.value &&
+      draftSession.matchId !== lastAutoFinishedMatchId
+    ) {
+      lastAutoFinishedMatchId = draftSession.matchId ?? null;
+      void startAndFinishBattle();
+    }
+  }
+);
+
+watch(
+  [() => props.modelValue, isWaitingForServerStage],
+  ([open, waiting]) => {
+    if (stagePollTimer) {
+      clearInterval(stagePollTimer);
+      stagePollTimer = null;
+    }
+    if (open && waiting) {
+      stagePollTimer = setInterval(() => {
+        if (!isActionBusy.value && props.modelValue && isWaitingForServerStage.value) {
+          void refreshDraftStatus(true);
+        }
+      }, 3000);
+    }
+  },
+  { immediate: true }
 );
 
 function formatHeroPower(power: number | undefined): string {
@@ -414,6 +765,151 @@ function close() {
         </div>
       </div>
 
+      <!-- Headless Action Toolbar -->
+      <div
+        id="draft-action-toolbar"
+        class="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs"
+      >
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span
+            id="draft-chips-badge"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border font-semibold"
+            :class="
+              draftChips === 0
+                ? 'bg-rose-500/10 text-rose-500 border-rose-500/25'
+                : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border-indigo-500/25'
+            "
+            title="Remaining Legends Draft Chips (never spends Emeralds)"
+          >
+            <span>🎟️ Draft Chips:</span>
+            <span class="font-mono font-bold">{{ draftChips != null ? draftChips : '—' }}</span>
+          </span>
+
+          <span
+            v-if="winStreakCount != null"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/25 font-semibold"
+          >
+            <span>🔥 Streak:</span>
+            <span class="font-mono font-bold">{{ winStreakCount }}</span>
+          </span>
+
+          <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 cursor-pointer select-none ml-1">
+            <input
+              id="draft-auto-finish-toggle"
+              v-model="autoFinishBattle"
+              type="checkbox"
+              class="rounded border-slate-300 text-indigo-600"
+              @change="saveAutoFinishSetting"
+            />
+            <span>Auto-finish battle when Ready</span>
+          </label>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            id="draft-refresh-btn"
+            type="button"
+            :disabled="isActionBusy"
+            class="cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition disabled:opacity-50"
+            @click="refreshDraftStatus(false)"
+          >
+            ↻ Refresh Status
+          </button>
+
+          <button
+            v-if="isReadyForBattle"
+            id="draft-start-battle-btn"
+            type="button"
+            :disabled="isActionBusy"
+            class="cursor-pointer px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition disabled:opacity-50"
+            @click="startAndFinishBattle"
+          >
+            {{ isActionBusy ? '⏳ Finishing...' : '⚔️ Start Battle & Claim Result' }}
+          </button>
+
+          <button
+            v-else
+            id="draft-start-match-btn"
+            type="button"
+            :disabled="isActionBusy || !canStartMatch"
+            class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition disabled:opacity-45 disabled:cursor-not-allowed"
+            :title="draftChips === 0 ? 'No Draft Chips remaining (will not spend Emeralds)' : 'Start a new Legends Draft match from popup'"
+            @click="startNewMatch"
+          >
+            {{
+              isWaitingForServerStage
+                ? '⏳ Syncing Stage...'
+                : isActionBusy
+                  ? '⏳ Working...'
+                  : '▶ Start New Match'
+            }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Inline Action Status / Error Strip -->
+      <div
+        v-if="actionError || actionStatus"
+        class="px-3.5 py-2 rounded-xl border text-xs flex items-center justify-between gap-2"
+        :class="
+          actionError
+            ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-300'
+            : 'bg-indigo-500/10 border-indigo-500/25 text-indigo-700 dark:text-indigo-200'
+        "
+      >
+        <span class="font-medium">{{ actionError || actionStatus }}</span>
+        <button
+          type="button"
+          class="cursor-pointer text-[11px] opacity-70 hover:opacity-100"
+          @click="actionError = null; actionStatus = null"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Match Result Summary Card (after battle completes) -->
+      <div
+        v-if="draftSession.lastMatchResult && (draftSession.stageId === 0 || draftSession.stageId === 7 || draftSession.stageId == null)"
+        id="draft-match-result-card"
+        class="p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-xs"
+        :class="
+          draftSession.lastMatchResult.win
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-200'
+        "
+      >
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span class="text-sm font-extrabold">
+            {{ draftSession.lastMatchResult.win ? '🏆 Victory' : '❌ Defeat' }}
+          </span>
+          <span v-if="draftSession.lastMatchResult.matchId" class="text-xs font-mono opacity-80">
+            Match #{{ draftSession.lastMatchResult.matchId }}
+          </span>
+          <span
+            v-if="draftSession.lastMatchResult.ratingDelta != null"
+            class="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-white/60 dark:bg-slate-900/60"
+          >
+            {{ draftSession.lastMatchResult.ratingDelta >= 0 ? '+' : '' }}{{ draftSession.lastMatchResult.ratingDelta }} Rating
+          </span>
+          <span
+            v-if="draftSession.lastMatchResult.draftBpExp > 0"
+            class="px-2 py-0.5 rounded-md text-xs font-mono font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300"
+          >
+            +{{ draftSession.lastMatchResult.draftBpExp }} BP EXP
+          </span>
+        </div>
+
+        <button
+          id="draft-play-next-btn"
+          type="button"
+          :disabled="isActionBusy || !canStartMatch"
+          class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition disabled:opacity-45 disabled:cursor-not-allowed"
+          @click="startNewMatch"
+        >
+          ▶ Play Next Match
+        </button>
+      </div>
+
       <!-- Decoding Error Alert (if any) -->
       <div
         v-if="draftSession.error"
@@ -485,6 +981,13 @@ function close() {
             <span>🃏 {{ poolHeadingLabel }}</span>
           </h3>
           <div class="flex items-center gap-2">
+            <span
+              v-if="isWaitingLocked"
+              id="draft-pool-locked-badge"
+              class="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30"
+            >
+              🔒 Locked · Waiting for opponent...
+            </span>
             <span class="text-xs text-slate-400 dark:text-slate-500">
               {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount} candidates${swapCandidates.length > 0 ? ` (${swapCandidates.length} swap)` : ''}` : 'Waiting for draft payload...' }}
             </span>
@@ -526,21 +1029,33 @@ function close() {
               <div
                 v-for="hero in col"
                 :key="hero.id"
+                :id="`draft-card-r${colIdx}-h${hero.id}`"
                 class="relative flex items-center gap-2.5 p-2 rounded-lg border transition-all"
-                :class="
+                :class="[
+                  isPickableStage && !hasSubmittedCurrentStage ? 'cursor-pointer' : '',
+                  isWaitingLocked && !hero.picked ? 'opacity-45 grayscale-[40%] pointer-events-none select-none' : '',
                   hero.picked
                     ? 'bg-amber-500/10 border-amber-500/60 dark:border-amber-400/60 shadow-sm ring-1 ring-amber-500/30'
-                    : highlightedHeroIdSet.has(hero.id)
-                      ? 'bg-emerald-500/10 border-emerald-500 dark:border-emerald-400 shadow-sm ring-2 ring-emerald-500/40'
-                      : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                "
+                    : selectedRoundPicks[colIdx] === hero.id
+                      ? 'bg-indigo-500/15 border-indigo-500 dark:border-indigo-400 shadow-sm ring-2 ring-indigo-500/50'
+                      : highlightedHeroIdSet.has(hero.id)
+                        ? 'bg-emerald-500/10 border-emerald-500 dark:border-emerald-400 shadow-sm ring-2 ring-emerald-500/40'
+                        : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700',
+                ]"
+                @click="selectRoundCard(colIdx, hero.id)"
               >
-                <!-- Picked Ribbon Badge -->
+                <!-- Picked / Selected Ribbon Badge -->
                 <div
                   v-if="hero.picked"
                   class="absolute -top-1.5 -right-1 px-1.5 py-0.2 text-[9px] font-bold tracking-tight bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full shadow-xs"
                 >
                   ✓ PICKED
+                </div>
+                <div
+                  v-else-if="selectedRoundPicks[colIdx] === hero.id"
+                  class="absolute -top-1.5 -right-1 px-1.5 py-0.2 text-[9px] font-bold tracking-tight bg-indigo-600 text-white rounded-full shadow-xs"
+                >
+                  ★ SELECTED
                 </div>
 
                 <!-- Hero Avatar -->
@@ -627,6 +1142,118 @@ function close() {
           </p>
         </div>
 
+        <!-- Interactive Lineup Confirmation Bar (1-Click Pick + Explicit Confirm) -->
+        <div
+          v-if="isPickableStage && !hasSubmittedCurrentStage"
+          id="draft-submit-bar"
+          class="mt-1 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/25 shadow-2xs"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              {{ activePickPhase === 'attack' ? '⚔️ Attack Picks' : '🛡️ Defense Picks' }} ({{ pickedSlotCount }}/5)
+            </span>
+
+            <div class="flex items-center gap-1.5">
+              <div
+                v-for="(slotHero, sIdx) in selectedPreviewHeroes"
+                :key="'slot-' + sIdx"
+                class="w-8 h-8 rounded-lg border flex items-center justify-center overflow-hidden text-[10px] font-bold"
+                :class="
+                  slotHero
+                    ? 'border-indigo-500 bg-white dark:bg-slate-900'
+                    : 'border-dashed border-slate-300 dark:border-slate-700 text-slate-400 bg-slate-100/50 dark:bg-slate-900/40'
+                "
+                :title="slotHero ? `Round ${sIdx + 1}: ${slotHero.name}` : `Round ${sIdx + 1}: Empty`"
+              >
+                <img
+                  v-if="slotHero?.avatarFile"
+                  :src="getAvatarUrl(slotHero.avatarFile)"
+                  :alt="slotHero.name"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ slotHero ? `#${slotHero.id}` : `R${sIdx + 1}` }}</span>
+              </div>
+            </div>
+
+            <span v-if="!lineupValidation.valid && pickedSlotCount > 0" class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+              {{ lineupValidation.error }}
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="recommendedTeams.length > 0"
+              id="draft-quick-pick-top1-btn"
+              type="button"
+              :disabled="isActionBusy"
+              class="cursor-pointer px-2.5 py-1.5 rounded-lg bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 text-xs font-semibold transition disabled:opacity-50"
+              title="1-click populate all 5 rounds with the top recommended team (requires explicit Confirm to submit)"
+              @click="quickPickBestTeam"
+            >
+              ⚡ 1-Click Pick #1
+            </button>
+
+            <button
+              v-if="pickedSlotCount > 0"
+              id="draft-clear-picks-btn"
+              type="button"
+              :disabled="isActionBusy"
+              class="cursor-pointer px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition disabled:opacity-50"
+              @click="clearSelectedPicks"
+            >
+              Clear
+            </button>
+
+            <button
+              v-if="canSimulateAttackRecommendations"
+              id="draft-sim-picked-btn"
+              type="button"
+              :disabled="!lineupValidation.valid || simulatingTeamKey !== null || isActionBusy"
+              class="cursor-pointer px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-2xs transition disabled:opacity-45 disabled:cursor-not-allowed"
+              title="Simulate your currently picked 5-hero lineup against the opponent's Defense team"
+              @click="simulatePickedTeam"
+            >
+              {{ simulatingTeamKey === '__picked__' ? `⏳ Sim ${simProgressText}` : '▶ Simulate Picked' }}
+            </button>
+
+            <span
+              v-if="canSimulateAttackRecommendations && pickedTeamSimResult"
+              id="draft-sim-picked-result"
+              class="text-xs font-bold font-mono px-2 py-1 rounded-lg border"
+              :title="pickedTeamSimResult.error || ''"
+              :class="
+                pickedTeamSimResult.error
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                  : pickedTeamSimResult.winRatePct >= 60
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+              "
+            >
+              {{
+                pickedTeamSimResult.error
+                  ? 'Sim Error'
+                  : `${pickedTeamSimResult.winRatePct}% Win (${pickedTeamSimResult.wins}/${pickedTeamSimResult.total})`
+              }}
+            </span>
+
+            <button
+              id="draft-submit-lineup-btn"
+              type="button"
+              :disabled="isActionBusy || !lineupValidation.valid"
+              class="cursor-pointer px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition disabled:opacity-45 disabled:cursor-not-allowed"
+              @click="confirmAndSubmitLineup"
+            >
+              {{
+                isActionBusy
+                  ? '⏳ Submitting...'
+                  : activePickPhase === 'attack'
+                    ? '✓ Confirm & Submit Attack'
+                    : '✓ Confirm & Submit Defense'
+              }}
+            </button>
+          </div>
+        </div>
+
         <!-- Phase 2: Instant Top-3 Team Recommendations (Defense & Attack; on-demand WASM simulation in Attack only) -->
         <div
           v-if="recommendedTeams.length > 0"
@@ -690,25 +1317,40 @@ function close() {
                 </div>
               </div>
 
-              <!-- On-demand WASM Simulate button (Attack Phase only, manual click required) -->
+              <!-- 1-Click Pick Team (local selection only) & On-demand WASM Simulate (Attack Phase) -->
               <div
-                v-if="canSimulateAttackRecommendations"
-                class="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2"
+                class="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2"
                 @click.stop
               >
-                <button
-                  :id="`btn-draft-sim-team-${tIdx}`"
-                  type="button"
-                  :disabled="simulatingTeamKey !== null"
-                  class="cursor-pointer px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                  @click="simulateRecommendedTeam(team)"
-                >
-                  {{ simulatingTeamKey === team.key ? `⏳ Sim ${simProgressText}` : '▶ Simulate' }}
-                </button>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    v-if="isPickableStage && !hasSubmittedCurrentStage"
+                    :id="`draft-apply-rec-${tIdx}`"
+                    type="button"
+                    :disabled="isActionBusy"
+                    class="cursor-pointer px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    title="Fill all 5 round picks with this team (you still click Confirm & Submit to send)"
+                    @click="applyRecommendedTeam(team)"
+                  >
+                    ✓ Pick Team
+                  </button>
+
+                  <button
+                    v-if="canSimulateAttackRecommendations"
+                    :id="`btn-draft-sim-team-${tIdx}`"
+                    type="button"
+                    :disabled="simulatingTeamKey !== null"
+                    class="cursor-pointer px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    @click="simulateRecommendedTeam(team)"
+                  >
+                    {{ simulatingTeamKey === team.key ? `⏳ Sim ${simProgressText}` : '▶ Simulate' }}
+                  </button>
+                </div>
 
                 <span
-                  v-if="getSimResult(team)"
+                  v-if="canSimulateAttackRecommendations && getSimResult(team)"
                   class="text-[11px] font-bold font-mono"
+                  :title="getSimResult(team)?.error || ''"
                   :class="
                     getSimResult(team)?.error
                       ? 'text-rose-500'
