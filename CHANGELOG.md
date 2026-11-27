@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.366 — 2026-11-27
+
+### Fixed
+
+- **Unity Battle Simulation Detached WASM `ArrayBuffer` After `memory.grow()` (`interceptor.ts`, `tests/dungeon-sim-automation.test.mjs`)**:
+  - Replaced static `heap = { buffer: memory.buffer, u8, u16, i32, u32 }` snapshots in `src/content/interceptor.ts` with live getter views (`syncHeap()`) that transparently rebind whenever Unity calls `WebAssembly.Memory.prototype.grow()` mid-simulation, preventing `readString(pStrPtr)` from reading a detached zero-length buffer (`undefined` length → empty string → `win=true, stars=3, progress=null`).
+  - Added `!Number.isFinite(len)` guard in `readString()` and pointer/length diagnostics (`pPtr`, `sPtr`, `sLen`) in `EXTRACT_BATTLE_RESULT`.
+
 ## 0.11.364 — 2026-11-27
 
 ### Fixed

@@ -1105,12 +1105,28 @@ export function installInterceptor(customWindow?: any): void {
         throw new Error('WASM table or memory not accessible in Unity engine');
       }
 
+      // Live WASM heap views that transparently rebind if WASM calls memory.grow() mid-simulation
+      // (a detached ArrayBuffer would otherwise make heap.i32[...] return undefined and readString() return "").
+      let _heapBuf = memory.buffer;
+      let _heapU8 = new Uint8Array(_heapBuf);
+      let _heapU16 = new Uint16Array(_heapBuf);
+      let _heapI32 = new Int32Array(_heapBuf);
+      let _heapU32 = new Uint32Array(_heapBuf);
+      const syncHeap = () => {
+        if (memory.buffer !== _heapBuf) {
+          _heapBuf = memory.buffer;
+          _heapU8 = new Uint8Array(_heapBuf);
+          _heapU16 = new Uint16Array(_heapBuf);
+          _heapI32 = new Int32Array(_heapBuf);
+          _heapU32 = new Uint32Array(_heapBuf);
+        }
+      };
       const heap = {
-        buffer: memory.buffer,
-        u8: new Uint8Array(memory.buffer),
-        u16: new Uint16Array(memory.buffer),
-        i32: new Int32Array(memory.buffer),
-        u32: new Uint32Array(memory.buffer)
+        get buffer() { syncHeap(); return _heapBuf; },
+        get u8() { syncHeap(); return _heapU8; },
+        get u16() { syncHeap(); return _heapU16; },
+        get i32() { syncHeap(); return _heapI32; },
+        get u32() { syncHeap(); return _heapU32; },
       };
 
       const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
@@ -1160,15 +1176,17 @@ export function installInterceptor(customWindow?: any): void {
         return callTableFn(idx, ...args) >>> 0;
       };
 
-      // Read string from IL2CPP System.String pointer
+      // Read string from IL2CPP System.String pointer (always refreshes views in case memory.grow() detached old buffer)
       const readString = (ptr: number): string | null => {
         if (!ptr) return null;
-        const len = heap.i32[(ptr + 8) >>> 2];
-        if (len < 0 || len > 2000000) return null;
+        const i32 = heap.i32;
+        const u16 = heap.u16;
+        const len = i32[(ptr + 8) >>> 2];
+        if (!Number.isFinite(len) || len < 0 || len > 2000000) return null;
         const u16Start = (ptr + 12) >>> 1;
         let s = '';
         for (let i = 0; i < len; i += 8192) {
-          s += String.fromCharCode.apply(null, Array.from(heap.u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+          s += String.fromCharCode.apply(null, Array.from(u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
         }
         return s;
       };
@@ -1622,8 +1640,9 @@ export function installInterceptor(customWindow?: any): void {
         const progressListPtr = invokePtr('MultiBattleResult_get_progress', resultHandle, 0);
         let parsedProgress: any = null;
         let pJsonStr: string | null = null;
+        let pStrPtr = 0;
         if (progressListPtr) {
-          const pStrPtr = invokePtr('DataObject_asJson', progressListPtr, 0);
+          pStrPtr = invokePtr('DataObject_asJson', progressListPtr, 0);
           pJsonStr = readString(pStrPtr);
           if (pJsonStr) {
             try {
@@ -1645,7 +1664,7 @@ export function installInterceptor(customWindow?: any): void {
 
         if (!isPlainProgAttackers && !isWipeEmptyAttackers) {
           const shape = !parsedProgress
-            ? 'progress=null'
+            ? `progress=null,pPtr=0x${progressListPtr.toString(16)},sPtr=0x${pStrPtr.toString(16)},sLen=${pJsonStr == null ? 'null' : pJsonStr.length}`
             : !parsedProgress.attackers
               ? 'attackers=missing'
               : Array.isArray(rawProgAttackers)
@@ -1796,23 +1815,41 @@ export function installInterceptor(customWindow?: any): void {
         throw new Error('WASM malloc/free memory primitives not found');
       }
 
+      // Live WASM heap views that transparently rebind if WASM calls memory.grow() mid-simulation
+      // (a detached ArrayBuffer would otherwise make heap.i32[...] return undefined and readString() return "").
+      let _heapBuf = memory.buffer;
+      let _heapU8 = new Uint8Array(_heapBuf);
+      let _heapU16 = new Uint16Array(_heapBuf);
+      let _heapI32 = new Int32Array(_heapBuf);
+      let _heapU32 = new Uint32Array(_heapBuf);
+      const syncHeap = () => {
+        if (memory.buffer !== _heapBuf) {
+          _heapBuf = memory.buffer;
+          _heapU8 = new Uint8Array(_heapBuf);
+          _heapU16 = new Uint16Array(_heapBuf);
+          _heapI32 = new Int32Array(_heapBuf);
+          _heapU32 = new Uint32Array(_heapBuf);
+        }
+      };
       const heap = {
-        buffer: memory.buffer,
-        u8: new Uint8Array(memory.buffer),
-        u16: new Uint16Array(memory.buffer),
-        i32: new Int32Array(memory.buffer),
-        u32: new Uint32Array(memory.buffer)
+        get buffer() { syncHeap(); return _heapBuf; },
+        get u8() { syncHeap(); return _heapU8; },
+        get u16() { syncHeap(); return _heapU16; },
+        get i32() { syncHeap(); return _heapI32; },
+        get u32() { syncHeap(); return _heapU32; },
       };
 
-      // Read string from IL2CPP System.String pointer
+      // Read string from IL2CPP System.String pointer (always refreshes views in case memory.grow() detached old buffer)
       const readString = (ptr: number): string | null => {
         if (!ptr) return null;
-        const len = heap.i32[(ptr + 8) >>> 2];
-        if (len < 0 || len > 2000000) return null;
+        const i32 = heap.i32;
+        const u16 = heap.u16;
+        const len = i32[(ptr + 8) >>> 2];
+        if (!Number.isFinite(len) || len < 0 || len > 2000000) return null;
         const u16Start = (ptr + 12) >>> 1;
         let s = '';
         for (let i = 0; i < len; i += 8192) {
-          s += String.fromCharCode.apply(null, Array.from(heap.u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+          s += String.fromCharCode.apply(null, Array.from(u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
         }
         return s;
       };
@@ -2007,12 +2044,28 @@ export function installInterceptor(customWindow?: any): void {
         throw new Error('WASM malloc/free memory primitives not found');
       }
 
+      // Live WASM heap views that transparently rebind if WASM calls memory.grow() mid-simulation
+      // (a detached ArrayBuffer would otherwise make heap.i32[...] return undefined and readString() return "").
+      let _heapBuf = memory.buffer;
+      let _heapU8 = new Uint8Array(_heapBuf);
+      let _heapU16 = new Uint16Array(_heapBuf);
+      let _heapI32 = new Int32Array(_heapBuf);
+      let _heapU32 = new Uint32Array(_heapBuf);
+      const syncHeap = () => {
+        if (memory.buffer !== _heapBuf) {
+          _heapBuf = memory.buffer;
+          _heapU8 = new Uint8Array(_heapBuf);
+          _heapU16 = new Uint16Array(_heapBuf);
+          _heapI32 = new Int32Array(_heapBuf);
+          _heapU32 = new Uint32Array(_heapBuf);
+        }
+      };
       const heap = {
-        buffer: memory.buffer,
-        u8: new Uint8Array(memory.buffer),
-        u16: new Uint16Array(memory.buffer),
-        i32: new Int32Array(memory.buffer),
-        u32: new Uint32Array(memory.buffer)
+        get buffer() { syncHeap(); return _heapBuf; },
+        get u8() { syncHeap(); return _heapU8; },
+        get u16() { syncHeap(); return _heapU16; },
+        get i32() { syncHeap(); return _heapI32; },
+        get u32() { syncHeap(); return _heapU32; },
       };
 
       const sym = buildSymMap(getActiveWasmProfile());

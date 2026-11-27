@@ -902,5 +902,12 @@ describe('Dungeon Simulator & Automation Engine', () => {
         /progress=null/
       );
     });
+
+    it('interceptor.ts binds live WASM heap views that auto-refresh after memory.grow() so readString never reads a detached ArrayBuffer', async () => {
+      const fs = await import('node:fs');
+      const src = fs.readFileSync(new URL('../src/content/interceptor.ts', import.meta.url), 'utf8');
+      assert.match(src, /if \(memory\.buffer !== _heapBuf\)/);
+      assert.match(src, /!Number\.isFinite\(len\)/);
+    });
   });
 });
