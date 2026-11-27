@@ -237,6 +237,32 @@ const showPoolConfig = ref(false);
 const activePoolTab = ref<DungeonElementKey>('water');
 const clearedRooms = ref<DungeonClearedRoomEntry[]>([]);
 const hoveredLogEntry = ref<DungeonClearedRoomEntry | null>(null);
+const hoverCardStyle = ref<Record<string, string>>({});
+
+function showLogHoverCard(room: DungeonClearedRoomEntry, event?: Event) {
+  hoveredLogEntry.value = room;
+  const target = event?.currentTarget as HTMLElement | null;
+  if (!target || typeof target.getBoundingClientRect !== 'function' || typeof window === 'undefined') {
+    hoverCardStyle.value = { top: '16px', left: '16px' };
+    return;
+  }
+  const rect = target.getBoundingClientRect();
+  const cardWidth = Math.min(340, window.innerWidth - 24);
+  const estHeight = 140;
+  let left = rect.left + rect.width / 2 - cardWidth / 2;
+  left = Math.max(12, Math.min(left, window.innerWidth - cardWidth - 12));
+  const showAbove = rect.bottom + estHeight + 12 > window.innerHeight && rect.top > estHeight + 12;
+  const top = showAbove ? Math.max(12, rect.top - estHeight - 8) : Math.min(window.innerHeight - estHeight - 12, rect.bottom + 8);
+  hoverCardStyle.value = {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+    width: `${Math.round(cardWidth)}px`,
+  };
+}
+
+function hideLogHoverCard() {
+  hoveredLogEntry.value = null;
+}
 
 const POOL_TABS: Array<{ key: DungeonElementKey; label: string }> = [
   { key: 'water', label: 'Water' },
@@ -676,8 +702,56 @@ function handleImgError(e: Event) {
         </div>
 
         <!-- Modal Body -->
-        <div id="dungeon-modal-body" class="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
-          <!-- Compact Auto Attack Config Bar -->
+        <div id="dungeon-modal-body" class="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+          <!-- SECTION 1: FIXED DAILY OVERVIEW STATS -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div class="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
+              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Current Floor</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ floorNumber }}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">In progress</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
+              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Personal Titanite</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(todayTitanite) }}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">Earned today</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
+              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Checkpoint</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ dungeonData.respawnFloor || 0 }}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">Respawn point</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
+              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Guild Activity</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(dungeonData.dungeonActivity ?? 0) }} pts</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">Dungeon score</div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: COMPACT 1-LINE ELEMENT AFFINITIES (FIXED DAILY) -->
+          <div
+            id="dungeon-element-affinities"
+            class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 flex items-center justify-between flex-wrap gap-2 dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Element Affinities
+            </span>
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Prime:</span>
+                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60">
+                  🌟 {{ primeElement }}
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Non-Prime:</span>
+                <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border dark:border-slate-600">
+                  {{ nonPrimeElements }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: AUTO ATTACK CONFIG & LINEUP -->
           <div
             id="dungeon-auto-config-bar"
             class="space-y-2 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-[11px]"
@@ -776,7 +850,7 @@ function handleImgError(e: Event) {
                     class="rounded border-slate-300 text-indigo-600"
                     @change="saveDungeonAutoSettings"
                   />
-                  <span>Best-of-10 (Single Door &le;5)</span>
+                  <span>Best-of-{{ autoSettings.simRounds || 5 }} (Single Door &le;5)</span>
                 </label>
 
                 <label
@@ -905,25 +979,23 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Active Battle Banner -->
-          <div
-            v-if="activeBattle"
-            class="rounded-xl border border-blue-400 bg-blue-50/90 p-4 space-y-2.5 dark:border-blue-600 dark:bg-blue-950/50 shadow-sm"
-          >
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <div class="flex items-center gap-2">
-                <span class="relative flex size-3">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full size-3 bg-blue-600"></span>
-                </span>
-                <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-100">
-                  ⚔️ Battle In Progress
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
-                  Door {{ activeDoorIdx }}
-                </span>
+          <!-- SECTION 4: BATTLE STATUS, ACTIVE TEAM & AUTOMATION OUTCOME SLOT -->
+          <div id="dungeon-battle-status-slot" class="space-y-2">
+            <!-- Active Battle Banner -->
+            <div
+              v-if="activeBattle"
+              class="rounded-xl border border-blue-400 bg-blue-50/90 px-3 py-2.5 space-y-2 dark:border-blue-600 dark:bg-blue-950/50 shadow-sm"
+            >
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="relative flex size-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full size-2.5 bg-blue-600"></span>
+                  </span>
+                  <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-100">
+                    ⚔️ Battle In Progress · Floor {{ floorNumber }} · Door {{ activeDoorIdx }}
+                  </span>
+                </div>
                 <button
                   id="dungeon-clear-active-battle-btn"
                   type="button"
@@ -934,97 +1006,160 @@ function handleImgError(e: Event) {
                   Reset Battle
                 </button>
               </div>
+
+              <div v-if="activeHeroes.length > 0" class="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-blue-200/80 dark:border-blue-800/60">
+                <span
+                  v-for="hId in activeHeroes"
+                  :key="hId"
+                  class="inline-flex items-center gap-1 rounded-lg bg-white/95 border border-blue-200 px-2 py-0.5 text-[11px] text-slate-800 shadow-2xs dark:bg-slate-900 dark:border-blue-800 dark:text-slate-200"
+                >
+                  <img
+                    :src="`assets/titans/${hId}.png`"
+                    class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
+                    alt=""
+                    @error="handleImgError"
+                  />
+                  <span>{{ getTitanName(hId) }}</span>
+                </span>
+              </div>
             </div>
 
-            <div class="text-xs text-blue-800 dark:text-blue-200">
-              Actively fighting on Floor {{ floorNumber }} · Door {{ activeDoorIdx }} with {{ activeHeroes.length }} titans deployed.
+            <!-- Last Battle Result -->
+            <div
+              v-else-if="lastBattleResult"
+              class="rounded-xl border px-3 py-2 flex items-center justify-between text-xs shadow-2xs"
+              :class="
+                lastBattleResult.win !== false
+                  ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  : 'border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-200'
+              "
+            >
+              <div class="flex items-center gap-2">
+                <span class="font-bold">{{ lastBattleResult.win !== false ? '🏆 Victory' : '❌ Defeat' }}</span>
+                <span v-if="lastBattleResult.stars" class="text-amber-500 font-bold tracking-widest">
+                  {{ '★'.repeat(Math.min(3, lastBattleResult.stars)) }}
+                </span>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">Previous battle outcome</span>
+              </div>
+              <div class="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                Floor {{ floorNumber }}
+              </div>
             </div>
 
-            <div v-if="activeHeroes.length > 0" class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-blue-200/80 dark:border-blue-800/60">
-              <span
-                v-for="hId in activeHeroes"
-                :key="hId"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-blue-200 px-2 py-0.5 text-[11px] text-slate-800 shadow-2xs dark:bg-slate-900 dark:border-blue-800 dark:text-slate-200"
+            <!-- Inline Automation Status Strip -->
+            <div
+              v-if="autoStatusMessage"
+              id="dungeon-auto-status-strip"
+              class="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]"
+              :class="
+                isAutomating
+                  ? 'border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  : autoStatusMessage.includes('stopped') || autoStatusMessage.includes('threshold') || autoStatusMessage.includes('below') || autoStatusMessage.includes('No winnable')
+                  ? 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-200'
+                  : 'border-blue-200 bg-blue-50/80 text-blue-900 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-200'
+              "
+            >
+              <span class="font-medium leading-snug">{{ autoStatusMessage }}</span>
+              <button
+                v-if="!isAutomating"
+                type="button"
+                class="cursor-pointer shrink-0 text-[10px] opacity-70 hover:opacity-100"
+                @click="autoStatusMessage = null"
               >
-                <img
-                  :src="`assets/titans/${hId}.png`"
-                  class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
-                  alt=""
-                  @error="handleImgError"
-                />
-                <span>{{ getTitanName(hId) }}</span>
-              </span>
+                ✕
+              </button>
             </div>
           </div>
 
-          <!-- Last Battle Result -->
-          <div
-            v-else-if="lastBattleResult"
-            class="rounded-xl border p-3 flex items-center justify-between text-xs shadow-2xs"
-            :class="
-              lastBattleResult.win !== false
-                ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
-                : 'border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-200'
-            "
-          >
-            <div class="flex items-center gap-2">
-              <span class="font-bold">{{ lastBattleResult.win !== false ? '🏆 Victory' : '❌ Defeat' }}</span>
-              <span v-if="lastBattleResult.stars" class="text-amber-500 font-bold tracking-widest">
-                {{ '★'.repeat(Math.min(3, lastBattleResult.stars)) }}
-              </span>
-              <span class="text-[11px] text-slate-500 dark:text-slate-400">Previous battle outcome</span>
-            </div>
-            <div class="text-[11px] font-medium text-slate-600 dark:text-slate-300">
-              Floor {{ floorNumber }}
-            </div>
-          </div>
+          <!-- SECTION 5: CURRENT FLOOR DOORS -->
+          <div id="dungeon-doors-section">
+            <div v-if="doors.length > 0" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <span>🚪</span>
+                  <span>Floor {{ floorNumber }} Doors</span>
+                </h3>
 
-          <!-- SECTION 1: OVERVIEW STATS -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
-              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Current Floor</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ floorNumber }}</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">In progress</div>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
-              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Personal Titanite</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(todayTitanite) }}</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">Earned today</div>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
-              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Checkpoint</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ dungeonData.respawnFloor || 0 }}</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">Respawn point</div>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
-              <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Guild Activity</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(dungeonData.dungeonActivity ?? 0) }} pts</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">Dungeon score</div>
-            </div>
-          </div>
-
-          <!-- SECTION 2: ELEMENT AFFINITIES -->
-          <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/60">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
-              Element Affinities
-            </h3>
-            <div class="flex items-center gap-4 flex-wrap text-sm">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Prime Element:</span>
-                <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60">
-                  🌟 {{ primeElement }}
-                </span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} choices</span>
               </div>
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Non-Prime Elements:</span>
-                <span class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border dark:border-slate-600">
-                  {{ nonPrimeElements }}
-                </span>
+
+              <div id="dungeon-doors-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  v-for="(door, idx) in doors"
+                  :key="idx"
+                  class="rounded-xl border p-3.5 space-y-2.5"
+                  :class="
+                    activeBattle && activeBattle.teamNum === idx
+                      ? 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-400 dark:border-blue-600 dark:bg-blue-950/40'
+                      : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'
+                  "
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-800 dark:text-slate-100">
+                      Door {{ idx + 1 }}
+                    </span>
+                    <span v-if="door.power" class="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300">
+                      Power: {{ formatNumber(door.power) }}
+                    </span>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Enemy Titans
+                    </div>
+                    <ul v-if="door.enemies.length" class="space-y-1.5" :aria-label="`Door ${Number(idx) + 1} enemy Titans`">
+                      <li
+                        v-for="(enemy, eIdx) in door.enemies"
+                        :key="`${enemy.id}:${eIdx}`"
+                        class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900/60"
+                      >
+                        <img
+                          v-if="enemy.avatar"
+                          :src="enemy.avatar"
+                          alt=""
+                          class="size-8 shrink-0 rounded-full object-cover"
+                          @error="handleImgError"
+                        />
+                        <div class="min-w-0 flex-1">
+                          <div class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ enemy.name }}</div>
+                          <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500 dark:text-slate-400">
+                            <span v-if="enemy.element">{{ enemy.element }}</span>
+                            <span v-if="enemy.level != null">Lv. {{ enemy.level }}</span>
+                            <UnitStars v-if="enemy.star != null" :count="enemy.star" compact="suffix" />
+                            <span class="font-mono">#{{ enemy.id }}</span>
+                          </div>
+                        </div>
+                      </li>
+                    </ul>
+                    <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
+                  </div>
+
+                  <!-- Door Actions: Interactive Simulation -->
+                  <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 flex-wrap">
+                    <button
+                      :id="`btn-door-sim-${idx}`"
+                      type="button"
+                      class="dungeon-door-sim-btn cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-indigo-600/30 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 dark:border-indigo-800 px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
+                      :title="`Simulate battle for Door ${Number(idx) + 1}`"
+                      @click="openSimModal(door, idx)"
+                    >
+                      <span>🧪</span>
+                      <span>Simulate</span>
+                    </button>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            <div
+              v-else
+              class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500"
+            >
+              Floor doors will update when a new dungeon floor is unlocked in game.
             </div>
           </div>
 
-          <!-- SECTION 3: UNIFIED COMBAT LOG & AUTOMATION RESULTS -->
+          <!-- SECTION 6: UNIFIED COMBAT LOG (BELOW DOORS, FLOATING HOVER CARD DETAILS) -->
           <div id="dungeon-combat-log-section" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center gap-2">
@@ -1069,32 +1204,8 @@ function handleImgError(e: Event) {
               </div>
             </div>
 
-            <!-- Inline Automation Status Strip -->
-            <div
-              v-if="autoStatusMessage"
-              id="dungeon-auto-status-strip"
-              class="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]"
-              :class="
-                isAutomating
-                  ? 'border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200'
-                  : autoStatusMessage.includes('stopped') || autoStatusMessage.includes('threshold') || autoStatusMessage.includes('below') || autoStatusMessage.includes('No winnable')
-                  ? 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-200'
-                  : 'border-blue-200 bg-blue-50/80 text-blue-900 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-200'
-              "
-            >
-              <span class="font-medium leading-snug">{{ autoStatusMessage }}</span>
-              <button
-                v-if="!isAutomating"
-                type="button"
-                class="cursor-pointer shrink-0 text-[10px] opacity-70 hover:opacity-100"
-                @click="autoStatusMessage = null"
-              >
-                ✕
-              </button>
-            </div>
-
             <!-- Compact 4-5 Column Cleared Room Cards Grid -->
-            <div v-if="mergedCombatLogRooms.length > 0" class="space-y-2">
+            <div v-if="mergedCombatLogRooms.length > 0">
               <div
                 id="dungeon-combat-log-grid"
                 class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-1.5"
@@ -1107,10 +1218,10 @@ function handleImgError(e: Event) {
                   class="group relative flex flex-col justify-between rounded-lg border px-2 py-1.5 text-left transition-all hover:shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                   :class="getElementCardClasses(room.element, room.casualties)"
                   :aria-label="`Floor ${room.floor} Door ${room.door} ${room.element} (${room.source === 'auto' ? 'Auto' : 'Manual'})`"
-                  @mouseenter="hoveredLogEntry = room"
-                  @mouseleave="hoveredLogEntry = null"
-                  @focus="hoveredLogEntry = room"
-                  @blur="hoveredLogEntry = null"
+                  @mouseenter="showLogHoverCard(room, $event)"
+                  @mouseleave="hideLogHoverCard"
+                  @focus="showLogHoverCard(room, $event)"
+                  @blur="hideLogHoverCard"
                 >
                   <div class="flex items-center justify-between gap-1 w-full">
                     <span class="font-mono font-bold text-[11px] leading-none">F{{ room.floor }}</span>
@@ -1142,145 +1253,11 @@ function handleImgError(e: Event) {
                   </div>
                 </button>
               </div>
-
-              <!-- Hover / Focus Detail Panel -->
-              <div
-                v-if="hoveredLogEntry"
-                id="dungeon-log-card-tooltip"
-                class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/90 p-2.5 text-[11px] space-y-1 shadow-xs"
-              >
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                  <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                    <span>Floor {{ hoveredLogEntry.floor }} · Door {{ hoveredLogEntry.door }} ({{ hoveredLogEntry.element }})</span>
-                    <span class="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-semibold">
-                      {{ hoveredLogEntry.source === 'auto' ? '⚡ Auto' : '👤 Manual' }}
-                    </span>
-                  </div>
-                  <span v-if="hoveredLogEntry.timestamp" class="text-[10px] font-mono text-slate-400">
-                    {{ formatLogTime(hoveredLogEntry.timestamp) }}
-                  </span>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300">
-                  <span v-if="hoveredLogEntry.casualties === 0" class="text-emerald-600 dark:text-emerald-400 font-semibold">
-                    Flawless ({{ hoveredLogEntry.stars }}★)
-                  </span>
-                  <span v-else class="text-rose-600 dark:text-rose-400 font-semibold">
-                    Casualties ({{ hoveredLogEntry.casualties }}): {{ hoveredLogEntry.fallenTitans.join(', ') || 'Fallen Titan' }}
-                  </span>
-                  <span v-if="hoveredLogEntry.tankLossPct != null || hoveredLogEntry.teamLossPct != null" class="font-mono text-[10px]">
-                    Tank -{{ hoveredLogEntry.tankLossPct ?? 0 }}% · Team -{{ hoveredLogEntry.teamLossPct ?? 0 }}%
-                  </span>
-                  <span v-if="hoveredLogEntry.switchedTankFrom && hoveredLogEntry.switchedTankTo" class="text-amber-600 dark:text-amber-400 font-medium">
-                    Tank switched: {{ hoveredLogEntry.switchedTankFrom }} → {{ hoveredLogEntry.switchedTankTo }}
-                  </span>
-                  <span v-if="hoveredLogEntry.forceMajeure" class="text-amber-600 dark:text-amber-400 font-semibold">
-                    Last-resort win (Pool ≤5)
-                  </span>
-                  <span v-if="hoveredLogEntry.bestOfTenNote" class="text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
-                    Best-of-10 {{ hoveredLogEntry.bestOfTenNote }}
-                  </span>
-                  <span v-if="hoveredLogEntry.checkpointGold" class="text-amber-600 dark:text-amber-300 font-mono text-[10px]">
-                    +{{ formatNumber(hoveredLogEntry.checkpointGold) }} Gold
-                  </span>
-                </div>
-
-                <div v-if="hoveredLogEntry.teamIds && hoveredLogEntry.teamIds.length > 0" class="text-[10px] text-slate-500 dark:text-slate-400">
-                  Squad: {{ hoveredLogEntry.teamIds.map((id) => getTitanName(id)).join(', ') }}
-                </div>
-              </div>
             </div>
 
             <div v-else class="text-center p-2.5 text-slate-400 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg text-xs">
               No rooms cleared yet today. Start Auto Attack or Simulate a door to record combat history.
             </div>
-          </div>
-
-          <!-- SECTION 4: CURRENT FLOOR DOORS -->
-          <div v-if="doors.length > 0" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <span>🚪</span>
-                <span>Floor {{ floorNumber }} Doors</span>
-              </h3>
-
-              <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} choices</span>
-            </div>
-
-            <div id="dungeon-doors-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div
-                v-for="(door, idx) in doors"
-                :key="idx"
-                class="rounded-xl border p-3.5 space-y-2.5"
-                :class="
-                  activeBattle && activeBattle.teamNum === idx
-                    ? 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-400 dark:border-blue-600 dark:bg-blue-950/40'
-                    : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'
-                "
-              >
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-xs text-slate-800 dark:text-slate-100">
-                    Door {{ idx + 1 }}
-                  </span>
-                  <span v-if="door.power" class="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300">
-                    Power: {{ formatNumber(door.power) }}
-                  </span>
-                </div>
-
-                <div class="space-y-2">
-                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Enemy Titans
-                  </div>
-                  <ul v-if="door.enemies.length" class="space-y-1.5" :aria-label="`Door ${Number(idx) + 1} enemy Titans`">
-                    <li
-                      v-for="(enemy, eIdx) in door.enemies"
-                      :key="`${enemy.id}:${eIdx}`"
-                      class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900/60"
-                    >
-                      <img
-                        v-if="enemy.avatar"
-                        :src="enemy.avatar"
-                        alt=""
-                        class="size-8 shrink-0 rounded-full object-cover"
-                        @error="handleImgError"
-                      />
-                      <div class="min-w-0 flex-1">
-                        <div class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ enemy.name }}</div>
-                        <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500 dark:text-slate-400">
-                          <span v-if="enemy.element">{{ enemy.element }}</span>
-                          <span v-if="enemy.level != null">Lv. {{ enemy.level }}</span>
-                          <UnitStars v-if="enemy.star != null" :count="enemy.star" compact="suffix" />
-                          <span class="font-mono">#{{ enemy.id }}</span>
-                        </div>
-                      </div>
-                    </li>
-                  </ul>
-                  <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
-                </div>
-
-                <!-- Door Actions: Interactive Simulation -->
-                <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 flex-wrap">
-                  <!-- Interactive Simulation Button -->
-                  <button
-                    :id="`btn-door-sim-${idx}`"
-                    type="button"
-                    class="dungeon-door-sim-btn cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-indigo-600/30 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 dark:border-indigo-800 px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
-                    :title="`Simulate battle for Door ${Number(idx) + 1}`"
-                    @click="openSimModal(door, idx)"
-                  >
-                    <span>🧪</span>
-                    <span>Simulate</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-else
-            class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500"
-          >
-            Floor doors will update when a new dungeon floor is unlocked in game.
           </div>
 
           <!-- SECTION 5: TITAN HEALTH & ENERGY STATUS -->
@@ -1373,6 +1350,54 @@ function handleImgError(e: Event) {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Floating Combat Log Hover Card (zero layout shift) -->
+    <div
+      v-if="hoveredLogEntry"
+      id="dungeon-log-card-tooltip"
+      :style="hoverCardStyle"
+      class="fixed z-[120] pointer-events-none rounded-xl border border-slate-300 dark:border-slate-600 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-3 text-[11px] space-y-1.5 shadow-xl"
+    >
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+          <span>Floor {{ hoveredLogEntry.floor }} · Door {{ hoveredLogEntry.door }} ({{ hoveredLogEntry.element }})</span>
+          <span class="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-semibold">
+            {{ hoveredLogEntry.source === 'auto' ? '⚡ Auto' : '👤 Manual' }}
+          </span>
+        </div>
+        <span v-if="hoveredLogEntry.timestamp" class="text-[10px] font-mono text-slate-400">
+          {{ formatLogTime(hoveredLogEntry.timestamp) }}
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300">
+        <span v-if="hoveredLogEntry.casualties === 0" class="text-emerald-600 dark:text-emerald-400 font-semibold">
+          Flawless ({{ hoveredLogEntry.stars }}★)
+        </span>
+        <span v-else class="text-rose-600 dark:text-rose-400 font-semibold">
+          Casualties ({{ hoveredLogEntry.casualties }}): {{ hoveredLogEntry.fallenTitans.join(', ') || 'Fallen Titan' }}
+        </span>
+        <span v-if="hoveredLogEntry.tankLossPct != null || hoveredLogEntry.teamLossPct != null" class="font-mono text-[10px]">
+          Tank -{{ hoveredLogEntry.tankLossPct ?? 0 }}% · Team -{{ hoveredLogEntry.teamLossPct ?? 0 }}%
+        </span>
+        <span v-if="hoveredLogEntry.switchedTankFrom && hoveredLogEntry.switchedTankTo" class="text-amber-600 dark:text-amber-400 font-medium">
+          Tank switched: {{ hoveredLogEntry.switchedTankFrom }} → {{ hoveredLogEntry.switchedTankTo }}
+        </span>
+        <span v-if="hoveredLogEntry.forceMajeure" class="text-amber-600 dark:text-amber-400 font-semibold">
+          Last-resort win (Pool ≤5)
+        </span>
+        <span v-if="hoveredLogEntry.bestOfTenNote" class="text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
+          Sim {{ hoveredLogEntry.bestOfTenNote }}
+        </span>
+        <span v-if="hoveredLogEntry.checkpointGold" class="text-amber-600 dark:text-amber-300 font-mono text-[10px]">
+          +{{ formatNumber(hoveredLogEntry.checkpointGold) }} Gold
+        </span>
+      </div>
+
+      <div v-if="hoveredLogEntry.teamIds && hoveredLogEntry.teamIds.length > 0" class="text-[10px] text-slate-500 dark:text-slate-400">
+        Squad: {{ hoveredLogEntry.teamIds.map((id) => getTitanName(id)).join(', ') }}
       </div>
     </div>
 

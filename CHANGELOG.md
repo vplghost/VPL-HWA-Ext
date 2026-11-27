@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.374 — 2026-11-27
+
+### Changed
+
+- **Titan Dungeon Modal Zero-Jump Layout, Compact Element Affinities & Floating Combat Log Hover Card (`DungeonModal.vue`, `tests/wxt-vue-frontend.test.mjs`)**:
+  - Reordered `#dungeon-modal-body` to keep fixed daily information anchored at the top and prevent layout jumping during combat: Overview Stats → single-line `#dungeon-element-affinities` → `#dungeon-auto-config-bar` (with dynamic `Best-of-N` label) → `#dungeon-battle-status-slot` (Active Battle team, Last Battle outcome, and Auto status strip) → `#dungeon-doors-section` → `#dungeon-combat-log-section`.
+  - Replaced the inline Combat Log detail panel with a viewport-aware fixed floating hover card (`#dungeon-log-card-tooltip`, `fixed z-[120] pointer-events-none`) inside `<Teleport to="body">`, eliminating vertical layout shift when hovering or focusing cleared room cards.
+
 ## 0.11.372 — 2026-11-27
 
 ### Fixed

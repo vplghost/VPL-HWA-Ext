@@ -1438,3 +1438,22 @@ test('HeroDetailModal includes hero skins overview and smart leveling with auto-
 
 
 
+
+test('P2-34: DungeonModal orders fixed sections above dynamic status/doors/combat-log and uses a fixed floating hover card', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
+  const idxAffinities = src.indexOf('id="dungeon-element-affinities"');
+  const idxConfig = src.indexOf('id="dungeon-auto-config-bar"');
+  const idxStatus = src.indexOf('id="dungeon-battle-status-slot"');
+  const idxDoors = src.indexOf('id="dungeon-doors-section"');
+  const idxCombatLog = src.indexOf('id="dungeon-combat-log-section"');
+  const idxTooltip = src.indexOf('id="dungeon-log-card-tooltip"');
+
+  assert.ok(idxAffinities > 0, '#dungeon-element-affinities must exist');
+  assert.ok(idxConfig > idxAffinities, 'Auto config must be below Element Affinities');
+  assert.ok(idxStatus > idxConfig, 'Battle status/outcome slot must be below Auto config');
+  assert.ok(idxDoors > idxStatus, 'Floor Doors must be below Battle status slot');
+  assert.ok(idxCombatLog > idxDoors, 'Combat Log must be below Floor Doors');
+  assert.ok(idxTooltip > idxCombatLog, 'Floating Combat Log hover card must be outside the combat log flow');
+  assert.match(src, /id="dungeon-log-card-tooltip"[\s\S]{0,200}fixed z-\[120\] pointer-events-none/);
+});
