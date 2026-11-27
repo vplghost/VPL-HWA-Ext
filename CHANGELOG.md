@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.387 — 2026-11-27
+
+### Changed
+
+- **Building & Research Tree Sync (`cityTreeManifest.json`, `buildingData.ts`, `sync-cdn-assets.mjs`)**:
+  - Synced live `remoteConfigInit` manifest (`personalResearchType` MD5 `9cadec04a42c496b7c649db2ed58da05` → `895f63f238e1dddc4f86d06c02ff07ad`: `combat_classes` open requirement lowered from `battle_pro >= 20` to `>= 12`).
+  - Improved `resilientFetch()` in `scripts/sync-cdn-assets.mjs` to try IPv4 DNS resolution first with timeout + automatic fallback across Akamai IPs instead of failing on stale hardcoded IP `ECONNRESET`.
+
 ## 0.11.386 — 2026-11-27
 
 ### Added

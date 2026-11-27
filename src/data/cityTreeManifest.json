@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-24T14:44:37.972Z",
+  "updatedAt": "2026-11-27T16:16:21.401Z",
   "configs": {
     "building": {
       "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/building/3c471c298931f782688e0f13987cfe87.json",
@@ -22,8 +22,8 @@
       "md5": "9208cc36ee789ffb3da461d1ba325264"
     },
     "personalResearchType": {
-      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/personalResearchType/9cadec04a42c496b7c649db2ed58da05.json",
-      "md5": "9cadec04a42c496b7c649db2ed58da05"
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/personalResearchType/895f63f238e1dddc4f86d06c02ff07ad.json",
+      "md5": "895f63f238e1dddc4f86d06c02ff07ad"
     },
     "strategicLocalization": {
       "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/strategicLocalization_en/5987ba26eadb03754697acb5494551a4.json",

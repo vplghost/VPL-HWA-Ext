@@ -12,9 +12,10 @@ import { convertImgBuffer } from './convert-img-asset.mjs';
 export const CDN_ORIGIN = 'https://heroesmobile-a-cdn.nextersglobal.com';
 export const DEFAULT_VERSION = '1.294.0';
 
-export async function resilientFetch(url, options = {}) {
+const NEXTERS_FALLBACK_IPS = ['125.234.51.43', '23.215.35.90'];
+
+function httpsRequestOnce(parsed, options, forcedIp = null, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
     const req = https.request({
       protocol: parsed.protocol,
       hostname: parsed.hostname,
@@ -22,6 +23,7 @@ export async function resilientFetch(url, options = {}) {
       port: parsed.port || 443,
       path: parsed.pathname + parsed.search,
       method: options.method || 'GET',
+      timeout: timeoutMs,
       headers: {
         'Host': parsed.hostname,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -29,11 +31,11 @@ export async function resilientFetch(url, options = {}) {
       },
       lookup: (hostname, opts, cb) => {
         if (typeof opts === 'function') { cb = opts; opts = {}; }
-        if (hostname.includes('nextersglobal.com')) {
-          if (opts?.all) cb(null, [{ address: '23.215.35.90', family: 4 }]);
-          else cb(null, '23.215.35.90', 4);
+        if (forcedIp) {
+          if (opts?.all) cb(null, [{ address: forcedIp, family: 4 }]);
+          else cb(null, forcedIp, 4);
         } else {
-          dns.lookup(hostname, opts, cb);
+          dns.lookup(hostname, { ...opts, family: 4 }, cb);
         }
       }
     }, (res) => {
@@ -52,9 +54,26 @@ export async function resilientFetch(url, options = {}) {
         });
       });
     });
+    req.on('timeout', () => req.destroy(new Error(`Request timed out after ${timeoutMs}ms`)));
     req.on('error', reject);
     req.end();
   });
+}
+
+export async function resilientFetch(url, options = {}) {
+  const parsed = new URL(url);
+  const candidates = parsed.hostname.includes('nextersglobal.com')
+    ? [null, ...NEXTERS_FALLBACK_IPS]
+    : [null];
+  let lastError;
+  for (const ip of candidates) {
+    try {
+      return await httpsRequestOnce(parsed, options, ip);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 const root = resolve(import.meta.dirname, '..');
 export const hash = (buffer, algorithm = 'sha256') => createHash(algorithm).update(buffer).digest('hex');
