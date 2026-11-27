@@ -26,10 +26,26 @@ export function monsterSquadPower(heroIds: unknown, roster: any, units: unknown,
   return { heroes, troops, total };
 }
 
+export const MONSTER_ATTACK_ENERGY_COST = 10;
+
+export function computeMaxMonsterAttacks(
+  worldEnergy: number | null | undefined,
+  energyPerAttack = MONSTER_ATTACK_ENERGY_COST,
+  fallbackMax = 100
+) {
+  if (worldEnergy != null && Number.isFinite(Number(worldEnergy))) {
+    const energy = Math.max(0, Math.floor(Number(worldEnergy)));
+    const cost = Math.max(1, Math.floor(Number(energyPerAttack) || MONSTER_ATTACK_ENERGY_COST));
+    return { known: true, energy, maxAttacks: Math.floor(energy / cost) };
+  }
+  return { known: false, energy: null as number | null, maxAttacks: fallbackMax };
+}
+
 export function monsterPowerComparison(level: number, squad: ReturnType<typeof monsterSquadPower>, target?: any) {
   const variants = Object.values(MONSTER_POWER).filter(row => row.level === level);
   const exact = variants.find(row => row.predefinedSquadId === Number(target?.predefinedSquadId));
-  const presets = exact ? [exact] : variants;
+  const pvpDefault = variants.find(row => row.variant === 'pvp') || variants[0];
+  const presets = exact ? [exact] : (pvpDefault ? [pvpDefault] : []);
   const rows = presets.map(preset => ({
     ...preset, total: preset.heroes + preset.troops,
     weaker: squad.total.complete && squad.total.value < preset.heroes + preset.troops,
@@ -39,8 +55,8 @@ export function monsterPowerComparison(level: number, squad: ReturnType<typeof m
     ? 'Incomplete squad power data. Refresh heroes and troops before comparing; + marks a known subtotal.'
     : weaker.length
       ? `Squad power is lower than ${weaker.map(row => row.variant === 'pvp' ? 'PvP monster' : 'Normal monster').join(' and ')} at this level. Risk of defeat and wounded troops.`
-      : 'Squad power meets these preset totals. Power alone does not guarantee victory.';
-  return { rows, variantKnown: Boolean(exact), warning: !squad.total.complete || weaker.length > 0,
+      : 'Squad power meets the PvP monster preset total. Power alone does not guarantee victory.';
+  return { rows, variantKnown: Boolean(exact || pvpDefault), warning: !squad.total.complete || weaker.length > 0,
     message, squad: { heroes: formatPower(squad.heroes), troops: formatPower(squad.troops), total: formatPower(squad.total) } };
 }
 

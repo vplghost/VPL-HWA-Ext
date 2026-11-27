@@ -12,7 +12,14 @@ import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import StatusAlertBanner from '@/src/components/common/StatusAlertBanner.vue';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
-import { monsterSquadPower, monsterPowerComparison, formatMonsterPower } from '@/src/utils/monsterPower';
+import { getWorldEnergy } from '@/src/utils/resourceData';
+import {
+  monsterSquadPower,
+  monsterPowerComparison,
+  formatMonsterPower,
+  computeMaxMonsterAttacks,
+  MONSTER_ATTACK_ENERGY_COST,
+} from '@/src/utils/monsterPower';
 import {
   soloMonsterConfigIds,
   soloMonsterLevel,
@@ -50,6 +57,7 @@ const {
 
 const mobLevel = ref(1);
 const mobCount = ref(2);
+const mobCountTouched = ref(false);
 const autoHealAfterQueue = ref(true);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
@@ -61,6 +69,43 @@ const showSessionSummary = ref(false);
 const selectedMobId = ref<string>('');
 const isSearchingMonsters = ref(false);
 const statusMessage = ref<string>('');
+
+const now = ref(Date.now());
+let timer: number | null = null;
+
+const worldEnergy = computed(() => getWorldEnergy(cache.value, now.value));
+const attackBudget = computed(() => computeMaxMonsterAttacks(worldEnergy.value, MONSTER_ATTACK_ENERGY_COST, 100));
+const hasEnoughWorldEnergy = computed(() => !attackBudget.value.known || attackBudget.value.maxAttacks > 0);
+
+watch(
+  attackBudget,
+  (budget) => {
+    if (!budget.known) return;
+    if (!mobCountTouched.value) {
+      mobCount.value = budget.maxAttacks;
+    } else if (mobCount.value > budget.maxAttacks) {
+      mobCount.value = budget.maxAttacks;
+    } else if (budget.maxAttacks > 0 && mobCount.value < 1) {
+      mobCount.value = 1;
+    }
+  },
+  { immediate: true }
+);
+
+function handleMobCountInput() {
+  mobCountTouched.value = true;
+  const max = attackBudget.value.maxAttacks;
+  if (!Number.isFinite(mobCount.value)) {
+    mobCount.value = max > 0 ? 1 : 0;
+    return;
+  }
+  const rounded = Math.floor(mobCount.value);
+  if (attackBudget.value.known) {
+    mobCount.value = max <= 0 ? 0 : Math.min(max, Math.max(1, rounded));
+  } else {
+    mobCount.value = Math.min(100, Math.max(1, rounded));
+  }
+}
 
 // Monster targets found from map search
 const searchData = computed(() => cache.value.experimentalSoloSearch?.data);
@@ -98,9 +143,6 @@ watch(
   },
   { immediate: true }
 );
-
-const now = ref(Date.now());
-let timer: number | null = null;
 
 const activeAttacks = computed(() => {
   const marches = normalizeArray(cache.value?.marchStatus?.data?.marches);
@@ -218,6 +260,10 @@ watch(
     if (open) {
       registerModalOpen('monster');
       now.value = Date.now();
+      mobCountTouched.value = false;
+      if (attackBudget.value.known) {
+        mobCount.value = attackBudget.value.maxAttacks;
+      }
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
       syncMonsterQueueState();
@@ -348,6 +394,17 @@ async function findMonsters() {
 async function startMonsterQueue(count = mobCount.value) {
   await ensureRpcEnabled();
   await savePreferences();
+
+  if (attackBudget.value.known && attackBudget.value.maxAttacks <= 0) {
+    statusMessage.value = `⚠️ Insufficient World Energy (${attackBudget.value.energy ?? 0}⚡; requires at least ${MONSTER_ATTACK_ENERGY_COST}⚡ per attack).`;
+    return;
+  }
+  const effectiveCount = attackBudget.value.known
+    ? Math.min(attackBudget.value.maxAttacks, Math.max(1, Math.floor(Number(count) || 1)))
+    : Math.min(100, Math.max(1, Math.floor(Number(count) || 1)));
+  if (effectiveCount !== count) {
+    count = effectiveCount;
+  }
 
   const heroIds = normalizeArray(selectedTeam.value?.heroIds);
   const teamId = selectedTeam.value?.id || '';
@@ -651,17 +708,17 @@ async function stopMonsterQueue() {
             <span>⚙️</span> Monster Search & Attack Parameters
           </h3>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-            <!-- Monster Level with Find Button -->
-            <div>
+          <div id="monster-params-row" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+            <!-- Level with Find Button -->
+            <div class="sm:col-span-4">
               <label for="monster-mob-level" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Monster Level
+                Level
               </label>
               <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <select
                   id="monster-mob-level"
                   v-model.number="mobLevel"
-                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                   @change="savePreferences"
                 >
                   <option
@@ -670,35 +727,35 @@ async function stopMonsterQueue() {
                     :value="lvl"
                     class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                   >
-                    Monster level {{ lvl }}
+                    Lv. {{ lvl }}
                   </option>
                 </select>
 
                 <button
                   type="button"
                   :disabled="isSearchingMonsters"
-                  class="cursor-pointer px-3.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
+                  class="cursor-pointer px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
                   title="Search map for wild monsters at this level"
                   @click="findMonsters"
                 >
-                  <span>{{ isSearchingMonsters ? 'Searching...' : 'Find' }}</span>
+                  <span>{{ isSearchingMonsters ? '...' : 'Find' }}</span>
                 </button>
               </div>
             </div>
 
-            <!-- Target Monster Select -->
-            <div>
-              <label for="monster-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Target ({{ matchingMonsterConfigs ? `${foundMonsters.length} target(s) found` : 'Search level first' }})
+            <!-- Target Select -->
+            <div class="sm:col-span-5">
+              <label for="monster-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 truncate">
+                Target ({{ matchingMonsterConfigs ? `${foundMonsters.length} found` : 'Search first' }})
               </label>
               <select
                 id="monster-target-select"
                 v-model="selectedMobId"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
                 <option v-if="foundMonsters.length === 0" value="" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
-                  No targets found (Click "Find")
+                  None (Click Find)
                 </option>
                 <option
                   v-for="(target, idx) in foundMonsters"
@@ -706,23 +763,33 @@ async function stopMonsterQueue() {
                   :value="target.mobId"
                   class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  Monster {{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
+                  #{{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
             </div>
 
-            <!-- Attack Count -->
-            <div class="sm:col-span-2">
-              <label for="monster-queue-count" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Attack Count (for queue)
+            <!-- Attack Count (World Energy capped) -->
+            <div class="sm:col-span-3">
+              <label
+                for="monster-queue-count"
+                class="flex items-center justify-between gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1"
+                :title="attackBudget.known ? `World Energy: ${attackBudget.energy} (${MONSTER_ATTACK_ENERGY_COST} per attack, max ${attackBudget.maxAttacks})` : 'Attack count for queue'"
+              >
+                <span>Count</span>
+                <span v-if="attackBudget.known" class="text-[10px] font-mono text-amber-600 dark:text-amber-400">
+                  Max {{ attackBudget.maxAttacks }} · {{ attackBudget.energy }}⚡
+                </span>
               </label>
               <input
                 id="monster-queue-count"
                 v-model.number="mobCount"
                 type="number"
-                min="1"
-                max="100"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                :min="attackBudget.known && attackBudget.maxAttacks === 0 ? 0 : 1"
+                :max="attackBudget.known ? Math.max(0, attackBudget.maxAttacks) : 100"
+                :disabled="attackBudget.known && attackBudget.maxAttacks === 0"
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden disabled:opacity-50"
+                @input="handleMobCountInput"
+                @change="handleMobCountInput"
               />
             </div>
           </div>
@@ -733,7 +800,7 @@ async function stopMonsterQueue() {
             class="rounded-lg border p-3 text-xs space-y-2"
             :class="powerComparison.warning ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200' : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200'"
           >
-            <div class="font-semibold">Power comparison · Level {{ mobLevel }}</div>
+            <div class="font-semibold">Power comparison · Lv. {{ mobLevel }}</div>
             <table class="w-full text-right tabular-nums">
               <thead><tr><th class="text-left">Squad</th><th>Heroes</th><th>Troops</th><th>Total</th></tr></thead>
               <tbody>
@@ -744,7 +811,6 @@ async function stopMonsterQueue() {
                 </tr>
               </tbody>
             </table>
-            <p v-if="!powerComparison.variantKnown" class="text-2xs">Search does not identify the target variant. Both level presets are shown.</p>
             <p id="monster-power-warning" role="status" aria-live="polite" class="font-medium">{{ powerComparison.warning ? '⚠️ ' : '' }}{{ powerComparison.message }}</p>
             <p class="text-2xs">Base power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.</p>
           </div>
@@ -833,7 +899,7 @@ async function stopMonsterQueue() {
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
             type="button"
-            :disabled="isRunning || isSearchingMonsters || Boolean(statusMessage?.includes('already running'))"
+            :disabled="isRunning || isSearchingMonsters || !hasEnoughWorldEnergy || Boolean(statusMessage?.includes('already running'))"
             class="cursor-pointer px-3.5 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors disabled:opacity-50"
             @click="startMonsterQueue(1)"
           >
@@ -843,7 +909,7 @@ async function stopMonsterQueue() {
           <button
             v-if="!isRunning && !statusMessage?.includes('already running')"
             type="button"
-            :disabled="isSearchingMonsters"
+            :disabled="isSearchingMonsters || !hasEnoughWorldEnergy || mobCount <= 0"
             class="cursor-pointer px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
             @click="startMonsterQueue(mobCount)"
           >

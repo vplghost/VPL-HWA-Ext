@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.389 — 2026-11-27
+
+### Changed
+
+- **Monster Attack Dialog World Energy Cap, Compact 1-Row UI & PvP Monster Power (`MonsterModal.vue`, `monsterPower.ts`, `tests/monster-power.test.mjs`)**:
+  - Added `computeMaxMonsterAttacks()` bound to `getWorldEnergy(cache, now)` (`10` World Energy per attack): `MonsterModal` now defaults `mobCount` to the maximum affordable attacks, clamps input and queue dispatch to available World Energy, and disables launch when World Energy is `< 10`.
+  - Compacted Monster Level + Find, Target, and Count onto a single 12-column row (`#monster-params-row`) and removed redundant `"Monster"` prefixes from Level (`Lv. N`) and Target (`#N · (x, y)`) dropdown options.
+  - Updated `monsterPowerComparison()` to default to the authoritative **PvP monster** preset across all 30 levels (e.g., Level 20: `147.2k` heroes / `102.2k` troops), eliminating false defeat warnings from legacy Normal presets.
+
 ## 0.11.388 — 2026-11-27
 
 ### Added

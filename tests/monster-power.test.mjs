@@ -9,6 +9,7 @@ import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import { MONSTER_POWER } from '../src/utils/rallyPowerData.ts';
 import * as power from '../src/utils/monsterPower.ts';
+import { getWorldEnergy } from '../src/utils/resourceData.ts';
 import { normalizeArray } from '../src/utils/troops.ts';
 import { formatNumber } from '../src/utils/formatters.ts';
 import { soloMonsterConfigIds, soloMonsterLevel } from '../src/utils/mobData.ts';
@@ -21,7 +22,15 @@ test('all 30 solo levels preserve both verified preset families, separate from r
     assert.deepEqual(Object.values(MONSTER_POWER).filter(row => row.level === level).map(row => row.variant).sort(), ['normal', 'pvp']);
   }
   assert.deepEqual([MONSTER_POWER[109].heroes, MONSTER_POWER[109].troops, MONSTER_POWER[109].count], [70903, 56050, 2950]);
+  assert.deepEqual([MONSTER_POWER[114].heroes, MONSTER_POWER[114].troops, MONSTER_POWER[114].level, MONSTER_POWER[114].variant], [147175, 102200, 20, 'pvp']);
   assert.equal(MONSTER_POWER[17].troops, 8645 * 19);
+});
+
+test('P2-39: computeMaxMonsterAttacks caps attacks by World Energy (10 per attack) with fallback when unknown', () => {
+  assert.deepEqual(power.computeMaxMonsterAttacks(125), { known: true, energy: 125, maxAttacks: 12 });
+  assert.deepEqual(power.computeMaxMonsterAttacks(9), { known: true, energy: 9, maxAttacks: 0 });
+  assert.deepEqual(power.computeMaxMonsterAttacks(0), { known: true, energy: 0, maxAttacks: 0 });
+  assert.deepEqual(power.computeMaxMonsterAttacks(null), { known: false, energy: null, maxAttacks: 100 });
 });
 
 test('squad power uses the allocation, handles object collections and discloses unknown data', () => {
@@ -37,14 +46,23 @@ test('squad power uses the allocation, handles object collections and discloses 
   assert.equal(power.monsterSquadPower(ids, roster(), [], true).troops.value, 0);
 });
 
-test('advisory distinguishes weaker, equal and higher power and rejects wrong-level target presets', () => {
+test('advisory defaults to PvP monster preset, distinguishes weaker/equal/higher power, and rejects wrong-level target presets', () => {
   const squad = power.monsterSquadPower(ids, roster(100), [], true);
-  const both = power.monsterPowerComparison(15, squad);
-  assert.equal(both.rows.length, 2); assert.equal(both.variantKnown, false);
-  assert.match(both.message, /Risk of defeat/);
+  const lv20 = power.monsterPowerComparison(20, squad);
+  assert.equal(lv20.rows.length, 1);
+  assert.equal(lv20.rows[0].variant, 'pvp');
+  assert.equal(power.formatMonsterPower(lv20.rows[0].heroes), '147.2k');
+  assert.equal(power.formatMonsterPower(lv20.rows[0].troops), '102.2k');
+  assert.match(lv20.message, /PvP monster/);
+  assert.match(lv20.message, /Risk of defeat/);
+
   const exact = power.monsterPowerComparison(15, squad, { predefinedSquadId: 109 });
   assert.equal(exact.rows.length, 1); assert.equal(exact.variantKnown, true);
-  assert.equal(power.monsterPowerComparison(1, squad, { predefinedSquadId: 109 }).rows.length, 2);
+  // Wrong-level predefinedSquadId falls back to PvP preset for requested level 1
+  const wrongLevel = power.monsterPowerComparison(1, squad, { predefinedSquadId: 109 });
+  assert.equal(wrongLevel.rows.length, 1);
+  assert.equal(wrongLevel.rows[0].level, 1);
+  assert.equal(wrongLevel.rows[0].variant, 'pvp');
   for (const value of [126953, 126954]) {
     const result = power.monsterPowerComparison(15, { ...squad, total: { value, known: true, complete: true } }, { predefinedSquadId: 109 });
     assert.equal(result.warning, false); assert.match(result.message, /does not guarantee victory/);
@@ -52,8 +70,12 @@ test('advisory distinguishes weaker, equal and higher power and rejects wrong-le
 });
 
 const source = await readFile(new URL('../src/components/dialogs/MonsterModal.vue', import.meta.url), 'utf8');
-function fixture() {
-  const cache = Vue.ref({ heroGetAll: { data: roster() }, 'getUnitSummary:unit': { data: {} } });
+function fixture(worldEnergyAmount = 125) {
+  const cache = Vue.ref({
+    heroGetAll: { data: roster() },
+    'getUnitSummary:unit': { data: {} },
+    'resource:world-energy': { data: { amount: worldEnergyAmount } },
+  });
   const selectedTeam = Vue.ref({ id: 'team', label: 'Test', heroIds: ids });
   const allocatedTroops = Vue.ref([{ unitId: 1, count: 100 }]);
   const squad = { selectedTeam, selectedTeamId: Vue.ref('team'), teams: Vue.computed(() => selectedTeam.value ? [selectedTeam.value] : []),
@@ -61,23 +83,27 @@ function fixture() {
     isRefreshingTroops: Vue.ref(false), mapContext: Vue.ref({ mapId: 'map' }), mapCenter: Vue.ref({ x: 1, y: 1 }),
     loadSquadData: async () => {}, refreshTroops: async () => {}, handleTeamChange: async () => {},
     getHeroSnapshot: () => null, getHeroName: id => `Hero ${id}`, getHeroAvatarUrl: () => '', getHeroGlow: () => '' };
-  const search = level => { cache.value.experimentalSoloSearch = { data: { mapId: 'map', mobConfigIds: soloMonsterConfigIds(level), mobs: [{ mobId: 'target' }] } }; };
+  const search = level => { cache.value.experimentalSoloSearch = { data: { mapId: 'map', mobConfigIds: soloMonsterConfigIds(level), mobs: [{ mobId: 'target', coordinates: { x: 12, y: 34 } }] } }; };
   return { cache, selectedTeam, squad, search };
 }
 
-test('actual dialog computed state waits for matching search and reacts to level, target and team changes', async t => {
-  const h = fixture(), stops = [];
+test('actual dialog computed state waits for matching search, defaults mobCount to max World Energy attacks, and reacts to level/target/team changes', async t => {
+  const h = fixture(125), stops = [];
   const script = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
   const js = ts.transpileModule(script, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
-  const context = { ...Vue, ...power, normalizeArray, soloMonsterConfigIds, soloMonsterLevel, formatNumber,
+  const context = { ...Vue, ...power, getWorldEnergy, normalizeArray, soloMonsterConfigIds, soloMonsterLevel, formatNumber,
     useRpcCache: () => ({ cache: h.cache }), useSquadTeams: () => h.squad, defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     onMounted() {}, onUnmounted() {}, watch: (...args) => { const stop = Vue.watch(...args); stops.push(stop); return stop; } };
-  vm.runInNewContext(js + '\nglobalThis.api = { powerComparison, mobLevel, selectedMobId };', context);
+  vm.runInNewContext(js + '\nglobalThis.api = { powerComparison, mobLevel, selectedMobId, mobCount, attackBudget };', context);
   t.after(() => stops.forEach(stop => stop()));
   const api = context.api;
+  assert.equal(api.attackBudget.value.maxAttacks, 12);
+  assert.equal(api.mobCount.value, 12, 'mobCount defaults to max affordable attacks from World Energy');
   assert.equal(api.powerComparison.value, null);
   h.search(1); await Vue.nextTick();
   assert.equal(api.powerComparison.value.warning, true);
+  assert.equal(api.powerComparison.value.rows.length, 1);
+  assert.equal(api.powerComparison.value.rows[0].variant, 'pvp');
   api.mobLevel.value = 2; await Vue.nextTick();
   assert.equal(api.powerComparison.value, null, 'old search is hidden immediately');
   h.search(2); await Vue.nextTick(); assert.equal(api.powerComparison.value.rows[0].level, 2);
@@ -88,8 +114,8 @@ test('actual dialog computed state waits for matching search and reacts to level
   h.selectedTeam.value = null; assert.equal(api.powerComparison.value, null);
 });
 
-test('actual Monster template displays power and warning before attack and updates with hero cache', async () => {
-  const h = fixture(); h.search(1);
+test('actual Monster template displays PvP monster power, compact 1-row params, and concise option labels', async () => {
+  const h = fixture(85); h.search(1);
   const { descriptor } = parse(source);
   const compiled = compileScript(descriptor, { id: 'monster-power-fixture', inlineTemplate: true });
   const js = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
@@ -99,6 +125,7 @@ test('actual Monster template displays power and warning before attack and updat
     '@/src/composables/useSquadTeams': { useSquadTeams: () => h.squad },
     '@/src/composables/useModals': useModalsModule,
     '@/src/utils/monsterPower': power,
+    '@/src/utils/resourceData': { getWorldEnergy },
     '@/src/utils/troops': { normalizeArray }, '@/src/utils/formatters': { formatNumber },
     '@/src/utils/mobData': { soloMonsterConfigIds, soloMonsterLevel },
     '@/src/utils/experimentalData': { soloMonsterConfigIds, soloMonsterLevel },
@@ -107,9 +134,13 @@ test('actual Monster template displays power and warning before attack and updat
   new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
   const render = () => renderToString(Vue.createSSRApp(module.exports.default, { modelValue: true }));
   const first = await render();
+  assert.match(first, /id="monster-params-row"/);
+  assert.match(first, /Lv\. 1/);
+  assert.doesNotMatch(first, /Monster level 1/);
+  assert.match(first, /#1 · \(12, 34\)/);
+  assert.doesNotMatch(first, /Monster 1 ·/);
   assert.match(first, /Power comparison/); assert.match(first, /Risk of defeat/);
-  assert.match(first, /Normal monster/); assert.match(first, /PvP monster/); assert.match(first, /800/);
-  assert.match(first, /Search does not identify/);
+  assert.match(first, /PvP monster/); assert.doesNotMatch(first, /Normal monster/); assert.match(first, /800/);
   h.cache.value.heroGetAll.data = roster(1e6);
   const updated = await render(); assert.doesNotMatch(updated, /Risk of defeat/); assert.match(updated, /does not guarantee victory/);
 });
