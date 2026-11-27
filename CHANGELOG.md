@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.386 — 2026-11-27
+
+### Added
+
+- **Quick Command Palette (`Ctrl+K`) & Compact Tab Bar Preset (`commandPalette.ts`, `CommandPaletteModal.vue`, `Header.vue`, `App.vue`, `SettingsTab.vue`, `tests/command-palette.test.mjs`)**:
+  - Added pure index & ranked search helper `src/utils/commandPalette.ts` indexing all 10 Navigation Tabs, 23 Dialogs/Modals, and Owned Heroes from `cache.heroGetAll.data`.
+  - Added `CommandPaletteModal.vue` (`#command-palette-modal`, `#command-palette-input`) with global `Ctrl+K` / `Cmd+K` shortcut, Arrow/Enter/Esc keyboard navigation, and `#header-command-palette-btn` trigger in `Header.vue`.
+  - Added 1-click **`Compact (5)`** (`#settings-tabs-preset-compact`) and **`Show All (9)`** (`#settings-tabs-preset-all`) tab visibility presets in `SettingsTab.vue` preserving custom drag-and-drop `tabConfig` order.
+
 ## 0.11.384 — 2026-11-27
 
 ### Changed

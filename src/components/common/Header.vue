@@ -767,6 +767,19 @@ function toggleTheme() {
           </span>
         </BaseTooltip>
 
+        <!-- Quick Command Palette Trigger (Ctrl+K) -->
+        <button
+          id="header-command-palette-btn"
+          type="button"
+          class="cursor-pointer inline-flex items-center gap-1 h-6 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors text-[11px] font-medium ml-1"
+          title="Quick Command Palette (Ctrl+K)"
+          aria-label="Open Quick Command Palette"
+          @click="openModal('commandPalette')"
+        >
+          <span>🔍</span>
+          <span class="hidden sm:inline font-mono text-[10px] opacity-75">Ctrl+K</span>
+        </button>
+
         <!-- Theme Toggle -->
         <button
           type="button"

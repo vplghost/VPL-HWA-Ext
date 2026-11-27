@@ -11,6 +11,7 @@ import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
+import { applyTabPreset } from '@/src/utils/commandPalette';
 import { moveItemToIndex } from '@/src/utils/listReorder';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
@@ -640,6 +641,11 @@ function resetDefaultTabs() {
   saveTabs();
 }
 
+function applyTabsVisibilityPreset(preset: 'compact' | 'all') {
+  tabSettings.value = applyTabPreset(tabSettings.value, preset);
+  saveTabs();
+}
+
 function handleThemeChange(event: Event) {
   const target = event.target as HTMLSelectElement;
   applyTheme(target.value as ThemeMode);
@@ -772,13 +778,33 @@ async function toggleRecording() {
               <span>📑</span> Navigation Tabs
               <span class="text-[10px] font-normal text-slate-400">Drag pills to reorder</span>
             </div>
-            <button
-              type="button"
-              class="cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0"
-              @click="resetDefaultTabs"
-            >
-              Reset Default
-            </button>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                id="settings-tabs-preset-compact"
+                type="button"
+                class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                title="Show 5 core tabs (Dashboard, Heroes, Titans, Events, Goals) while preserving your custom order"
+                @click="applyTabsVisibilityPreset('compact')"
+              >
+                Compact (5)
+              </button>
+              <button
+                id="settings-tabs-preset-all"
+                type="button"
+                class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                title="Show all 9 navigation tabs while preserving your custom order"
+                @click="applyTabsVisibilityPreset('all')"
+              >
+                Show All (9)
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+                @click="resetDefaultTabs"
+              >
+                Reset Default
+              </button>
+            </div>
           </div>
 
           <div

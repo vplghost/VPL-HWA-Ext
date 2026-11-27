@@ -42,6 +42,7 @@ import ArenaModal from '@/src/components/dialogs/ArenaModal.vue';
 import GrandArenaModal from '@/src/components/dialogs/GrandArenaModal.vue';
 import PvpTeamOptimizerModal from '@/src/components/dialogs/PvpTeamOptimizerModal.vue';
 import HydraModal from '@/src/components/dialogs/HydraModal.vue';
+import CommandPaletteModal from '@/src/components/common/CommandPaletteModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -114,6 +115,7 @@ const { modalState, modalContext } = useModals();
       <GrandArenaModal v-model="modalState.grandArena" />
       <PvpTeamOptimizerModal v-model="modalState.pvpOptimizer" />
       <HydraModal v-model="modalState.hydra" />
+      <CommandPaletteModal v-model="modalState.commandPalette" @select-tab="activeTab = $event" />
     </div>
   </div>
 </template>
