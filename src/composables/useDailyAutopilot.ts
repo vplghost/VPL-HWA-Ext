@@ -1,4 +1,10 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { useModals } from './useModals.ts';
+import {
+  hasAutopilotDialogRunner,
+  runAutopilotStepViaDialog,
+  stopActiveAutopilotDialogRunner,
+} from './useAutopilotDialogBridge.ts';
 import {
   planFavoriteSoulStoneSweep,
   DEFAULT_SOUL_SWEEP_RESERVE_ENERGY,
@@ -268,6 +274,27 @@ export function useDailyAutopilot(
 
   async function executeStep(stepId: DailyActivityId): Promise<void> {
     if (!dispatchRpc) throw new Error('Game RPC dispatcher unavailable');
+
+    // Unified 1:1 Dialog Runner delegation (open if closed -> run exact button handler -> close only if opened by autopilot)
+    if (hasAutopilotDialogRunner(stepId)) {
+      const { modalState, openModal, closeModal } = useModals();
+      const result = await runAutopilotStepViaDialog(stepId, {
+        openModal,
+        closeModal,
+        isModalOpen: (name) => modalState[name] === true,
+        isAborted: () => abortRequested,
+      });
+      if (result) {
+        runtimeState.steps[stepId] = {
+          status: result.status,
+          detail: result.detail,
+          ...(result.waitingUntil ? { waitingUntil: result.waitingUntil } : {}),
+          ...(result.error ? { error: result.error } : {}),
+          ...(result.status === 'done' ? { completedAt: Date.now() } : {}),
+        };
+        return;
+      }
+    }
 
     if (stepId === 'freebies') {
       const items = computeFreeGiftStripItems(cacheRef.value, Date.now(), { hasGameTab: true });
@@ -567,6 +594,7 @@ export function useDailyAutopilot(
   function stopAutopilot() {
     abortRequested = true;
     runtimeState.summary = 'Stopping…';
+    void stopActiveAutopilotDialogRunner(runtimeState.activeStepId);
   }
 
   return {

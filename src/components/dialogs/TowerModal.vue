@@ -5,6 +5,8 @@ import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
+import { towerActivityState } from '@/src/composables/activityState';
+import { registerAutopilotDialogRunner } from '@/src/composables/useAutopilotDialogBridge';
 import { TOWER_FLOOR_COUNT } from '@/src/utils/towerRules';
 import { towerBuffs } from '@/src/data/towerData';
 import { DEFAULT_BUFF_PRIORITY } from '@/src/services/queues/towerAutomation';
@@ -441,7 +443,51 @@ onMounted(() => {
   }
 });
 
+const unregisterTowerRunner =
+  typeof registerAutopilotDialogRunner === 'function'
+    ? registerAutopilotDialogRunner({
+        stepId: 'tower',
+        modalName: 'tower',
+        async run({ isAborted }) {
+          await loadTowerSettings();
+          const initialState = towerActivityState(cache.value, Date.now());
+          if (initialState.state === 'done') {
+            return { status: 'done', detail: initialState.detail || 'Tower completed today' };
+          }
+          if (!isRunning.value) {
+            await toggleTowerRun();
+          }
+          if (!isRunning.value) {
+            const errText = towerAutomationMessage.value || 'Could not start Tower automation.';
+            return { status: 'error', detail: errText, error: errText };
+          }
+          const startedAt = Date.now();
+          const maxWaitMs = 10 * 60 * 1000;
+          while (isRunning.value && Date.now() - startedAt < maxWaitMs) {
+            if (isAborted()) {
+              await toggleTowerRun();
+              return { status: 'skipped', detail: 'Tower automation stopped by user.' };
+            }
+            const liveState = towerActivityState(cache.value, Date.now());
+            if (liveState.state === 'done') break;
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          const finalState = towerActivityState(cache.value, Date.now());
+          return {
+            status: 'done',
+            detail: finalState.detail || towerAutomationMessage.value || 'Tower run finished',
+          };
+        },
+        async stop() {
+          if (isRunning.value) {
+            await toggleTowerRun();
+          }
+        },
+      })
+    : () => {};
+
 onUnmounted(() => {
+  unregisterTowerRunner();
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.removeListener(handleStorageChange);
   }

@@ -6,6 +6,7 @@ import MissionDropTooltip from './MissionDropTooltip.vue';
 import pickerData from '@/src/data/campaign-picker.json';
 import { useCampaignMissionHistory } from '@/src/composables/useCampaignMissionHistory';
 import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
+import { registerAutopilotDialogRunner } from '@/src/composables/useAutopilotDialogBridge';
 import {
   planFavoriteSoulStoneSweep,
   clampReserveEnergy,
@@ -146,6 +147,36 @@ async function runFavoriteSoulSweep() {
     abortCampaignRaidLoop.value = false;
   }
 }
+
+const unregisterSoulSweepRunner =
+  typeof registerAutopilotDialogRunner === 'function'
+    ? registerAutopilotDialogRunner({
+        stepId: 'soul-sweep',
+        modalName: 'campaign',
+        async run({ isAborted }) {
+          await loadDisabledMissions();
+          const plan = soulSweepPlan.value;
+          if (plan.plannedRaids <= 0) {
+            return {
+              status: 'skipped',
+              detail: plan.skippedReason || 'No eligible favorite Heroic missions.',
+            };
+          }
+          await runFavoriteSoulSweep();
+          return {
+            status: isAborted() ? 'skipped' : 'done',
+            detail: loopStatusMsg.value || `Swept ${plan.plannedRaids} Heroic raids (${plan.plannedEnergy}⚡)`,
+          };
+        },
+        stop() {
+          abortCampaignRaidLoop.value = true;
+        },
+      })
+    : () => {};
+
+onUnmounted(() => {
+  unregisterSoulSweepRunner();
+});
 
 const resolveMissionTries = (numId: any, missionData: any) => {
   return getMissionTries(numId, missionData);

@@ -5,6 +5,8 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import { useNow } from '@/src/composables/useNow';
 import { expeditionRows, expeditionPlan, expeditionRefreshCalls } from '@/src/utils/expeditions';
+import { computeExpeditionNextWakeMs } from '@/src/services/dailyAutopilotService';
+import { registerAutopilotDialogRunner } from '@/src/composables/useAutopilotDialogBridge';
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { getHeroMetadata } from '@/src/utils/metadata';
 
@@ -324,9 +326,80 @@ async function collect(slotId: number) {
   } catch (error) { if (pending.value === request) void settle(false, String(error)); }
 }
 
+function waitForExpeditionsSettle(isAborted: () => boolean, timeoutMs = 32000): Promise<void> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      if (isAborted() || (!pending.value && !refreshing.value && transitioningSlots.value.length === 0) || Date.now() - start >= timeoutMs) {
+        resolve();
+        return;
+      }
+      setTimeout(check, 250);
+    };
+    setTimeout(check, 150);
+  });
+}
+
+const unregisterExpeditionRunner =
+  typeof registerAutopilotDialogRunner === 'function'
+    ? registerAutopilotDialogRunner({
+        stepId: 'expeditions',
+        modalName: 'expeditions',
+        async run({ isAborted }) {
+          if (!hasGameTab.value) {
+            return { status: 'skipped', detail: 'Game tab disconnected.' };
+          }
+          await waitForExpeditionsSettle(isAborted, 4000);
+          let collectedPasses = 0;
+          let startedPasses = 0;
+          for (let pass = 0; pass < 6 && !isAborted(); pass++) {
+            if (readyRows.value.length > 0) {
+              await collectAll();
+              await waitForExpeditionsSettle(isAborted, 32000);
+              collectedPasses++;
+              continue;
+            }
+            const nextPlan = expeditionPlan(cache.value, Date.now());
+            if (nextPlan.length > 0) {
+              await startAvailable();
+              await waitForExpeditionsSettle(isAborted, 32000);
+              startedPasses++;
+              continue;
+            }
+            break;
+          }
+          const nextWake = computeExpeditionNextWakeMs(cache.value, Date.now());
+          if (nextWake) {
+            if (typeof chrome !== 'undefined' && chrome.alarms?.create) {
+              try {
+                chrome.alarms.create('daily-autopilot-expedition-wake', { when: nextWake });
+              } catch (_) {}
+            }
+            const detailPrefix = collectedPasses || startedPasses
+              ? `Collected ${collectedPasses}, started ${startedPasses} · `
+              : '';
+            return {
+              status: 'waiting',
+              waitingUntil: nextWake,
+              detail: `${detailPrefix}Next return ${formatFinishTime(nextWake)}`,
+            };
+          }
+          return {
+            status: 'done',
+            detail: collectedPasses || startedPasses
+              ? `Expeditions updated (collected ${collectedPasses}, started ${startedPasses})`
+              : (message.value || 'Expeditions checked'),
+          };
+        },
+        stop() {
+          autoRunning.value = false;
+        },
+      })
+    : () => {};
+
 watch(() => props.modelValue, open => { if (open) void refresh(); else autoRunning.value = false; });
 watch(accountId, () => { autoRunning.value = false; pending.value = null; message.value = ''; transitioningSlots.value = []; clearTimeout(timer); clearTimeout(refreshTimer); });
-onUnmounted(() => { clearTimeout(timer); clearTimeout(refreshTimer); });
+onUnmounted(() => { unregisterExpeditionRunner(); clearTimeout(timer); clearTimeout(refreshTimer); });
 </script>
 
 <template>

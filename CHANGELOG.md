@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.382 — 2026-11-27
+
+### Added
+
+- **Daily Autopilot Unified Dialog Runner — 1:1 Manual Parity (`useAutopilotDialogBridge.ts`, `useDailyAutopilot.ts`, `ExpeditionsModal.vue`, `TowerModal.vue`, `CampaignRaidModal.vue`, `tests/autopilot-dialog-bridge.test.mjs`)**:
+  - Added `useAutopilotDialogBridge.ts` (`registerAutopilotDialogRunner`, `runAutopilotStepViaDialog`, `stopActiveAutopilotDialogRunner`) enforcing strict modal ownership: opens a dialog only if closed, awaits the dialog's exact manual button handler, and closes the dialog in `finally` only if Autopilot opened it.
+  - Wired 1:1 dialog runners for **Expeditions** (`collectAll()` + `startAvailable()` + wake alarm), **Tower** (`loadTowerSettings()` + `toggleTowerRun()` with saved `heroes` & `buffPriority` + completion wait), and **Favorite Soul Sweep** (`runFavoriteSoulSweep()`), with clean `stop()` propagation on Autopilot stop.
+
 ## 0.11.380 — 2026-11-27
 
 ### Fixed
