@@ -4,6 +4,8 @@ import {
   getTodayActivityStats,
   getActivityStatsForDay,
   resolvePersonalTitaniteToday,
+  recordPriorityAutoJoinDaily,
+  persistDailyActivityStats,
 } from '../src/utils/activityStats.ts';
 
 const testNow = Date.parse('2026-11-18T10:00:00Z');
@@ -37,6 +39,7 @@ test('getTodayActivityStats aggregates extension vs game auto joins, campaign, r
     accountStatus: { data: { id: 100 } },
     priorityAutoJoinedRallies: {
       data: ['rally-1', 'rally-2', 'rally-3'],
+      dailyCounts: { '2026-11-18': 3 },
     },
     marchStatus: {
       data: {
@@ -384,4 +387,97 @@ test('resolvePersonalTitaniteToday uses uncapped guildStatus & max across Titani
     questGetAll: { ...cache.questGetAll, updatedAt: '2026-11-17T23:59:00Z' },
   };
   assert.equal(resolvePersonalTitaniteToday(staleCache, testNow), 0);
+});
+
+
+test('P1-20: 200-cap priorityAutoJoinedRallies ring buffer never leaks into daily extAutoJoinCount and gameAutoJoinCount recovers', () => {
+  const twoHundredIds = Array.from({ length: 200 }, (_, i) => `old-rally-${i + 1}`);
+  const cacheWithDaily = {
+    priorityAutoJoinedRallies: {
+      data: twoHundredIds,
+      dailyCounts: { '2026-11-17': 15, '2026-11-18': 4 },
+    },
+    battleReportSummary: {
+      data: {
+        days: {
+          '2026-11-18': {
+            types: { rallyMobAttackResult: 12 }, // 0 org + 4 ext + 8 game
+          },
+        },
+      },
+    },
+  };
+
+  const todayStats = getTodayActivityStats(cacheWithDaily, testNow);
+  assert.equal(todayStats.extAutoJoinCount, 4, 'Must use today UTC dailyCounts instead of 200-cap data.length');
+  assert.equal(todayStats.gameAutoJoinCount, 8, 'Must recover gameAutoJoinCount = 12 - 0 - 4 = 8');
+  assert.equal(todayStats.autoJoinV2, true);
+
+  // New UTC day rollover: no entry for 2026-11-19 -> extAutoJoinCount must be 0, not 200
+  const nextDayNow = Date.parse('2026-11-19T01:00:00Z');
+  const nextDayStats = getTodayActivityStats(cacheWithDaily, nextDayNow);
+  assert.equal(nextDayStats.extAutoJoinCount, 0);
+  assert.equal(nextDayStats.gameAutoJoinCount, 0);
+});
+
+test('P1-20: recordPriorityAutoJoinDaily deduplicates IDs, caps data at 200, prunes dailyCounts to 7 UTC days, and self-heals stale 200 history', async () => {
+  let entry = null;
+  for (let d = 1; d <= 9; d++) {
+    const dayTs = Date.parse(`2026-11-0${d}T12:00:00Z`);
+    entry = recordPriorityAutoJoinDaily(entry, `r-${d}-a`, dayTs);
+    entry = recordPriorityAutoJoinDaily(entry, `r-${d}-a`, dayTs); // duplicate ignored
+    entry = recordPriorityAutoJoinDaily(entry, `r-${d}-b`, dayTs);
+  }
+  assert.equal(Object.keys(entry.dailyCounts).length, 7, 'dailyCounts must be pruned to last 7 UTC days');
+  assert.equal(entry.dailyCounts['2026-11-09'], 2, 'Duplicate rallyId must not double-increment');
+  assert.equal(entry.dailyCounts['2026-11-01'], undefined);
+
+  // Self-heal poisoned legacy dailyActivityHistory (missing autoJoinV2, stuck at 200 Ext / 1 Game)
+  const poisonedHistory = {
+    '2026-11-18': {
+      date: '2026-11-18',
+      extAutoJoinCount: 200,
+      gameAutoJoinCount: 1,
+      totalAutoJoinCount: 201,
+      autoJoinLosses: 0,
+      campaignCount: 5,
+      campaignLosses: 0,
+      organizedRalliesCount: 0,
+      rallyLosses: 0,
+      monstersCount: 0,
+      monsterLosses: 0,
+      brigandCampsCount: 0,
+      campLosses: 0,
+      dungeonBattlesToday: 0,
+      personalTitaniteToday: 0,
+      frontierStagesToday: 0,
+      frontierCoinsToday: 0,
+      campaignEnergySpent: 30,
+      worldEnergySpent: 0,
+      totalEnergySpent: 30,
+    },
+  };
+  const liveCache = {
+    priorityAutoJoinedRallies: { data: Array.from({ length: 200 }, (_, i) => `r-${i}`), dailyCounts: { '2026-11-18': 3 } },
+    battleReportSummary: { data: { days: { '2026-11-18': { types: { rallyMobAttackResult: 10 } } } } },
+  };
+
+  const healedView = getActivityStatsForDay(liveCache, '2026-11-18', poisonedHistory, testNow);
+  assert.equal(healedView.extAutoJoinCount, 3);
+  assert.equal(healedView.gameAutoJoinCount, 7);
+  assert.equal(healedView.autoJoinV2, true);
+
+  const memStore = { dailyActivityHistory: poisonedHistory };
+  const mockChrome = {
+    storage: {
+      local: {
+        get: async () => ({ ...memStore }),
+        set: async (patch) => Object.assign(memStore, patch),
+      },
+    },
+  };
+  const persisted = await persistDailyActivityStats(healedView, mockChrome, testNow);
+  assert.equal(persisted['2026-11-18'].extAutoJoinCount, 3);
+  assert.equal(persisted['2026-11-18'].gameAutoJoinCount, 7);
+  assert.equal(persisted['2026-11-18'].autoJoinV2, true);
 });

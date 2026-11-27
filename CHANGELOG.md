@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.380 — 2026-11-27
+
+### Fixed
+
+- **Dashboard Auto-Join Stats Stuck at `200 Ext / 1 Game` (`activityStats.ts`, `backgroundRuntime.ts`, `tests/activity-stats.test.mjs`)**:
+  - Added `recordPriorityAutoJoinDaily()` storing compact UTC-day `dailyCounts` (pruned to last 7 UTC days, deduplicated per `rallyId`) alongside the existing 200-item `priorityAutoJoinedRallies.data` lookup buffer.
+  - Stopped `getTodayActivityStats()` from using untimestamped `priorityAutoJoinedRallies.data.length` (`200`), scoping `extAutoJoinCount` strictly to the current UTC day and restoring accurate `gameAutoJoinCount` calculation.
+  - Added `autoJoinV2: true` flag to self-heal legacy `dailyActivityHistory[today]` entries previously frozen at `200 Ext`.
+
 ## 0.11.378 — 2026-11-27
 
 ### Added

@@ -37,6 +37,7 @@ import { createRuntimeEventBus } from './eventBus.ts';
 import { resourceLockManager } from './resourceLock.ts';
 import { planPostQueueHeal, buildQueueSessionSummary } from '../services/queues/queueCoordination.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
+import { recordPriorityAutoJoinDaily } from '../utils/activityStats.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
@@ -1893,15 +1894,7 @@ export async function evaluatePriorityAutoJoin(record: any, cache: any, stored: 
     const dispatch = rpcMessageForSettings(stored, [joinCall]);
     if (dispatch) {
       attemptedAutoJoinRallies.add(attemptKey);
-      const existingAutoJoins = Array.isArray(cache.priorityAutoJoinedRallies?.data) ? cache.priorityAutoJoinedRallies.data : [];
-      if (!existingAutoJoins.includes(rallyId)) {
-        cache.priorityAutoJoinedRallies = {
-          key: 'priorityAutoJoinedRallies',
-          group: 'internal',
-          updatedAt: new Date().toISOString(),
-          data: [...existingAutoJoins, rallyId].slice(-200),
-        };
-      }
+      cache.priorityAutoJoinedRallies = recordPriorityAutoJoinDaily(cache.priorityAutoJoinedRallies, rallyId);
       const marchList = cache.marchStatus?.data?.marches;
       if (Array.isArray(marchList)) {
         const targetSquadId = (squad as any)?.squadId;

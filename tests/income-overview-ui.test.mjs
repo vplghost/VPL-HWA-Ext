@@ -167,7 +167,7 @@ test('IncomeOverview.vue generates donut slices for gold and supports day naviga
 test('IncomeOverview.vue computes and exposes activityStats with auto-join, campaign, and energy metrics', async () => {
   const todayStr = new Date().toISOString().slice(0, 10);
   const cache = ref({
-    priorityAutoJoinedRallies: { data: ['r1', 'r2'] },
+    priorityAutoJoinedRallies: { data: ['r1', 'r2'], dailyCounts: { [todayStr]: 2 } },
     campaignRaidReceipts: {
       data: [{ at: new Date().toISOString(), times: 12, missionId: 10 }],
     },

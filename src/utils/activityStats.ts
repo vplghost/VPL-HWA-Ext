@@ -6,6 +6,7 @@ export interface DailyActivityStats {
   extAutoJoinCount: number;
   gameAutoJoinCount: number;
   totalAutoJoinCount: number;
+  autoJoinV2?: boolean;
   autoJoinLosses: number;
   // Activities
   campaignCount: number;
@@ -188,6 +189,58 @@ function resolveCampaignDayTotals(
 }
 
 /**
+ * Records a new extension auto-joined rally ID into `priorityAutoJoinedRallies`:
+ * - Preserves `data` as a deduplicated rolling list of the last 200 rally IDs (for membership lookups).
+ * - Maintains compact `dailyCounts` keyed by UTC day (pruned to last 7 UTC days, < 200 bytes).
+ */
+export function recordPriorityAutoJoinDaily(
+  existingEntry: any,
+  rallyId: string | number,
+  now = Date.now()
+): {
+  key: 'priorityAutoJoinedRallies';
+  group: 'internal';
+  updatedAt: string;
+  data: any[];
+  dailyCounts: Record<string, number>;
+} {
+  const existingIds = Array.isArray(existingEntry?.data) ? existingEntry.data : [];
+  const rawCounts =
+    existingEntry?.dailyCounts && typeof existingEntry.dailyCounts === 'object'
+      ? { ...existingEntry.dailyCounts }
+      : {};
+  const today = formatUtcDay(now);
+  const alreadyRecorded = existingIds.some((id: any) => String(id) === String(rallyId));
+  const nextData = alreadyRecorded ? existingIds.slice(-200) : [...existingIds, rallyId].slice(-200);
+
+  const dailyCounts: Record<string, number> = {};
+  for (const [k, v] of Object.entries(rawCounts)) {
+    const n = Number(v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(n) && n >= 0) {
+      dailyCounts[k] = Math.floor(n);
+    }
+  }
+  if (!alreadyRecorded) {
+    dailyCounts[today] = (dailyCounts[today] || 0) + 1;
+  }
+
+  // Prune to last 7 UTC days
+  const sortedDays = Object.keys(dailyCounts).sort();
+  while (sortedDays.length > 7) {
+    const oldest = sortedDays.shift();
+    if (oldest) delete dailyCounts[oldest];
+  }
+
+  return {
+    key: 'priorityAutoJoinedRallies',
+    group: 'internal',
+    updatedAt: new Date(now).toISOString(),
+    data: nextData,
+    dailyCounts,
+  };
+}
+
+/**
  * Aggregates daily activity and automation efficiency metrics from cache for today:
  * - Raid auto-joins: extension auto-recalls/joins vs game auto-joins
  * - Campaign missions completed today
@@ -198,11 +251,11 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   const today = formatUtcDay(now);
   const accountId = String(cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? '');
 
-  // 1. Raid Auto-Joins (Extension vs Game)
-  const priorityJoins = Array.isArray(cache?.priorityAutoJoinedRallies?.data)
-    ? cache.priorityAutoJoinedRallies.data
-    : [];
-  let extAutoJoinCount = priorityJoins.length;
+  // 1. Raid Auto-Joins (Extension vs Game) — strictly scoped to current UTC day
+  const priorityEntry = cache?.priorityAutoJoinedRallies;
+  const priorityJoins = Array.isArray(priorityEntry?.data) ? priorityEntry.data : [];
+  const priorityJoinIdSet = new Set(priorityJoins.map((id: any) => String(id)));
+  const dailyExtAutoCount = Math.max(0, Math.floor(Number(priorityEntry?.dailyCounts?.[today]) || 0));
 
   const marches = Array.isArray(cache?.marchStatus?.data?.marches)
     ? cache.marchStatus.data.marches
@@ -224,9 +277,6 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
         const isGame = Boolean(m.rally.autoJoinSource === 'game' || (!isExt && m.rally.isAutoJoin));
         if (isExt) {
           marchExtJoins++;
-          if (m.rally.rallyId && !priorityJoins.includes(m.rally.rallyId)) {
-            extAutoJoinCount++;
-          }
         } else if (isGame) {
           marchGameJoins++;
         }
@@ -259,6 +309,7 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   let campaignLosses = 0;
 
   const organizedRallyIds = new Set<string>();
+  const todayExtReportRallyIds = new Set<string>();
   const seenReportIds = new Set<string>();
 
   for (const rep of rawReports) {
@@ -286,6 +337,10 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
         if (rId) organizedRallyIds.add(String(rId));
         if (isLoss) rallyLosses++;
       } else {
+        const rId = rep.payload?.rallyId || rep.rallyId;
+        if (rId != null && priorityJoinIdSet.has(String(rId))) {
+          todayExtReportRallyIds.add(String(rId));
+        }
         if (isLoss) autoJoinLosses++;
       }
     } else if (type === 'soloMobAttackResult' || type === 'mobAttackResult' || type === 'mobSoloAttackResult') {
@@ -361,6 +416,9 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
       organizedRalliesCount = 1;
     }
   }
+
+  // Extension auto-joins for today only (never use untimestamped 200-cap priorityJoins.length)
+  const extAutoJoinCount = Math.max(dailyExtAutoCount, todayExtReportRallyIds.size, marchExtJoins);
 
   // Game auto joins from battle reports (if total rallies exceed organized + extension auto-joins)
   let gameAutoJoinCount = marchGameJoins;
@@ -497,6 +555,7 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     extAutoJoinCount,
     gameAutoJoinCount,
     totalAutoJoinCount: extAutoJoinCount + gameAutoJoinCount,
+    autoJoinV2: true,
     autoJoinLosses,
     campaignCount,
     campaignLosses,
@@ -532,9 +591,14 @@ export function getActivityStatsForDay(
     const existing = historyMap[dateStr];
     if (!existing) return liveToday;
 
-    // Merge live with existing stored records (taking maximums)
-    const extAuto = Math.max(liveToday.extAutoJoinCount, existing.extAutoJoinCount || 0);
-    const gameAuto = Math.max(liveToday.gameAutoJoinCount, existing.gameAutoJoinCount || 0);
+    // Merge live with existing stored records; self-heal pre-v2 entries that were poisoned to 200 Ext
+    const isV2Existing = existing.autoJoinV2 === true;
+    const extAuto = isV2Existing
+      ? Math.max(liveToday.extAutoJoinCount, existing.extAutoJoinCount || 0)
+      : liveToday.extAutoJoinCount;
+    const gameAuto = isV2Existing
+      ? Math.max(liveToday.gameAutoJoinCount, existing.gameAutoJoinCount || 0)
+      : liveToday.gameAutoJoinCount;
     const autoLoss = Math.max(liveToday.autoJoinLosses, existing.autoJoinLosses || 0);
     const campaign = Math.max(liveToday.campaignCount, existing.campaignCount || 0);
     const campLoss = Math.max(liveToday.campaignLosses, existing.campaignLosses || 0);
@@ -568,6 +632,7 @@ export function getActivityStatsForDay(
       extAutoJoinCount: extAuto,
       gameAutoJoinCount: gameAuto,
       totalAutoJoinCount: extAuto + gameAuto,
+      autoJoinV2: true,
       autoJoinLosses: autoLoss,
       campaignCount: campaign,
       campaignLosses: campLoss,
@@ -614,7 +679,10 @@ export function getActivityStatsForDay(
 
   const campaign = Math.max(history?.campaignCount || 0, pastCampaignTotals.count);
   const orgRallies = Math.max(history?.organizedRalliesCount || 0, pastCreatedCount);
-  const extAuto = history?.extAutoJoinCount || 0;
+  const dailyExtFromCache = Math.max(0, Math.floor(Number(cache?.priorityAutoJoinedRallies?.dailyCounts?.[dateStr]) || 0));
+  const extAuto = history?.autoJoinV2
+    ? Math.max(history.extAutoJoinCount || 0, dailyExtFromCache)
+    : (dailyExtFromCache > 0 ? dailyExtFromCache : (history?.extAutoJoinCount || 0));
   let gameAuto = history?.gameAutoJoinCount || 0;
   if (rallyReports > 0) {
     gameAuto = Math.max(gameAuto, Math.max(0, rallyReports - orgRallies - extAuto));
@@ -705,11 +773,19 @@ export async function persistDailyActivityStats(
   try {
     const current = await loadDailyActivityHistory(cr);
     const existing = current[stats.date];
+    const isV2Existing = existing?.autoJoinV2 === true;
+    const nextExtAuto = isV2Existing
+      ? Math.max(existing?.extAutoJoinCount || 0, stats.extAutoJoinCount)
+      : stats.extAutoJoinCount;
+    const nextGameAuto = isV2Existing
+      ? Math.max(existing?.gameAutoJoinCount || 0, stats.gameAutoJoinCount)
+      : stats.gameAutoJoinCount;
     const merged: DailyActivityStats = {
       date: stats.date,
-      extAutoJoinCount: Math.max(existing?.extAutoJoinCount || 0, stats.extAutoJoinCount),
-      gameAutoJoinCount: Math.max(existing?.gameAutoJoinCount || 0, stats.gameAutoJoinCount),
-      totalAutoJoinCount: Math.max(existing?.totalAutoJoinCount || 0, stats.totalAutoJoinCount),
+      extAutoJoinCount: nextExtAuto,
+      gameAutoJoinCount: nextGameAuto,
+      totalAutoJoinCount: nextExtAuto + nextGameAuto,
+      autoJoinV2: true,
       autoJoinLosses: Math.max(existing?.autoJoinLosses || 0, stats.autoJoinLosses),
       campaignCount: Math.max(existing?.campaignCount || 0, stats.campaignCount),
       campaignLosses: Math.max(existing?.campaignLosses || 0, stats.campaignLosses),
