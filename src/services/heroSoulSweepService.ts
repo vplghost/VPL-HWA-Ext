@@ -61,14 +61,14 @@ export function planFavoriteSoulStoneSweep(
 ): SoulSweepPlan {
   const reserveEnergy = clampReserveEnergy(options.reserveEnergy, DEFAULT_SOUL_SWEEP_RESERVE_ENERGY);
   const energyInfo = getEnergy(cache, options.now ?? Date.now());
+  const resolvedEnergy = typeof energyInfo === 'number' ? energyInfo : Number((energyInfo as any)?.amount ?? 0);
   const currentEnergy = Number.isFinite(Number(options.currentEnergy))
     ? Math.max(0, Math.floor(Number(options.currentEnergy)))
-    : Math.max(0, Math.floor(Number(energyInfo?.amount ?? 0)));
+    : Math.max(0, Math.floor(Number.isFinite(resolvedEnergy) ? resolvedEnergy : 0));
 
   const heroesMap = cache?.heroGetAll?.data || {};
   const inventory = cache?.inventoryGet?.data || {};
   const missionProgress = cache?.missionGetAll?.data;
-  const missionCosts = getMissionCosts() || {};
   const disabledSet = new Set<number>(
     options.disabledMissionIds ? Array.from(options.disabledMissionIds).map(Number) : []
   );
@@ -110,7 +110,7 @@ export function planFavoriteSoulStoneSweep(
       const tries = getMissionTries(mId, missionProgress);
       const triesLeft = Math.max(0, Number(tries?.triesLeft ?? (tries as any)?.remaining) || 0);
       if (triesLeft <= 0) continue;
-      const costs = missionCosts[mId];
+      const costs = getMissionCosts(mId);
       const costPerRaid = Array.isArray(costs) ? (Number(costs[0]) + Number(costs[1])) : 12;
       seenMissionIds.add(mId);
       rawMissions.push({

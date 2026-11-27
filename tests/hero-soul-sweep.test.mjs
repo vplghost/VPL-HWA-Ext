@@ -36,14 +36,18 @@ test('planFavoriteSoulStoneSweep skips 6-star & canEvolve heroes, filters 3-star
     missionGetAll: {
       data: missionGetAllData,
     },
-    userGetInfo: { data: { stamina: { amount: 66, cap: 180 } } },
+    userGetInfo: { data: { refillable: [{ id: 1, amount: 66, cap: 180 }] } },
   };
 
   assert.equal(DEFAULT_SOUL_SWEEP_RESERVE_ENERGY, 30);
   assert.equal(clampReserveEnergy(-5), 30);
   assert.equal(clampReserveEnergy(250), 200);
 
-  // Reserve 30⚡ out of 66⚡ -> budget = 36⚡
+  // Reserve 30⚡ out of 66⚡ -> budget = 36⚡ (also verify reading live energy from cache when currentEnergy is omitted)
+  const planFromCache = planFavoriteSoulStoneSweep(cache, [1, 2, 3], { reserveEnergy: 30 });
+  assert.equal(planFromCache.currentEnergy, 66, 'Should read numeric energy from getEnergy(cache)');
+  assert.ok(planFromCache.plannedRaids > 0);
+
   const plan = planFavoriteSoulStoneSweep(cache, [1, 2, 3], { reserveEnergy: 30, currentEnergy: 66 });
   assert.equal(plan.eligibleHeroCount, 1, 'Only hero 1 (not 6★, not canEvolve) is eligible');
   assert.ok(plan.missions.every((m) => m.heroId === 1));

@@ -187,6 +187,7 @@ watch(
       registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      hoveredLogEntry.value = null;
       registerModalClose('dungeon');
       document.removeEventListener('keydown', handleKeydown);
     }
@@ -226,7 +227,10 @@ async function resetActiveBattle() {
   await refreshDungeon();
 }
 
-const { customTeams } = useAccountTeams();
+const activeAccountId = computed<string | number | undefined>(
+  () => cache.value?.accountStatus?.data?.id ?? cache.value?.userGetInfo?.data?.id
+);
+const { customTeams } = useAccountTeams(activeAccountId);
 const isAutomating = ref(false);
 const autoStopRequested = ref(false);
 const autoStatusMessage = ref<string | null>(null);
@@ -289,9 +293,15 @@ async function loadClearedRooms() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const res = await chrome.storage.local.get(DUNGEON_CLEARED_ROOMS_KEY);
-      const saved = res?.[DUNGEON_CLEARED_ROOMS_KEY];
+      const saved = res?.[DUNGEON_CLEARED_ROOMS_KEY] as { dateKey?: string; rooms?: unknown[] } | undefined;
       if (saved && saved.dateKey === getTodayDateKey() && Array.isArray(saved.rooms)) {
-        clearedRooms.value = saved.rooms;
+        clearedRooms.value = saved.rooms
+          .filter((r): r is DungeonClearedRoomEntry => Boolean(r && typeof r === 'object'))
+          .map((r) => ({
+            ...r,
+            fallenTitans: Array.isArray(r.fallenTitans) ? r.fallenTitans.map(String) : [],
+            teamIds: Array.isArray(r.teamIds) ? r.teamIds : undefined,
+          }));
       } else {
         clearedRooms.value = [];
       }
@@ -1239,7 +1249,7 @@ function handleImgError(e: Event) {
                     <span
                       v-if="room.casualties > 0"
                       class="inline-flex items-center gap-0.5 rounded bg-rose-600/90 px-1 py-0.2 text-[9px] font-bold text-white"
-                      :title="room.fallenTitans.length ? `Fallen: ${room.fallenTitans.join(', ')}` : `${room.casualties} casualty`"
+                      :title="Array.isArray(room.fallenTitans) && room.fallenTitans.length ? `Fallen: ${room.fallenTitans.join(', ')}` : `${room.casualties} casualty`"
                     >
                       💀{{ room.casualties }}{{ room.forceMajeure ? '!' : '' }}
                     </span>
@@ -1377,7 +1387,7 @@ function handleImgError(e: Event) {
           Flawless ({{ hoveredLogEntry.stars }}★)
         </span>
         <span v-else class="text-rose-600 dark:text-rose-400 font-semibold">
-          Casualties ({{ hoveredLogEntry.casualties }}): {{ hoveredLogEntry.fallenTitans.join(', ') || 'Fallen Titan' }}
+          Casualties ({{ hoveredLogEntry.casualties }}): {{ (Array.isArray(hoveredLogEntry.fallenTitans) ? hoveredLogEntry.fallenTitans.join(', ') : '') || 'Fallen Titan' }}
         </span>
         <span v-if="hoveredLogEntry.tankLossPct != null || hoveredLogEntry.teamLossPct != null" class="font-mono text-[10px]">
           Tank -{{ hoveredLogEntry.tankLossPct ?? 0 }}% · Team -{{ hoveredLogEntry.teamLossPct ?? 0 }}%
@@ -1396,7 +1406,7 @@ function handleImgError(e: Event) {
         </span>
       </div>
 
-      <div v-if="hoveredLogEntry.teamIds && hoveredLogEntry.teamIds.length > 0" class="text-[10px] text-slate-500 dark:text-slate-400">
+      <div v-if="Array.isArray(hoveredLogEntry.teamIds) && hoveredLogEntry.teamIds.length > 0" class="text-[10px] text-slate-500 dark:text-slate-400">
         Squad: {{ hoveredLogEntry.teamIds.map((id) => getTitanName(id)).join(', ') }}
       </div>
     </div>

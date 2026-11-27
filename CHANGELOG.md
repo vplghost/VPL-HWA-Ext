@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.376 — 2026-11-27
+
+### Fixed
+
+- **Popup Runtime Stability & Soul-Stone Sweep Fixes (`DungeonModal.vue`, `CampaignRaidModal.vue`, `heroSoulSweepService.ts`, `entrypoints/popup/main.ts`, `tests/hero-soul-sweep.test.mjs`)**:
+  - Passed `activeAccountId` ref to `useAccountTeams(activeAccountId)` in `DungeonModal.vue`, normalized persisted `dungeonClearedRoomsLog` entries (`fallenTitans`/`teamIds` array guards), and cleared `hoveredLogEntry` on modal close.
+  - Fixed `runFavoriteSoulSweep()` calling `executeRaidCall()` instead of undefined `executeSingleRaid()`, fixed `getMissionCosts(missionId)` argument usage in `CampaignRaidModal.vue` and `heroSoulSweepService.ts`, and fixed `planFavoriteSoulStoneSweep()` reading numeric energy directly from `getEnergy(cache)`.
+  - Added `app.config.errorHandler` in `entrypoints/popup/main.ts` to log component names on Vue runtime errors.
+
 ## 0.11.374 — 2026-11-27
 
 ### Changed

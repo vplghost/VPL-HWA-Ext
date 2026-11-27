@@ -129,7 +129,7 @@ async function runFavoriteSoulSweep() {
       if (m.plannedRaids <= 0) continue;
       missionId.value = m.missionId;
       loopStatusMsg.value = `Sweeping ${m.heroName} (Mission #${m.missionId}, ${m.plannedRaids}x)…`;
-      const res = await executeSingleRaid(m.plannedRaids);
+      const res = await executeRaidCall(m.plannedRaids);
       if (!res?.ok) {
         loopStatusMsg.value = res?.error || `Stopped on Mission #${m.missionId}.`;
         break;
@@ -801,8 +801,8 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
       if (missionResponses.length > 0) {
         await missionHistory.record(raidMission, raidAccount);
         const drops = extractDropsFromRaidResponse(missionResponses);
-        const costs = getMissionCosts()?.[raidMission];
-        const fallbackPerRaid = costs ? (costs[0] + costs[1]) : 6;
+        const costs = getMissionCosts(raidMission);
+        const fallbackPerRaid = Array.isArray(costs) ? (costs[0] + costs[1]) : 6;
         const nowIso = new Date().toISOString();
         const utcDay = nowIso.slice(0, 10);
         const callEntries = effectiveResults
