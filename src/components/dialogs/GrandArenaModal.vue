@@ -666,26 +666,6 @@ watch(
               <div class="text-[11px]">{{ lastPlan.reason }}</div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                id="btn-grand-arena-presim"
-                type="button"
-                :disabled="isSimulating || isAutoRunning || !allTeamsComplete"
-                class="cursor-pointer py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs disabled:opacity-50 transition"
-                @click="handleManualPreSim"
-              >
-                🧪 Pre-Sim (0 Cost)
-              </button>
-              <button
-                id="btn-grand-arena-fight"
-                type="button"
-                :disabled="isSimulating || isAutoRunning || !allTeamsComplete"
-                class="cursor-pointer py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs disabled:opacity-50 transition"
-                @click="handleManualFight"
-              >
-                ⚔️ Fight Best Order
-              </button>
-            </div>
           </div>
 
           <div v-else class="py-8 text-center text-slate-400 text-xs">
@@ -700,27 +680,6 @@ watch(
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
             🤖 Auto Grand Arena (3-Team WASM Optimizer)
           </h3>
-          <div class="flex items-center gap-2">
-            <button
-              v-if="!isAutoRunning"
-              id="btn-grand-arena-auto-start"
-              type="button"
-              :disabled="isSimulating || !allTeamsComplete"
-              class="cursor-pointer px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs disabled:opacity-50 transition"
-              @click="startAutoGrandArena"
-            >
-              ▶ Start Auto Grand Arena
-            </button>
-            <button
-              v-else
-              id="btn-grand-arena-auto-stop"
-              type="button"
-              class="cursor-pointer px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
-              @click="stopAutoGrandArena"
-            >
-              ⏹ Stop Auto
-            </button>
-          </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
@@ -795,5 +754,47 @@ watch(
         <AutomationLogPanel :logs="logs" empty-text="No Grand Arena automation events yet." />
       </div>
     </div>
+
+    <template #footer>
+      <div id="grand-arena-dialog-footer" class="w-full flex flex-wrap items-center justify-end gap-2">
+        <button
+          id="btn-grand-arena-presim"
+          type="button"
+          :disabled="!selectedEnemy || isSimulating || isAutoRunning || !allTeamsComplete"
+          class="cursor-pointer px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs disabled:opacity-50 transition"
+          @click="handleManualPreSim"
+        >
+          🧪 Pre-Sim (0 Cost)
+        </button>
+        <button
+          id="btn-grand-arena-fight"
+          type="button"
+          :disabled="!selectedEnemy || isSimulating || isAutoRunning || !allTeamsComplete"
+          class="cursor-pointer px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs disabled:opacity-50 transition"
+          @click="handleManualFight"
+        >
+          ⚔️ Fight Best Order
+        </button>
+        <button
+          v-if="!isAutoRunning"
+          id="btn-grand-arena-auto-start"
+          type="button"
+          :disabled="isSimulating || !allTeamsComplete"
+          class="cursor-pointer px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs disabled:opacity-50 transition"
+          @click="startAutoGrandArena"
+        >
+          ▶ Start Auto Grand Arena
+        </button>
+        <button
+          v-else
+          id="btn-grand-arena-auto-stop"
+          type="button"
+          class="cursor-pointer px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
+          @click="stopAutoGrandArena"
+        >
+          ⏹ Stop Auto
+        </button>
+      </div>
+    </template>
   </ModalDialog>
 </template>

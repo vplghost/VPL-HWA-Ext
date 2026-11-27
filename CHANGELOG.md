@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.391 — 2026-11-28
+
+### Changed
+
+- **Unified Pinned Dialog Footers (`ModalDialog.vue`, `MonsterModal.vue`, `ArenaModal.vue`, `GrandArenaModal.vue`, `PvpTeamOptimizerModal.vue`, `ExpeditionsModal.vue`, `tests/status-alert-banner.test.mjs`)**:
+  - Added `shrink-0` / `min-h-0` flexbox pinning to `ModalDialog.vue` header, body, and `#footer` slot.
+  - Extracted `MonsterModal` primary queue actions (`Attack Once`, `Start/Stop Monster Queue`) into pinned `#monster-dialog-footer` above `<StatusAlertBanner>` with top-anchored backdrop for zero button jump.
+  - Moved primary CTA buttons into pinned `ModalDialog` `#footer` bars across `ArenaModal` (`#arena-dialog-footer`), `GrandArenaModal` (`#grand-arena-dialog-footer`), `PvpTeamOptimizerModal` (`#pvp-optimizer-dialog-footer`), and `ExpeditionsModal` (`#expeditions-dialog-footer`) so actions remain always clickable regardless of scroll position.
+
 ## 0.11.390 — 2026-11-28
 
 ### Changed

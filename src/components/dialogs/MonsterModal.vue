@@ -522,7 +522,7 @@ async function stopMonsterQueue() {
     aria-modal="true"
     aria-labelledby="monster-dialog-title"
     :style="{ zIndex: stackLevel }"
-    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    class="fixed inset-0 flex items-start justify-center pt-4 sm:pt-8 px-3 sm:px-4 pb-3 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div
@@ -582,7 +582,7 @@ async function stopMonsterQueue() {
       </div>
 
       <!-- Dialog Body -->
-      <div id="monster-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]">
+      <div id="monster-dialog-body" class="p-4 space-y-3.5 overflow-y-auto flex-1 min-h-0">
         <!-- Section 1: Team & Troop Deployment -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -886,17 +886,14 @@ async function stopMonsterQueue() {
             </div>
           </div>
         </section>
+      </div>
 
-        <!-- Status Message Banner -->
-        <StatusAlertBanner
-          v-if="statusMessage"
-          :message="statusMessage"
-          :on-refresh="handleBannerRefresh"
-          refresh-title="Refresh marches and troops"
-        />
-
-        <!-- Section 3: Actions & Queue Controls -->
-        <div class="flex items-center justify-end gap-2 pt-2">
+      <!-- Pinned Zero-Jump Footer (Actions above Status Banner) -->
+      <div
+        id="monster-dialog-footer"
+        class="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 py-3 space-y-2"
+      >
+        <div id="monster-dialog-actions" class="flex items-center justify-end gap-2">
           <button
             type="button"
             :disabled="isRunning || isSearchingMonsters || !hasEnoughWorldEnergy || Boolean(statusMessage?.includes('already running'))"
@@ -925,6 +922,13 @@ async function stopMonsterQueue() {
             ⏹ Stop Monster Queue
           </button>
         </div>
+
+        <StatusAlertBanner
+          v-if="statusMessage"
+          :message="statusMessage"
+          :on-refresh="handleBannerRefresh"
+          refresh-title="Refresh marches and troops"
+        />
       </div>
     </div>
   </div>

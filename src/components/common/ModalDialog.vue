@@ -79,7 +79,7 @@ onUnmounted(() => {
         :class="maxWidth || 'max-w-2xl'"
       >
         <!-- Header -->
-        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50/80 dark:bg-slate-800/50">
+        <div class="shrink-0 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50/80 dark:bg-slate-800/50">
           <div class="flex items-center gap-2">
             <span v-if="icon" class="text-lg">{{ icon }}</span>
             <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">
@@ -98,12 +98,12 @@ onUnmounted(() => {
         </div>
 
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto p-4 text-xs space-y-4">
+        <div class="flex-1 min-h-0 overflow-y-auto p-4 text-xs space-y-4">
           <slot />
         </div>
 
         <!-- Footer -->
-        <div v-if="$slots.footer" class="border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/50 flex items-center justify-end gap-2">
+        <div v-if="$slots.footer" class="shrink-0 border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/50 flex flex-wrap items-center justify-end gap-2">
           <slot name="footer" />
         </div>
       </div>

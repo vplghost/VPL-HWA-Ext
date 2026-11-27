@@ -537,15 +537,6 @@ watch(
               <span>Canonical Seed: {{ lastSimResult.canonicalOutcome?.win ? 'WIN' : 'LOSS' }}</span>
             </div>
 
-            <button
-              id="btn-arena-sim-fight"
-              type="button"
-              :disabled="isSimulating || isAutoRunning || selectedHeroIds.length !== 5"
-              class="cursor-pointer w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs disabled:opacity-50 transition"
-              @click="handleManualSimAndFight"
-            >
-              {{ isSimulating ? (simProgressText || 'Simulating...') : `🧪 Simulate ${simRounds}x & Fight (if ≥ ${minWinRatePct}%)` }}
-            </button>
           </div>
 
           <div v-else class="py-8 text-center text-slate-400 text-xs">
@@ -560,27 +551,6 @@ watch(
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
             🤖 Arena Automation (Unity WASM Monte Carlo)
           </h3>
-          <div class="flex items-center gap-2">
-            <button
-              v-if="!isAutoRunning"
-              id="btn-arena-auto-start"
-              type="button"
-              :disabled="isSimulating || selectedHeroIds.length !== 5"
-              class="cursor-pointer px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs disabled:opacity-50 transition"
-              @click="startAutoArena"
-            >
-              ▶ Start Auto Arena
-            </button>
-            <button
-              v-else
-              id="btn-arena-auto-stop"
-              type="button"
-              class="cursor-pointer px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
-              @click="stopAutoArena"
-            >
-              ⏹ Stop Auto
-            </button>
-          </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -655,5 +625,38 @@ watch(
         </div>
       </div>
     </div>
+
+    <template #footer>
+      <div id="arena-dialog-footer" class="w-full flex flex-wrap items-center justify-end gap-2">
+        <button
+          id="btn-arena-sim-fight"
+          type="button"
+          :disabled="!currentOpponent || isSimulating || isAutoRunning || selectedHeroIds.length !== 5"
+          class="cursor-pointer px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs disabled:opacity-50 transition"
+          @click="handleManualSimAndFight"
+        >
+          {{ isSimulating ? (simProgressText || 'Simulating...') : `🧪 Simulate ${simRounds}x & Fight (if ≥ ${minWinRatePct}%)` }}
+        </button>
+        <button
+          v-if="!isAutoRunning"
+          id="btn-arena-auto-start"
+          type="button"
+          :disabled="isSimulating || selectedHeroIds.length !== 5"
+          class="cursor-pointer px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs disabled:opacity-50 transition"
+          @click="startAutoArena"
+        >
+          ▶ Start Auto Arena
+        </button>
+        <button
+          v-else
+          id="btn-arena-auto-stop"
+          type="button"
+          class="cursor-pointer px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
+          @click="stopAutoArena"
+        >
+          ⏹ Stop Auto
+        </button>
+      </div>
+    </template>
   </ModalDialog>
 </template>

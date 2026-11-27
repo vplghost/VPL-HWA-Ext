@@ -404,38 +404,8 @@ onUnmounted(() => { unregisterExpeditionRunner(); clearTimeout(timer); clearTime
 
 <template>
   <ModalDialog :model-value="modelValue" title="Expeditions" icon="⛵" max-width="max-w-4xl" @update:model-value="emit('update:modelValue', $event)">
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-xs text-slate-500">Hero expeditions require 5 available heroes and enough power. Video Expedition requires no heroes.</p>
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="isAnyBusy || !hasGameTab"
-            @click="refresh"
-          >
-            {{ refreshing ? 'Refreshing…' : 'Refresh' }}
-          </button>
-          <button
-            v-if="readyRows.length"
-            type="button"
-            class="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
-            :disabled="isAnyBusy || !hasGameTab"
-            @click="collectAll"
-          >
-            {{ pending?.action === 'collect' && pending.count > 1 ? `Claiming (${pending.count})…` : `Claim all (${readyRows.length})` }}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg bg-violet-600 hover:bg-violet-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
-            :disabled="isAnyBusy || !hasGameTab || !plan.length"
-            @click="startAvailable"
-          >
-            {{ pending?.action === 'start' && pending.count > 1 ? `Starting (${pending.count})…` : `Start available (${plan.length})` }}
-          </button>
-        </div>
-      </div>
-      <p v-if="message" class="text-xs text-slate-600 dark:text-slate-300" role="status">{{ message }}</p>
+    <div class="space-y-3">
+      <p class="text-xs text-slate-500">Hero expeditions require 5 available heroes and enough power. Video Expedition requires no heroes.</p>
 
       <div class="relative min-h-[300px]">
         <!-- Refreshing Grid Overlay to block interactions and eliminate blank flickers -->
@@ -533,5 +503,39 @@ onUnmounted(() => { unregisterExpeditionRunner(); clearTimeout(timer); clearTime
         </div>
       </div>
     </div>
+
+    <template #footer>
+      <div id="expeditions-dialog-footer" class="w-full flex flex-wrap items-center justify-between gap-2">
+        <p v-if="message" class="text-xs text-slate-600 dark:text-slate-300 truncate max-w-[55%]" role="status">{{ message }}</p>
+        <span v-else class="text-[11px] text-slate-400">Ready: {{ readyRows.length }} · Available: {{ plan.length }}</span>
+        <div class="flex flex-wrap items-center gap-2 ml-auto">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isAnyBusy || !hasGameTab"
+            @click="refresh"
+          >
+            {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+          </button>
+          <button
+            v-if="readyRows.length"
+            type="button"
+            class="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
+            :disabled="isAnyBusy || !hasGameTab"
+            @click="collectAll"
+          >
+            {{ pending?.action === 'collect' && pending.count > 1 ? `Claiming (${pending.count})…` : `Claim all (${readyRows.length})` }}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-violet-600 hover:bg-violet-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
+            :disabled="isAnyBusy || !hasGameTab || !plan.length"
+            @click="startAvailable"
+          >
+            {{ pending?.action === 'start' && pending.count > 1 ? `Starting (${pending.count})…` : `Start available (${plan.length})` }}
+          </button>
+        </div>
+      </div>
+    </template>
   </ModalDialog>
 </template>

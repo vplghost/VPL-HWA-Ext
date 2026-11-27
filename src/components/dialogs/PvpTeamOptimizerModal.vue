@@ -755,36 +755,6 @@ watch(
             >
               Heap: {{ wasmMemoryMb }} MB · GC: {{ wasmGcRuns }}
             </span>
-            <button
-              id="btn-pvp-run-gc"
-              type="button"
-              :disabled="isRunning || isRunningGc"
-              class="cursor-pointer rounded-lg px-2.5 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold disabled:opacity-40"
-              title="Run Unity WASM garbage collection and yield frame loop"
-              @click="handleManualGc"
-            >
-              {{ isRunningGc ? 'GC...' : '🧹 Run GC' }}
-            </button>
-            <button
-              v-if="!isRunning"
-              id="btn-start-pvp-optimizer"
-              type="button"
-              :disabled="!canStartOptimization"
-              :title="startButtonDisabledTitle"
-              class="cursor-pointer rounded-lg px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold disabled:opacity-50"
-              @click="startOptimization"
-            >
-              ⚡ Start Optimization
-            </button>
-            <button
-              v-else
-              id="btn-stop-pvp-optimizer"
-              type="button"
-              class="cursor-pointer rounded-lg px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-              @click="stopOptimization"
-            >
-              ⏹ Stop
-            </button>
           </div>
         </div>
 
@@ -912,5 +882,46 @@ watch(
         @clear="logs = []"
       />
     </div>
+
+    <template #footer>
+      <div id="pvp-optimizer-dialog-footer" class="w-full flex flex-wrap items-center justify-between gap-2">
+        <span v-if="errorMessage || statusMessage" class="text-[11px] font-mono truncate max-w-[55%]" :class="errorMessage ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'">
+          {{ errorMessage ? `⚠️ ${errorMessage}` : statusMessage }}
+        </span>
+        <span v-else class="text-[11px] text-slate-400">Unity WASM Optimizer</span>
+        <div class="flex items-center gap-2 ml-auto">
+          <button
+            id="btn-pvp-run-gc"
+            type="button"
+            :disabled="isRunning || isRunningGc"
+            class="cursor-pointer rounded-lg px-2.5 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold disabled:opacity-40"
+            title="Run Unity WASM garbage collection and yield frame loop"
+            @click="handleManualGc"
+          >
+            {{ isRunningGc ? 'GC...' : '🧹 Run GC' }}
+          </button>
+          <button
+            v-if="!isRunning"
+            id="btn-start-pvp-optimizer"
+            type="button"
+            :disabled="!canStartOptimization"
+            :title="startButtonDisabledTitle"
+            class="cursor-pointer rounded-lg px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs disabled:opacity-50"
+            @click="startOptimization"
+          >
+            ⚡ Start Optimization
+          </button>
+          <button
+            v-else
+            id="btn-stop-pvp-optimizer"
+            type="button"
+            class="cursor-pointer rounded-lg px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs"
+            @click="stopOptimization"
+          >
+            ⏹ Stop
+          </button>
+        </div>
+      </div>
+    </template>
   </ModalDialog>
 </template>

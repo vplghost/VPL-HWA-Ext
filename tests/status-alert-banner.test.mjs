@@ -91,6 +91,10 @@ test('MonsterModal integrates StatusAlertBanner with handleBannerRefresh dispatc
   const monsterModalSource = await readFile(new URL('../src/components/dialogs/MonsterModal.vue', import.meta.url), 'utf8');
   assert.ok(monsterModalSource.includes('<StatusAlertBanner'), 'MonsterModal must mount StatusAlertBanner');
   assert.ok(monsterModalSource.includes('handleBannerRefresh'), 'MonsterModal must define handleBannerRefresh');
+  const mActionsIdx = monsterModalSource.indexOf('id="monster-dialog-actions"');
+  const mBannerIdx = monsterModalSource.indexOf('<StatusAlertBanner');
+  assert.ok(mActionsIdx > 0 && mBannerIdx > mActionsIdx, 'P2-41: MonsterModal StatusAlertBanner renders below #monster-dialog-actions in #monster-dialog-footer');
+  assert.ok(monsterModalSource.includes('id="monster-dialog-footer"'), 'P2-41: MonsterModal mounts pinned #monster-dialog-footer');
 
   const runtime = await setupDialog('dialogs/MonsterModal.vue', 'handleBannerRefresh, statusMessage');
   assert.equal(typeof runtime.handlers.handleBannerRefresh, 'function');
@@ -102,4 +106,22 @@ test('MonsterModal integrates StatusAlertBanner with handleBannerRefresh dispatc
   assert.ok(calls.some(c => c.name === 'getUnitSummary' && c.feature === 'unit'), 'Must refresh unit summary');
   assert.ok(calls.some(c => c.name === 'heroGetAll'), 'Must refresh heroes');
   assert.match(runtime.handlers.statusMessage.value, /refreshed successfully/);
+});
+
+test('P2-41: Arena, GrandArena, PvP Optimizer, and Expeditions dialogs pin primary actions in ModalDialog #footer', async () => {
+  const checks = [
+    ['dialogs/ArenaModal.vue', 'id="arena-dialog-footer"', 'id="btn-arena-auto-start"'],
+    ['dialogs/GrandArenaModal.vue', 'id="grand-arena-dialog-footer"', 'id="btn-grand-arena-auto-start"'],
+    ['dialogs/PvpTeamOptimizerModal.vue', 'id="pvp-optimizer-dialog-footer"', 'id="btn-start-pvp-optimizer"'],
+    ['dialogs/ExpeditionsModal.vue', 'id="expeditions-dialog-footer"', '@click="startAvailable"'],
+  ];
+  for (const [file, footerId, primaryAction] of checks) {
+    const src = await readFile(new URL('../src/components/' + file, import.meta.url), 'utf8');
+    const footerSlotIdx = src.indexOf('<template #footer>');
+    const footerIdIdx = src.indexOf(footerId);
+    const actionIdx = src.indexOf(primaryAction);
+    assert.ok(footerSlotIdx > 0, `${file} must use ModalDialog #footer slot`);
+    assert.ok(footerIdIdx > footerSlotIdx, `${file} must render ${footerId} inside #footer`);
+    assert.ok(actionIdx > footerSlotIdx, `${file} must place ${primaryAction} inside pinned #footer`);
+  }
 });
