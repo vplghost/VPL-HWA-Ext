@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.368 — 2026-11-27
+
+### Changed
+
+- **Configurable Battle Simulation Rounds (Default 5) & Settings Control (`dungeonPlanner.ts`, `dungeonAutomationRunner.ts`, `arenaService.ts`, `pvpTeamOptimizer.ts`, `SettingsTab.vue`, `DungeonModal.vue`, `ArenaModal.vue`, `tests/dungeon-planner.test.mjs`)**:
+  - Lowered default WASM battle simulation rounds from `10` to `5` across Titan Dungeon (`SINGLE_DOOR_SIM_ROUNDS = 5`), Arena (`runArenaMonteCarloSim` / `ArenaModal.vue`), and PvP Team Optimizer (`DEFAULT_PVP_MATCH_ROUNDS = 5`), reducing simulation latency and WASM heap pressure.
+  - Added `clampSimRounds()` (1–20), global **Default Sim Rounds** setting (`#setting-sim-rounds`, persisted as `defaultSimRounds`) in `SettingsTab.vue` (`Game Engine Diagnostics`), and per-dialog **Sim Rounds** control (`#dungeon-sim-rounds-input`) in `DungeonModal.vue` with dynamic `Best-of-N` status labels.
+
 ## 0.11.366 — 2026-11-27
 
 ### Fixed

@@ -22,8 +22,11 @@ import { DUNGEON_SAVED_LINEUPS_KEY, isTitanEligibleForDoor } from '@/src/utils/d
 import {
   DEFAULT_DUNGEON_AUTO_SETTINGS,
   DEFAULT_ORDERED_TITAN_POOLS,
+  DEFAULT_SIM_ROUNDS,
+  DEFAULT_SIM_ROUNDS_KEY,
   DUNGEON_AUTO_SETTINGS_KEY,
   DUNGEON_CLEARED_ROOMS_KEY,
+  clampSimRounds,
   mergeClearedRoomEntry,
   formatDungeonElementName,
   type DungeonAutoSettings,
@@ -438,12 +441,14 @@ function formatLogTime(ts: string): string {
 async function loadDungeonAutoSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const res = await chrome.storage.local.get(DUNGEON_AUTO_SETTINGS_KEY);
+      const res = await chrome.storage.local.get([DUNGEON_AUTO_SETTINGS_KEY, DEFAULT_SIM_ROUNDS_KEY]);
+      const globalDefaultRounds = clampSimRounds(res?.[DEFAULT_SIM_ROUNDS_KEY], DEFAULT_SIM_ROUNDS);
       if (res?.[DUNGEON_AUTO_SETTINGS_KEY]) {
         const stored = res[DUNGEON_AUTO_SETTINGS_KEY];
         autoSettings.value = {
           ...DEFAULT_DUNGEON_AUTO_SETTINGS,
           ...stored,
+          simRounds: clampSimRounds(stored.simRounds, globalDefaultRounds),
           orderedPools: {
             water: [...DEFAULT_ORDERED_TITAN_POOLS.water],
             earth: [...DEFAULT_ORDERED_TITAN_POOLS.earth],
@@ -452,12 +457,18 @@ async function loadDungeonAutoSettings() {
             ...(stored.orderedPools || {}),
           },
         };
+      } else {
+        autoSettings.value = {
+          ...autoSettings.value,
+          simRounds: globalDefaultRounds,
+        };
       }
     } catch (_) {}
   }
 }
 
 async function saveDungeonAutoSettings() {
+  autoSettings.value.simRounds = clampSimRounds(autoSettings.value.simRounds, DEFAULT_SIM_ROUNDS);
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     try {
       await chrome.storage.local.set({ [DUNGEON_AUTO_SETTINGS_KEY]: { ...autoSettings.value } });
@@ -498,6 +509,7 @@ async function startAutomation() {
         targetTitanite: autoSettings.value.targetTitanite,
         todayTitanite: todayTitanite.value,
         singleDoorBestOf10: autoSettings.value.singleDoorBestOf10,
+        simRounds: clampSimRounds(autoSettings.value.simRounds, DEFAULT_SIM_ROUNDS),
         allowCasualtyOnDepletedPool: autoSettings.value.allowCasualtyOnDepletedPool,
         shouldStop: () => autoStopRequested.value,
       });
@@ -530,7 +542,7 @@ async function startAutomation() {
           ? ` · Last-resort win (${step.casualties || 0} casualties)`
           : '';
         const best10Note = step.bestOfTenReport
-          ? ` · Best-of-10 (#${step.bestOfTenReport.bestIndex + 1}/10, ${step.bestOfTenReport.wins}/10 wins)`
+          ? ` · Best-of-${step.bestOfTenReport.roundsRun} (#${step.bestOfTenReport.bestIndex + 1}/${step.bestOfTenReport.roundsRun}, ${step.bestOfTenReport.wins}/${step.bestOfTenReport.roundsRun} wins)`
           : '';
         const cpNote = step.checkpointClaimed
           ? ` · 5-floor reward claimed${step.checkpointGold ? ` (+${formatNumber(step.checkpointGold)} Gold)` : ''}`
@@ -722,6 +734,23 @@ function handleImgError(e: Event) {
                     <option :value="45">45%</option>
                     <option :value="50">50%</option>
                   </select>
+                </label>
+
+                <label
+                  class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium"
+                  title="Number of Unity WASM simulation rounds per depleted/single-door evaluation (1-20)"
+                >
+                  <span>Sim Rounds:</span>
+                  <input
+                    id="dungeon-sim-rounds-input"
+                    v-model.number="autoSettings.simRounds"
+                    type="number"
+                    min="1"
+                    max="20"
+                    :disabled="isAutomating"
+                    class="w-12 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold text-center tabular-nums"
+                    @change="saveDungeonAutoSettings"
+                  />
                 </label>
               </div>
 

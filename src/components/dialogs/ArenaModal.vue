@@ -50,7 +50,7 @@ const ownedHeroes = computed(() => {
 
 const selectedHeroIds = ref<number[]>([]);
 const maxPowerRatioPct = ref(90);
-const simRounds = ref(10);
+const simRounds = ref(5);
 const minWinRatePct = ref(80);
 const maxRefreshPerBattle = ref(10);
 
@@ -211,7 +211,7 @@ async function simulateAndOptionallyFight(enemy: ArenaEnemy): Promise<'won' | 'l
       throw new Error(String(errDesc));
     }
 
-    const rounds = Math.max(1, Math.min(20, Math.floor(Number(simRounds.value) || 10)));
+    const rounds = Math.max(1, Math.min(20, Math.floor(Number(simRounds.value) || 5)));
     simProgressText.value = `Simulating 0/${rounds} rounds via Unity Engine...`;
 
     const mc = await runArenaMonteCarloSim(

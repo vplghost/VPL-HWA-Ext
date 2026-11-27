@@ -7,9 +7,17 @@
  * - Multi-door evaluation ranking
  */
 
-export const SINGLE_DOOR_SIM_ROUNDS = 10;
+export const DEFAULT_SIM_ROUNDS = 5;
+export const DEFAULT_SIM_ROUNDS_KEY = 'defaultSimRounds';
+export const SINGLE_DOOR_SIM_ROUNDS = DEFAULT_SIM_ROUNDS;
 export const DUNGEON_AUTO_SETTINGS_KEY = 'dungeonAutoSettings';
 export const DUNGEON_CLEARED_ROOMS_KEY = 'dungeonClearedRoomsLog';
+
+export function clampSimRounds(value: unknown, fallback = DEFAULT_SIM_ROUNDS): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n < 1) return Math.max(1, Math.min(20, Math.floor(fallback) || DEFAULT_SIM_ROUNDS));
+  return Math.max(1, Math.min(20, n));
+}
 
 export type DungeonElementKey = 'water' | 'fire' | 'earth' | 'neutral';
 export type DungeonElementName = 'Water' | 'Fire' | 'Earth' | 'Neutral';
@@ -33,6 +41,7 @@ export interface DungeonAutoSettings {
   safetyThresholdPct: number;           // default: 20
   tankSwitchHpPct: number;              // default: 35
   singleDoorBestOf10: boolean;          // default: true
+  simRounds?: number;                   // default: 5 (1..20)
   allowCasualtyOnDepletedPool: boolean; // default: false (force-majeure when all doors <= 5 alive)
   orderedPools?: Partial<DungeonOrderedPools>;
 }
@@ -42,6 +51,7 @@ export const DEFAULT_DUNGEON_AUTO_SETTINGS: DungeonAutoSettings = {
   safetyThresholdPct: 20,
   tankSwitchHpPct: 35,
   singleDoorBestOf10: true,
+  simRounds: SINGLE_DOOR_SIM_ROUNDS,
   allowCasualtyOnDepletedPool: false,
   orderedPools: {
     water: [...DEFAULT_ORDERED_TITAN_POOLS.water],

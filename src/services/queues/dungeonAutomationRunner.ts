@@ -21,6 +21,7 @@ import {
   areAllDoorsPoolDepleted,
   formatDungeonElementName,
   SINGLE_DOOR_SIM_ROUNDS,
+  clampSimRounds,
   type BestOfTenReport,
   type DungeonOrderedPools,
   type DungeonOutcomeScore,
@@ -39,6 +40,7 @@ export interface DungeonAutomationOptions {
   targetTitanite?: number; // 0 = unlimited
   todayTitanite?: number;
   singleDoorBestOf10?: boolean; // default: true
+  simRounds?: number; // default: 5 (1..20)
   allowCasualtyOnDepletedPool?: boolean; // default: false
   simulateFn?: (rawBattle: any, seed: number) => Promise<SimResultPayload>;
   shouldStop?: () => boolean;
@@ -143,6 +145,7 @@ export async function executeDungeonAutomationStep(
     targetTitanite = 0,
     todayTitanite = 0,
     singleDoorBestOf10 = true,
+    simRounds = SINGLE_DOOR_SIM_ROUNDS,
     allowCasualtyOnDepletedPool = false,
     simulateFn = simulateBattleWithUnity,
   } = options;
@@ -316,7 +319,7 @@ export async function executeDungeonAutomationStep(
         bestOfTenReport = await runSingleDoorBestOfTen(startPayload, simulateFn, {
           frontlineId,
           minHpThresholdPct: safetyThresholdPct,
-          rounds: SINGLE_DOOR_SIM_ROUNDS,
+          rounds: clampSimRounds(simRounds, SINGLE_DOOR_SIM_ROUNDS),
         });
         outcome = bestOfTenReport.bestOutcome;
       } else {

@@ -15,6 +15,7 @@ import { moveItemToIndex } from '@/src/utils/listReorder';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import { DEFAULT_WASM_PROFILE_VERSION } from '@/src/data/wasmSymbols';
+import { DEFAULT_SIM_ROUNDS, DEFAULT_SIM_ROUNDS_KEY, clampSimRounds } from '@/src/services/dungeonPlanner';
 import cityTreeManifest from '@/src/data/cityTreeManifest.json';
 import { buildingLevelsData } from '@/src/data/buildingData';
 import { researchData } from '@/src/data/researchData';
@@ -34,6 +35,14 @@ import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
 const openInPopup = ref(false);
+const defaultSimRounds = ref(DEFAULT_SIM_ROUNDS);
+
+async function saveDefaultSimRounds() {
+  defaultSimRounds.value = clampSimRounds(defaultSimRounds.value, DEFAULT_SIM_ROUNDS);
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ [DEFAULT_SIM_ROUNDS_KEY]: defaultSimRounds.value });
+  }
+}
 
 async function saveOpenInPopup() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
@@ -488,6 +497,7 @@ onMounted(async () => {
         'socketRefreshMode',
         'popupRpcEnabled',
         'openInPopup',
+        DEFAULT_SIM_ROUNDS_KEY,
         'mqttCaptureEnabled',
         'sanitizeTeamEnabled',
         'captureSettings',
@@ -511,6 +521,7 @@ onMounted(async () => {
       dispatchMode.value = rawMode === 'piggyback' ? 'piggyback' : 'direct';
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
       openInPopup.value = stored.openInPopup === true;
+      defaultSimRounds.value = clampSimRounds(stored[DEFAULT_SIM_ROUNDS_KEY], DEFAULT_SIM_ROUNDS);
       sanitizeTeamEnabled.value = stored.sanitizeTeamEnabled !== false;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
@@ -1380,6 +1391,19 @@ async function toggleRecording() {
           >
             Override Active
           </span>
+        </dd>
+        <dt>Default Sim Rounds</dt>
+        <dd class="flex items-center gap-2">
+          <input
+            id="setting-sim-rounds"
+            v-model.number="defaultSimRounds"
+            type="number"
+            min="1"
+            max="20"
+            class="w-16 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-semibold text-center tabular-nums"
+            @change="saveDefaultSimRounds"
+          />
+          <span class="text-[11px] text-slate-500 dark:text-slate-400">rounds / battle (1–20, default 5)</span>
         </dd>
       </dl>
 

@@ -15,7 +15,7 @@ export { DEFAULT_ARENA_BATTLE_FEATURES, DEFAULT_ARENA_BATTLE_EFFECTS };
 
 export const PVP_OPTIMIZER_STORAGE_KEY = 'pvpOptimizerLastResult';
 export const PVP_OPTIMIZER_POOL_CONFIG_KEY = 'pvpOptimizerPoolConfig';
-export const DEFAULT_PVP_MATCH_ROUNDS = 10;
+export const DEFAULT_PVP_MATCH_ROUNDS = 5;
 export const BASE_ELO = 1500;
 export const ELO_K_FACTOR = 32;
 

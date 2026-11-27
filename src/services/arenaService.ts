@@ -190,10 +190,10 @@ export function buildArenaEndBattleArgs(
 export async function runArenaMonteCarloSim(
   rawBattle: any,
   simulateFn: (battle: any, seed: number) => Promise<any>,
-  rounds: number = 10,
+  rounds: number = 5,
   onProgress?: (completed: number, total: number, wins: number) => void
 ): Promise<ArenaMonteCarloResult> {
-  const total = Math.max(1, Math.min(30, Math.floor(Number(rounds) || 10)));
+  const total = Math.max(1, Math.min(30, Math.floor(Number(rounds) || 5)));
   const baseSeed = (Number(rawBattle?.seed) >>> 0) || (Math.floor(Math.random() * 0xffffffff) >>> 0);
   const seeds: number[] = [];
   for (let i = 0; i < total; i++) {

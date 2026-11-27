@@ -13,6 +13,7 @@ import {
   areAllDoorsPoolDepleted,
   mergeClearedRoomEntry,
   SINGLE_DOOR_SIM_ROUNDS,
+  clampSimRounds,
 } from '../src/services/dungeonPlanner.ts';
 import { executeDungeonAutomationStep } from '../src/services/queues/dungeonAutomationRunner.ts';
 
@@ -58,7 +59,7 @@ test('shouldUseBestOfTen returns true strictly for single-door rooms with <= 5 a
   assert.equal(shouldUseBestOfTen([{}], []), false);
 });
 
-test('runSingleDoorBestOfTen executes 10 WASM runs and selects the best outcome by win > 0 casualties > HP/energy score', async () => {
+test('runSingleDoorBestOfTen defaults to 5 WASM runs and supports custom rounds (10) picking best win > 0 casualties > HP/energy', async () => {
   const seenSeeds = [];
   const mockSim = async (_battle, seed) => {
     seenSeeds.push(seed);
@@ -86,8 +87,8 @@ test('runSingleDoorBestOfTen executes 10 WASM runs and selects the best outcome 
         endArgs: { seed },
       };
     }
-    // Run 6: best flawless victory (tank 95% HP, positive energy 900)
-    if (idx === 6) {
+    // Run 3: best flawless victory (tank 95% HP, positive energy 900)
+    if (idx === 3) {
       return {
         win: true,
         stars: 3,
@@ -112,18 +113,23 @@ test('runSingleDoorBestOfTen executes 10 WASM runs and selects the best outcome 
     };
   };
 
+  assert.equal(SINGLE_DOOR_SIM_ROUNDS, 5);
+  assert.equal(clampSimRounds(0), 5);
+  assert.equal(clampSimRounds(25), 20);
+  assert.equal(clampSimRounds(8), 8);
+
   const report = await runSingleDoorBestOfTen({ seed: 123456 }, mockSim, {
     frontlineId: 4020,
     minHpThresholdPct: 20,
   });
 
-  assert.equal(report.roundsRun, SINGLE_DOOR_SIM_ROUNDS);
-  assert.equal(seenSeeds.length, 10);
+  assert.equal(report.roundsRun, 5);
+  assert.equal(seenSeeds.length, 5);
   assert.equal(seenSeeds[0], 123456, 'First run must use canonical server seed');
-  assert.equal(new Set(seenSeeds).size, 10, 'All 10 candidate seeds must be distinct');
-  assert.equal(report.wins, 9);
-  assert.equal(report.zeroCasualtyWins, 8);
-  assert.equal(report.bestIndex, 6);
+  assert.equal(new Set(seenSeeds).size, 5, 'All 5 candidate seeds must be distinct');
+  assert.equal(report.wins, 4);
+  assert.equal(report.zeroCasualtyWins, 3);
+  assert.equal(report.bestIndex, 3);
   assert.equal(report.bestOutcome.endArgs.bestMarker, true);
   assert.equal(report.bestScore.tankHpEndPct, 95);
 });
@@ -228,8 +234,8 @@ test('executeDungeonAutomationStep runs Best-of-10 on single-door <=5 earth room
 
   assert.equal(step.stopped, undefined);
   assert.equal(step.floorPassed, 585);
-  assert.equal(simSeeds.length, 10, 'Must run 10 simulations for single-door <=5 earth roster');
-  assert.equal(step.bestOfTenReport?.roundsRun, 10);
+  assert.equal(simSeeds.length, 5, 'Must run default 5 simulations for single-door <=5 earth roster');
+  assert.equal(step.bestOfTenReport?.roundsRun, 5);
   assert.equal(step.checkpointClaimed, true, 'Must auto-claim 5-floor checkpoint at floor 585');
   assert.equal(step.checkpointGold, 49600);
   assert.deepEqual(rpcCalls, [
