@@ -281,71 +281,127 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // Helper to start & simulate a single door candidate via Unity WASM.
-  // Calling dungeonStartBattle without submitting dungeonEndBattle acts as the real game's manual retreat buffer.
+  // Helper to start & simulate a single door candidate via Unity WASM using ONLY real server seeds.
+  // Calling dungeonStartBattle without submitting dungeonEndBattle acts as the real game's manual retreat buffer,
+  // issuing a fresh server-authoritative seed on each reroll (preventing server "Invalid battle" seed rejections).
   const startAndSimulateDoor = async (
     ctx: DoorCandidateContext,
     disableBestOfTen = false
   ): Promise<{ result?: SimulatedDoorCandidate; error?: string }> => {
-    const startRes = await dispatchRpc([
-      {
-        name: 'dungeonStartBattle',
-        args: {
-          teamNum: ctx.doorIdx,
-          heroes: ctx.squadPick.squadIds,
-        },
-      },
-    ]);
-
-    const startPayload = startRes?.results?.[0]?.result?.response || startRes?.results?.[0]?.response;
-    if (!startPayload || startRes?.results?.[0]?.error) {
-      return {
-        error: startRes?.results?.[0]?.error?.description || 'Failed to start dungeon battle on server.',
-      };
-    }
-
-    const seed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
     const frontlineId = ctx.squadPick.frontlineId ?? ctx.squadPick.squadIds[0] ?? 0;
     const useBestOfTen =
       !disableBestOfTen &&
       singleDoorBestOf10 &&
       (shouldUseBestOfTen(doors, ctx.squadPick.aliveEligibleIds) ||
         (forceMajeureEligible && ctx.squadPick.isPoolDepleted));
+    const maxRounds = useBestOfTen ? clampSimRounds(simRounds, SINGLE_DOOR_SIM_ROUNDS) : 1;
 
-    let outcome: SimResultPayload;
-    let bestOfTenReport: BestOfTenReport | null = null;
-    try {
-      if (useBestOfTen) {
-        bestOfTenReport = await runSingleDoorBestOfTen(startPayload, simulateFn, {
-          frontlineId,
-          minHpThresholdPct: safetyThresholdPct,
-          rounds: clampSimRounds(simRounds, SINGLE_DOOR_SIM_ROUNDS),
-        });
-        outcome = bestOfTenReport.bestOutcome;
-      } else {
-        outcome = await simulateFn(startPayload, seed);
+    const allScores: Array<{
+      index: number;
+      seed: number;
+      win: boolean;
+      stars: number;
+      casualties: number;
+      tankHpEndPct: number;
+      teamHpDeltaPct: number;
+      score: number;
+    }> = [];
+    let wins = 0;
+    let zeroCasualtyWins = 0;
+
+    let activeSeed = 0;
+    let activeOutcome: SimResultPayload | null = null;
+    let activeMetrics: HpLossMetrics | null = null;
+    let activeScore: DungeonOutcomeScore | null = null;
+
+    for (let roundIdx = 0; roundIdx < maxRounds; roundIdx++) {
+      if (roundIdx > 0 && options.shouldStop?.()) break;
+
+      const startRes = await dispatchRpc([
+        {
+          name: 'dungeonStartBattle',
+          args: {
+            teamNum: ctx.doorIdx,
+            heroes: ctx.squadPick.squadIds,
+          },
+        },
+      ]);
+
+      const startPayload = startRes?.results?.[0]?.result?.response || startRes?.results?.[0]?.response;
+      if (!startPayload || startRes?.results?.[0]?.error) {
+        return {
+          error: startRes?.results?.[0]?.error?.description || 'Failed to start dungeon battle on server.',
+        };
       }
-    } catch (err: any) {
-      if (cache?.value?.dungeonStatus?.data) {
-        cache.value.dungeonStatus.data.activeBattle = null;
+
+      const roundSeed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
+      let roundOutcome: SimResultPayload;
+      try {
+        roundOutcome = await simulateFn(startPayload, roundSeed);
+      } catch (err: any) {
+        if (cache?.value?.dungeonStatus?.data) {
+          cache.value.dungeonStatus.data.activeBattle = null;
+        }
+        await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+        const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
+        return {
+          error: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Battle retreated without loss.`,
+        };
       }
-      await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
-      const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
-      return {
-        error: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Battle retreated without loss.`,
-      };
+
+      const roundMetrics = calculateHpLossMetrics(roundOutcome?.attackers || {}, frontlineId, safetyThresholdPct);
+      const roundScore = scoreDungeonOutcome(roundOutcome, frontlineId, safetyThresholdPct);
+
+      if (roundScore.win) wins++;
+      if (roundScore.win && roundScore.casualties === 0) zeroCasualtyWins++;
+      allScores.push({
+        index: roundIdx,
+        seed: roundSeed,
+        win: roundScore.win,
+        stars: roundScore.stars,
+        casualties: roundScore.casualties,
+        tankHpEndPct: roundScore.tankHpEndPct,
+        teamHpDeltaPct: roundScore.teamHpDeltaPct,
+        score: roundScore.score,
+      });
+
+      activeSeed = roundSeed;
+      activeOutcome = roundOutcome;
+      activeMetrics = roundMetrics;
+      activeScore = roundScore;
+
+      // Early exit: as soon as a real server seed yields a safe flawless win, stop rerolling and submit it immediately!
+      const isSafeFlawlessWin =
+        Boolean(roundOutcome?.win) &&
+        roundScore.casualties === 0 &&
+        roundMetrics.minFinalHpPct >= safetyThresholdPct;
+      if (isSafeFlawlessWin) break;
     }
 
-    const metrics = calculateHpLossMetrics(outcome?.attackers || {}, frontlineId, safetyThresholdPct);
-    const score = scoreDungeonOutcome(outcome, frontlineId, safetyThresholdPct);
+    if (!activeOutcome || !activeMetrics || !activeScore) {
+      return { error: 'Failed to simulate dungeon battle.' };
+    }
+
+    const bestOfTenReport: BestOfTenReport | null = useBestOfTen
+      ? {
+          roundsRun: allScores.length,
+          wins,
+          zeroCasualtyWins,
+          bestIndex: allScores.length - 1,
+          bestSeed: activeSeed,
+          bestScore: activeScore,
+          bestOutcome: activeOutcome,
+          allScores,
+        }
+      : null;
 
     return {
       result: {
         ctx,
-        startSeed: seed,
-        outcome,
-        score,
-        metrics,
+        startSeed: activeSeed,
+        outcome: activeOutcome,
+        score: activeScore,
+        metrics: activeMetrics,
         bestOfTenReport,
       },
     };
@@ -447,10 +503,10 @@ export async function executeDungeonAutomationStep(
   const doorElem = chosen.ctx.doorElement;
 
   // Hard outgoing payload safety guard: NEVER dispatch dungeonEndBattle with empty/malformed
-  // progress[0].attackers.heroes or 0 surviving titans (server treats omitted titans as dead -> wipe).
+  // progress[0].attackers.heroes, 0 surviving titans, or a non-server fabricated seed (prevents "Invalid battle").
   const endArgsCheck = validateDungeonEndBattleArgs(outcome.endArgs, {
     expectedTeamIds: bestDoor.teamIds,
-    expectedSeed: bestOfTenReport ? null : chosen.startSeed,
+    expectedSeed: chosen.startSeed,
     requireAllAlive: !acceptedViaForceMajeure,
   });
   if (!endArgsCheck.ok) {

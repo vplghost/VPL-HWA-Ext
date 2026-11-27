@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.372 — 2026-11-27
+
+### Fixed
+
+- **Titan Dungeon `"Invalid battle"` Rejection — Real Server-Seed Reroll & Strict `expectedSeed` Enforcement (`dungeonAutomationRunner.ts`, `tests/dungeon-planner.test.mjs`)**:
+  - Replaced client-fabricated seed rerolling (`deriveCandidateSeeds`) in `executeDungeonAutomationStep()` with real server-seed rerolling via `dungeonStartBattle` (retreat without loss), with immediate early exit on the first safe flawless win (up to 5× faster on healthy floors).
+  - Removed the `bestOfTenReport ? null : chosen.startSeed` bypass in `validateDungeonEndBattleArgs()` so outgoing `dungeonEndBattle` payloads ALWAYS enforce `progress[0].seed === activeServerSeed`, preventing server `"Invalid battle"` rejections.
+
 ## 0.11.370 — 2026-11-27
 
 ### Added

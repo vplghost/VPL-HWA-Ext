@@ -234,8 +234,10 @@ test('executeDungeonAutomationStep runs Best-of-10 on single-door <=5 earth room
 
   assert.equal(step.stopped, undefined);
   assert.equal(step.floorPassed, 585);
-  assert.equal(simSeeds.length, 5, 'Must run default 5 simulations for single-door <=5 earth roster');
-  assert.equal(step.bestOfTenReport?.roundsRun, 5);
+  // Early exit on round 0 safe flawless win -> 1 real server seed, 0 fabricated seeds
+  assert.equal(simSeeds.length, 1, 'Must early-exit on round 0 safe flawless win with exact real server seed');
+  assert.equal(simSeeds[0], 777001);
+  assert.equal(step.bestOfTenReport?.roundsRun, 1);
   assert.equal(step.checkpointClaimed, true, 'Must auto-claim 5-floor checkpoint at floor 585');
   assert.equal(step.checkpointGold, 49600);
   assert.deepEqual(rpcCalls, [
@@ -244,6 +246,103 @@ test('executeDungeonAutomationStep runs Best-of-10 on single-door <=5 earth room
     'dungeonSaveProgress',
     'dungeonGetInfo',
   ]);
+});
+
+test('P1-19: executeDungeonAutomationStep rerolls via real dungeonStartBattle server seeds on defeat and never submits fabricated seed', async () => {
+  const serverSeeds = [888001, 888002, 888003];
+  let startIdx = 0;
+  let submittedSeed = null;
+
+  const cache = {
+    value: {
+      dungeonStatus: {
+        data: {
+          floorNumber: 601,
+          floorType: 'battle',
+          respawnFloor: 601,
+          currentFloorDoors: [{ attackerType: 'earth', team: [{ id: 4020, power: 50000 }] }],
+          states: {
+            titans: {
+              '4020': { hp: 900000, maxHp: 1000000, energy: 500, isDead: false },
+              '4021': { hp: 700000, maxHp: 700000, energy: 500, isDead: false },
+              '4022': { hp: 800000, maxHp: 800000, energy: 500, isDead: false },
+              '4023': { hp: 800000, maxHp: 800000, energy: 500, isDead: false },
+              '4024': { hp: 400000, maxHp: 400000, energy: 500, isDead: false },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const dispatchRpc = async (calls) => {
+    const name = calls[0]?.name;
+    if (name === 'dungeonStartBattle') {
+      const seed = serverSeeds[startIdx++] || 999999;
+      return { results: [{ result: { response: { seed, attackers: {}, defenders: {} } } }] };
+    }
+    if (name === 'dungeonEndBattle') {
+      submittedSeed = calls[0]?.args?.progress?.[0]?.seed;
+      return { results: [{ result: { response: { reward: { dungeonActivity: 12 }, dungeon: { floorNumber: 602 } } } }] };
+    }
+    return { results: [{ result: { response: {} } }] };
+  };
+
+  const simulateFn = async (_raw, seed) => {
+    // Round 0 (888001) fails, Round 1 (888002) wins cleanly -> must submit 888002 (NOT fabricated seed!)
+    if (seed === 888001) {
+      return {
+        win: false,
+        stars: 0,
+        seed,
+        attackers: { '4020': { hp: 0, maxHp: 1000000, energy: 0, isDead: true, hpDelta: -900000 } },
+        defenders: {},
+        endArgs: { result: { win: false, stars: 0 }, progress: [{ seed, attackers: { heroes: {} } }] },
+      };
+    }
+    return {
+      win: true,
+      stars: 3,
+      seed,
+      attackers: {
+        '4020': { hp: 850000, maxHp: 1000000, energy: 700, isDead: false, hpDelta: -50000 },
+        '4021': { hp: 680000, maxHp: 700000, energy: 600, isDead: false, hpDelta: -20000 },
+        '4022': { hp: 780000, maxHp: 800000, energy: 600, isDead: false, hpDelta: -20000 },
+        '4023': { hp: 790000, maxHp: 800000, energy: 600, isDead: false, hpDelta: -10000 },
+        '4024': { hp: 380000, maxHp: 400000, energy: 600, isDead: false, hpDelta: -20000 },
+      },
+      defenders: {},
+      endArgs: {
+        result: { win: true, stars: 3 },
+        progress: [{
+          seed,
+          attackers: {
+            heroes: {
+              '4020': { hp: 850000, energy: 700, isDead: false },
+              '4021': { hp: 680000, energy: 600, isDead: false },
+              '4022': { hp: 780000, energy: 600, isDead: false },
+              '4023': { hp: 790000, energy: 600, isDead: false },
+              '4024': { hp: 380000, energy: 600, isDead: false },
+            },
+          },
+        }],
+      },
+    };
+  };
+
+  const step = await executeDungeonAutomationStep({
+    cache,
+    dispatchRpc,
+    simulateFn,
+    safetyThresholdPct: 20,
+    singleDoorBestOf10: true,
+    simRounds: 5,
+  });
+
+  assert.equal(step.stopped, undefined);
+  assert.equal(startIdx, 2, 'Must reroll via a 2nd dungeonStartBattle to get a fresh real server seed');
+  assert.equal(submittedSeed, 888002, 'Submitted dungeonEndBattle seed MUST match the active real server seed');
+  assert.equal(step.bestOfTenReport?.roundsRun, 2);
 });
 
 test('executeDungeonAutomationStep stops cleanly when Target Titanite is reached', async () => {
