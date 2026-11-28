@@ -3289,6 +3289,15 @@ export async function evaluateMineDefense(record: any, cache: any, stored: any, 
   const cr = getActiveChrome(customChrome);
   const helper = mineDefenseService;
   if (!helper) return { state, hold: false };
+  if (stored?.autoGatherSettings?.defenseRecallEnabled === false) {
+    if (tabId) await dropMineDefenseRpc(tabId, cr);
+    cr?.alarms?.clear?.('hwa-mine-defense');
+    if (state?.defense) {
+      state.defense = { ...state.defense, pending: null, waiting: [], intercept: null, status: 'Mine defense paused' };
+    }
+    state.wakeAt = null;
+    return { state, hold: false };
+  }
   state = helper.sync(state, record, cache, now);
   const defense = state.defense;
   const plan = helper.plan(cache, defense, now, stored?.autoGatherSettings, stored);
@@ -3496,7 +3505,25 @@ export async function evaluateSmartGather(
     reason = 'Waiting for rally team to return before resuming gathering';
   } else if (!state.error) {
     if (state.reservation?.type === 'rally') state.reservation = null;
-    if (state.marchLimitBackoffUntil && now < state.marchLimitBackoffUntil) {
+    const reserve = stored.autoGatherSettings?.reserveTroops;
+    if (state.waitingForTroops) {
+      const troopEvent = Boolean(
+        record && autoGatherService.isTroopAvailabilityEvent(record, stored.rpcCache, cache, now, reserve)
+      );
+      const rawUnitSummary = cache?.['getUnitSummary:unit']?.data;
+      const hasSurplusNow = Boolean(
+        rawUnitSummary &&
+          autoGatherService.countAvailableTroops(autoGatherService.applyTroopReserve(rawUnitSummary, reserve)) > 0
+      );
+      if (troopEvent || hasSurplusNow) {
+        state.waitingForTroops = null;
+      } else {
+        reason = state.waitingForTroops.reason || 'No troops available; waiting for training, healing, or returning march';
+      }
+    }
+    if (state.waitingForTroops) {
+      // Stay idle without dispatching search/probe/refresh RPCs until a troop availability event arrives
+    } else if (state.marchLimitBackoffUntil && now < state.marchLimitBackoffUntil) {
       reason = 'Server march limit reached (MarchLimitExceeded); waiting for squad return';
       if (now - (state.lastRefreshAt || 0) >= 5000) {
         calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
@@ -3505,13 +3532,19 @@ export async function evaluateSmartGather(
     } else {
       const plan = autoGatherService.planAutoGather(cache, { ...stored, smartGatherState: state }, now);
       reason = plan.reason || (plan.action === 'gather' ? 'Dispatching gathering squad' : 'Searching for resource mine');
-      calls = plan.calls || (plan.call ? [plan.call] : []);
-      if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
-      if (calls.length) calls = passiveMarchReads(cache, calls, now);
-      if (calls.length) {
-        state.lastPlanAt = now;
-        if (plan.nearest) state.nearest = plan.nearest;
-        state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
+      if (plan.waitForTroops) {
+        state.waitingForTroops = { since: now, reason };
+        calls = [];
+      } else {
+        if (['gather', 'search', 'probe'].includes(plan.action)) state.waitingForTroops = null;
+        calls = plan.calls || (plan.call ? [plan.call] : []);
+        if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
+        if (calls.length) calls = passiveMarchReads(cache, calls, now);
+        if (calls.length) {
+          state.lastPlanAt = now;
+          if (plan.nearest) state.nearest = plan.nearest;
+          state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
+        }
       }
     }
   }
@@ -3619,9 +3652,16 @@ export async function tickAutoGather(reset = false, customChrome?: any) {
   const tab = await findActiveGameTab(cr);
   if (reset) {
     if (tab?.id) await cr?.tabs?.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
-    if (tab?.id && !stored.autoGatherSettings?.smartEnabled) await dropMineDefenseRpc(tab.id, cr);
+    if (tab?.id && stored.autoGatherSettings?.defenseRecallEnabled === false) await dropMineDefenseRpc(tab.id, cr);
     if (stored.smartGatherState) {
-      stored.smartGatherState = { ...stored.smartGatherState, error: null, nearest: null, readTimeout: null, notice: null };
+      stored.smartGatherState = {
+        ...stored.smartGatherState,
+        error: null,
+        nearest: null,
+        readTimeout: null,
+        notice: null,
+        waitingForTroops: null,
+      };
       if (
         stored.smartGatherState.pending &&
         !['stopMineGathering', 'attackMine', 'joinRally'].includes(stored.smartGatherState.pending.call?.name)
@@ -3631,6 +3671,47 @@ export async function tickAutoGather(reset = false, customChrome?: any) {
     }
   }
   if (tab?.id) await evaluateAutoGather(null, stored.rpcCache || {}, stored, tab.id, cr);
+}
+
+export async function tickMineDefense(customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+      'autoGatherSettings',
+      'smartGatherState',
+      'troopCapacitySettings',
+      'customTeams'
+    ])) || {};
+  const tab = await findActiveGameTab(cr);
+  if (stored.autoGatherSettings?.defenseRecallEnabled === false) {
+    if (tab?.id) await dropMineDefenseRpc(tab.id, cr);
+    cr?.alarms?.clear?.('hwa-mine-defense');
+    if (stored.smartGatherState?.defense) {
+      stored.smartGatherState = {
+        ...stored.smartGatherState,
+        wakeAt: null,
+        defense: {
+          ...stored.smartGatherState.defense,
+          pending: null,
+          waiting: [],
+          intercept: null,
+          status: 'Mine defense paused',
+        },
+      };
+      await cr?.storage?.local?.set({ smartGatherState: stored.smartGatherState });
+    }
+    return;
+  }
+  if (!tab?.id || stored.popupRpcEnabled !== true) return;
+  const now = Date.now();
+  const smartState = smartGatherService.sync(stored.smartGatherState, null, stored.rpcCache || {}, now);
+  const evaluated = await evaluateMineDefense(null, stored.rpcCache || {}, stored, smartState, tab.id, now, cr);
+  const nextState = { ...smartState, defense: evaluated.state.defense, wakeAt: evaluated.state.wakeAt };
+  await cr?.storage?.local?.set({ smartGatherState: nextState });
 }
 
 export function socketRefreshCalls(record: any, cache: any): any[] {
@@ -4061,7 +4142,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runAutoExpiringClaims(false, cr)).catch(() => {});
       await pending;
     }
-    if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
+    if (alarm.name === 'hwa-mine-defense') await tickMineDefense(cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
       if (tab?.id) {
@@ -4321,9 +4402,20 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(async () => {
         if (message.kind === 'auto-gather-stop') {
           const tab = await findActiveGameTab(cr);
-          if (tab?.id) await dropMineDefenseRpc(tab.id, cr);
           if (tab?.id) await cr.tabs?.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
         } else await tickAutoGather(message.kind === 'auto-gather-start', cr);
+        return { ok: true };
+      });
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      ['mine-defense-update', 'mine-defense-stop'].includes(message?.kind) &&
+      sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/')
+    ) {
+      pending = pending.then(async () => {
+        await tickMineDefense(cr);
         return { ok: true };
       });
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
@@ -5432,10 +5524,21 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       void resourceLockManager.persistSnapshot(cr);
       let defenseHold = false;
       let evaluatedDefense: any = null;
-      if (sender.tab?.id && stored.autoGatherSettings?.enabled && stored.autoGatherSettings?.smartEnabled) {
+      const defenseEnabled = stored.autoGatherSettings?.defenseRecallEnabled !== false;
+      const hasGatheringSquad = smartGatherService
+        .list(cacheResult.cache?.marchStatus?.data?.marches)
+        .some((m: any) => smartGatherService.gathering(m));
+      const hasDefenseActivity = Boolean(
+        hasGatheringSquad ||
+          stored.smartGatherState?.defense?.pending ||
+          stored.smartGatherState?.defense?.intercept ||
+          stored.smartGatherState?.defense?.waiting?.length
+      );
+      if (sender.tab?.id && stored.popupRpcEnabled === true && defenseEnabled && hasDefenseActivity) {
         let smartState = smartGatherService.sync(stored.smartGatherState, record, cacheResult.cache, Date.now());
         evaluatedDefense = await evaluateMineDefense(record, cacheResult.cache, stored, smartState, sender.tab.id, Date.now(), cr);
         stored.smartGatherState = { ...smartState, defense: evaluatedDefense.state.defense, wakeAt: evaluatedDefense.state.wakeAt };
+        await cr?.storage?.local?.set({ smartGatherState: stored.smartGatherState });
         defenseHold = evaluatedDefense.hold;
       }
       if (sender.tab?.id && !defenseHold) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id, cr);
@@ -5749,6 +5852,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     evaluateAutoGather: (record: any, currentCache: any, stored: any, tabId: number) =>
       evaluateAutoGather(record, currentCache, stored, tabId, cr),
     tickAutoGather: (reset?: boolean) => tickAutoGather(reset, cr),
+    tickMineDefense: () => tickMineDefense(cr),
     deferQueueForGathering: (queueType: string, options: any, tabId: number, accountId: any, stored: any, now: number = Date.now()) =>
       deferQueueForGathering(queueType, options, tabId, accountId, stored, now, cr),
     advanceGatherQueue: (queueType: string, record: any, stored: any, tabId: number) =>

@@ -83,14 +83,19 @@ export function computeActiveAutomations(stored: Record<string, any> | null | un
   }
 
   if (stored.autoGatherSettings?.enabled === true) {
-    const smart = stored.autoGatherSettings.smartEnabled ? 'Smart' : 'Auto';
     const lockedByRaid = Array.isArray(stored.activeResourceLocks) &&
       stored.activeResourceLocks.some((l: any) => l?.owner === 'raidQueue');
+    const waitingForTroops = Boolean(stored.smartGatherState?.waitingForTroops);
+    const smart = stored.autoGatherSettings.smartEnabled ? 'Smart' : 'Auto';
     items.push({
       id: 'gather',
       icon: '⛏️',
-      label: lockedByRaid ? `${smart} Gather · Yielding to Raid` : `${smart} Gather: Active`,
-      statusTone: lockedByRaid ? 'waiting' : 'running',
+      label: lockedByRaid
+        ? `${smart} Gather · Yielding to Raid`
+        : waitingForTroops
+          ? `${smart} Gather · Waiting for troops`
+          : `${smart} Gather: Active`,
+      statusTone: lockedByRaid || waitingForTroops ? 'waiting' : 'running',
       modalName: 'gathering',
       storageDisableKey: {
         key: 'autoGatherSettings',

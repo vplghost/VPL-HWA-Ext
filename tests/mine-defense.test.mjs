@@ -219,11 +219,19 @@ test('account change drops queued defense groups before clearing the old runtime
   assert.equal(local.smartGatherState.defense.pending, null);
 });
 
-test('disabling Smart while basic auto-gather remains enabled cancels queued defensive recalls', async () => {
+test('disabling defenseRecallEnabled cancels queued defensive recalls while disabling auto-gather keeps defense active', async () => {
   const { ctx, cache, local, clock, attack, sent } = environment(); crowdHospital(cache);
   await ctx.runDefense(null, cache, local, 1, clock.now);
+  local.autoGatherSettings.enabled = false;
   local.autoGatherSettings.smartEnabled = false;
   ctx.chrome.tabs.query = (args, cb) => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]);
+  await ctx.tickMine(true);
+  assert.equal(
+    sent.some(msg => msg.kind === 'drop-rpc-group' && msg.group === 'mine-defense:' + attack.routeId),
+    false,
+    'Disabling auto-gather must not drop independent mine-defense RPCs'
+  );
+  local.autoGatherSettings.defenseRecallEnabled = false;
   await ctx.tickMine(true);
   assert.ok(sent.some(msg => msg.kind === 'drop-rpc-group' && msg.group === 'mine-defense:' + attack.routeId));
 });

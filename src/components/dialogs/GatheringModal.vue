@@ -17,6 +17,8 @@ import {
   buildOptimizedGatheringTeam,
 } from '@/src/utils/mineData';
 import { buildSquad } from '@/src/utils/squadCapacity';
+import { normalizeTroopReserve, hasTroopReserve } from '@/src/services/queues/autoGather';
+import type { GatherTroopReserve } from '@/src/types/game/gatherQueue';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -60,16 +62,17 @@ interface AutoGatherSettings {
   mineLevel: number | 'nearest';
   mineType: string;
   lastAutoMineType: string | null;
-  defenseRecallEnabled?: boolean;
-  defenseInfirmaryThreshold?: number;
-  interceptTeamId?: string;
+  defenseRecallEnabled: boolean;
+  defenseInfirmaryThreshold: number;
+  interceptTeamId: string;
   selectedTeam?: string;
   optimizeTeam?: boolean;
+  reserveTroops: GatherTroopReserve;
 }
 
 const autoSettings = ref<AutoGatherSettings>({
   enabled: false,
-  smartEnabled: false,
+  smartEnabled: true,
   maxMarches: 3,
   mineLevel: 10,
   mineType: 'rotate',
@@ -79,7 +82,10 @@ const autoSettings = ref<AutoGatherSettings>({
   interceptTeamId: '',
   selectedTeam: '',
   optimizeTeam: false,
+  reserveTroops: { infantry: 0, spearmen: 0, marksmen: 0 },
 });
+
+const showReserveConfig = ref(false);
 
 // Manual search
 const manualMineType = ref<'food' | 'wood' | 'stone' | 'iron'>('food');
@@ -89,13 +95,44 @@ const searchStatus = ref<string>('');
 const isDispatching = ref<string | null>(null);
 
 const smartStatus = ref('');
+const waitingForTroopsReason = ref('');
+const defenseStatus = ref('');
+const defenseActive = ref(false);
 const accountMaxMarches = computed(() => calculateAccountMaxMarches(cache.value));
+
+const hasReserve = computed(() => hasTroopReserve(autoSettings.value.reserveTroops));
+const reserveSummaryLabel = computed(() => {
+  const r = normalizeTroopReserve(autoSettings.value.reserveTroops);
+  return `${r.infantry}/${r.spearmen}/${r.marksmen}`;
+});
+
+function applySmartStateSnapshot(state: any) {
+  smartStatus.value = state?.status || '';
+  waitingForTroopsReason.value = state?.waitingForTroops?.reason || '';
+  defenseStatus.value = state?.defense?.status || '';
+  defenseActive.value = Boolean(state?.defense?.pending || state?.defense?.intercept);
+}
+
+function mergeStoredSettings(storedSettings: any) {
+  if (!storedSettings || typeof storedSettings !== 'object') return;
+  autoSettings.value = {
+    ...autoSettings.value,
+    ...storedSettings,
+    defenseRecallEnabled: storedSettings.defenseRecallEnabled !== false,
+    defenseInfirmaryThreshold: Number.isFinite(storedSettings.defenseInfirmaryThreshold)
+      ? Number(storedSettings.defenseInfirmaryThreshold)
+      : 50,
+    interceptTeamId: typeof storedSettings.interceptTeamId === 'string' ? storedSettings.interceptTeamId : '',
+    reserveTroops: normalizeTroopReserve(storedSettings.reserveTroops),
+  };
+}
 
 function onGatherStorage(changes: Record<string, chrome.storage.StorageChange>, area: string) {
   if (area !== 'local') return;
-  if (changes.smartGatherState) smartStatus.value = (changes.smartGatherState.newValue as { status?: string } | undefined)?.status || '';
-  if (changes.autoGatherSettings?.newValue) autoSettings.value = { ...autoSettings.value, ...changes.autoGatherSettings.newValue };
+  if (changes.smartGatherState) applySmartStateSnapshot(changes.smartGatherState.newValue);
+  if (changes.autoGatherSettings?.newValue) mergeStoredSettings(changes.autoGatherSettings.newValue);
 }
+
 const now = ref(Date.now());
 let timer: number | null = null;
 
@@ -110,14 +147,11 @@ onMounted(async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const stored = await chrome.storage.local.get(['autoGatherSettings', 'popupRpcEnabled', 'socketRefreshMode', 'smartGatherState']);
-      smartStatus.value = (stored.smartGatherState as { status?: string } | undefined)?.status || '';
-      if (stored.autoGatherSettings) {
-        autoSettings.value = { ...autoSettings.value, ...stored.autoGatherSettings };
-      }
+      applySmartStateSnapshot(stored.smartGatherState);
+      if (stored.autoGatherSettings) mergeStoredSettings(stored.autoGatherSettings);
     } catch (_) {}
   }
 
-  // Refresh marches to ensure active marches list is completely fresh
   try {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       await chrome.runtime.sendMessage({
@@ -145,33 +179,95 @@ async function ensureRpcEnabled() {
   }
 }
 
-async function saveAutoSettings() {
-  if (!autoSettings.value.smartEnabled && autoSettings.value.mineLevel === 'nearest') autoSettings.value.mineLevel = 10;
+function buildPersistableSettings(): AutoGatherSettings {
   const maxLimit = accountMaxMarches.value;
   autoSettings.value.maxMarches = Math.max(1, Math.min(maxLimit, autoSettings.value.maxMarches || 1));
   autoSettings.value.selectedTeam = selectedTeamId.value;
   autoSettings.value.optimizeTeam = selectedTeamId.value === 'optimized';
+  autoSettings.value.smartEnabled = autoSettings.value.enabled ? true : autoSettings.value.smartEnabled;
+  autoSettings.value.defenseInfirmaryThreshold = Math.max(
+    1,
+    Math.min(100, Number(autoSettings.value.defenseInfirmaryThreshold) || 50)
+  );
+  autoSettings.value.reserveTroops = normalizeTroopReserve(autoSettings.value.reserveTroops);
+  return {
+    ...autoSettings.value,
+    reserveTroops: { ...autoSettings.value.reserveTroops },
+  };
+}
+
+async function saveAutoSettings() {
+  const payload = buildPersistableSettings();
   await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-    await chrome.storage.local.set({ autoGatherSettings: autoSettings.value });
+    await chrome.storage.local.set({ autoGatherSettings: payload });
   }
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     chrome.runtime.sendMessage({
-      kind: autoSettings.value.enabled ? 'auto-gather-start' : 'auto-gather-stop',
-      settings: autoSettings.value,
+      kind: payload.enabled ? 'auto-gather-start' : 'auto-gather-stop',
+      settings: payload,
     });
   }
 }
 
 function toggleAutoGather() {
   autoSettings.value.enabled = !autoSettings.value.enabled;
-  saveAutoSettings();
+  if (autoSettings.value.enabled) {
+    autoSettings.value.smartEnabled = true;
+  }
+  void saveAutoSettings();
+}
+
+async function saveDefenseSettings() {
+  const payload = buildPersistableSettings();
+  await ensureRpcEnabled();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ autoGatherSettings: payload });
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({
+      kind: payload.defenseRecallEnabled ? 'mine-defense-update' : 'mine-defense-stop',
+      settings: payload,
+    });
+  }
+}
+
+async function saveReserveSettings() {
+  const payload = buildPersistableSettings();
+  await ensureRpcEnabled();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ autoGatherSettings: payload });
+  }
+  if (payload.enabled && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({
+      kind: 'auto-gather-start',
+      settings: payload,
+    });
+  }
+}
+
+function resetReserveTroops() {
+  autoSettings.value.reserveTroops = { infantry: 0, spearmen: 0, marksmen: 0 };
+  void saveReserveSettings();
+}
+
+async function refreshAll() {
+  await refreshTroops();
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({
+      kind: 'experimental-rpc',
+      calls: [{ name: 'getMarches', feature: 'march' }],
+    }).catch(() => {});
+    if (autoSettings.value.enabled) {
+      chrome.runtime.sendMessage({ kind: 'auto-gather-start', settings: buildPersistableSettings() }).catch(() => {});
+    }
+  }
 }
 
 // Next target mine type in rotation
 const nextTargetType = computed(() => {
   if (autoSettings.value.mineType !== 'rotate') return autoSettings.value.mineType;
-  const types = autoSettings.value.smartEnabled ? ['food', 'iron', 'stone', 'wood'] : ['food', 'wood', 'stone', 'iron'];
+  const types = ['food', 'iron', 'stone', 'wood'];
   const last = autoSettings.value.lastAutoMineType;
   if (!last || !types.includes(last)) return 'food';
   const idx = types.indexOf(last);
@@ -194,9 +290,19 @@ const gatheringMarches = computed(() => {
     })
     .map((m: any) => {
       const progress = gatheringProgress(m, now.value, cache.value);
-      return { ...m, id: m.id || m.squadId, squadId: m.squadId || m.id,
-        progress, stage: progress.phase,
-        timerText: progress.remainingSeconds == null ? 'In progress' : progress.remainingSeconds > 0 ? formatDuration(progress.remainingSeconds) : 'Awaiting update' };
+      return {
+        ...m,
+        id: m.id || m.squadId,
+        squadId: m.squadId || m.id,
+        progress,
+        stage: progress.phase,
+        timerText:
+          progress.remainingSeconds == null
+            ? 'In progress'
+            : progress.remainingSeconds > 0
+              ? formatDuration(progress.remainingSeconds)
+              : 'Awaiting update',
+      };
     });
 });
 
@@ -208,7 +314,7 @@ const gatheringOverall = computed(() => {
   return total > 0 ? { total, collected, progress: Math.round(collected / total * 1000) / 10 } : null;
 });
 
-// Found full mines matching search criteria
+// Found full mines matching search criteria (declared before immediate watcher)
 const foundMines = computed(() => {
   const search = cache.value.experimentalMineSearch?.data;
   if (!search || !Array.isArray(search.mines)) return [];
@@ -405,57 +511,130 @@ async function recallMarch(march: any) {
   <ModalDialog
     :model-value="modelValue"
     title="Gathering & Resource Automation"
+    icon="⛏️"
     max-width="max-w-3xl"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div class="space-y-4 text-xs">
+    <template #header-status>
+      <span
+        id="gather-header-marches-pill"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+      >
+        <span>⛏️</span>
+        <span>{{ gatheringMarches.length }}/{{ autoSettings.maxMarches }}</span>
+        <span v-if="gatheringOverall" class="text-teal-600 dark:text-teal-400 font-mono">· {{ gatheringOverall.progress }}%</span>
+      </span>
+
+      <span
+        id="gather-header-status-pill"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border"
+        :class="
+          autoSettings.enabled
+            ? waitingForTroopsReason
+              ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+              : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+        "
+      >
+        <span
+          class="size-1.5 rounded-full"
+          :class="
+            autoSettings.enabled
+              ? waitingForTroopsReason
+                ? 'bg-amber-500'
+                : 'bg-emerald-500 animate-pulse'
+              : 'bg-slate-400'
+          "
+        />
+        <span>{{ autoSettings.enabled ? (waitingForTroopsReason ? 'Waiting for troops' : 'Smart Auto') : 'Manual' }}</span>
+      </span>
+
+      <span
+        id="gather-header-defense-pill"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border"
+        :class="
+          defenseActive
+            ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 animate-pulse'
+            : autoSettings.defenseRecallEnabled
+              ? 'bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800/60'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+        "
+      >
+        <span>{{ defenseActive ? '⚠️' : '🛡️' }}</span>
+        <span>{{ defenseActive ? 'Defense Active' : autoSettings.defenseRecallEnabled ? 'Protected' : 'Defense Off' }}</span>
+      </span>
+    </template>
+
+    <template #header-actions>
+      <label
+        class="inline-flex items-center gap-1.5 cursor-pointer rounded-lg px-2.5 py-1 text-xs font-bold border transition-colors select-none"
+        :class="
+          autoSettings.enabled
+            ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500'
+            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+        "
+        title="Enable or pause Smart Auto-Gather (daily priorities & activity coordination)"
+      >
+        <input
+          id="gather-auto-toggle"
+          type="checkbox"
+          :checked="autoSettings.enabled"
+          class="size-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+          @change="toggleAutoGather"
+        />
+        <span>Auto</span>
+      </label>
+
+      <button
+        id="gather-header-refresh-btn"
+        type="button"
+        :disabled="isRefreshingTroops"
+        title="Refresh troops & marches"
+        aria-label="Refresh troops and marches"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+        @click="refreshAll"
+      >
+        <span :class="{ 'inline-block animate-spin': isRefreshingTroops }">↻</span>
+      </button>
+    </template>
+
+    <div class="space-y-3 text-xs">
       <!-- Section 1: Team & Squad Parameters -->
-      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
-        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2.5 shadow-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label for="gather-team-select" class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <span>👥</span> Gathering Team & Troop Capacity
-          </h3>
-          <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
+          </label>
+          <span v-if="selectedTeam" class="text-[10px] font-mono text-slate-400">
             ID: {{ selectedTeam.id }}
           </span>
         </div>
 
-        <div>
-          <label for="gather-team-select" class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Select Team
-          </label>
-          <select
-            id="gather-team-select"
-            v-model="selectedTeamId"
-            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-            @change="handleTeamChange(selectedTeamId)"
-          >
-            <option v-for="t in teams" :key="t.id" :value="t.id">
-              {{ t.label }} ({{ t.heroIds.length }}/5)
-            </option>
-          </select>
-        </div>
+        <select
+          id="gather-team-select"
+          v-model="selectedTeamId"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
+          @change="handleTeamChange(selectedTeamId)"
+        >
+          <option v-for="t in teams" :key="t.id" :value="t.id">
+            {{ t.label }} ({{ t.heroIds.length }}/5)
+          </option>
+        </select>
 
         <!-- Optimize Team Information Badge -->
-        <div v-if="selectedTeamId === 'optimized'" class="p-2.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-200 text-2xs space-y-1">
-          <div class="font-semibold flex items-center gap-1.5">
-            <span>⚡</span>
-            <span>Optimized Squad: Selects lowest power heroes, stopping once squad capacity covers the target mine's remaining resources (up to 5 heroes).</span>
-          </div>
-          <div class="text-teal-600 dark:text-teal-400">
-            Capacity scaled by resource density (Food: 1 · Wood: 1 · Stone: 5 · Iron: 20) & troop tier (Level 1–10).
-          </div>
+        <div v-if="selectedTeamId === 'optimized'" class="px-2.5 py-1.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-200 text-[11px]">
+          ⚡ <strong>Optimized Squad:</strong> Picks lowest-power heroes up to mine capacity (Food:1 · Wood:1 · Stone:5 · Iron:20).
         </div>
 
         <!-- Team Chips Preview -->
-        <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="flex flex-wrap items-center gap-2">
+        <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="flex flex-wrap items-center gap-1.5">
           <span
             v-for="hid in selectedTeam.heroIds"
             :key="hid"
-            class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+            class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
           >
             <span
-              class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+              class="relative size-4 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
               :class="getHeroGlow(hid)"
             >
               <img
@@ -467,7 +646,7 @@ async function recallMarch(march: any) {
               />
               <span v-else class="text-[9px]">👤</span>
             </span>
-            <span class="font-medium truncate max-w-[110px]">{{ getHeroName(hid) }}</span>
+            <span class="font-medium truncate max-w-[100px]">{{ getHeroName(hid) }}</span>
             <HeroHoverCard
               :hero-id="hid"
               :hero="getHeroSnapshot(hid)"
@@ -476,34 +655,101 @@ async function recallMarch(march: any) {
           </span>
         </div>
 
-        <!-- Troop Allocation Summary -->
+        <!-- Troop Allocation Summary + Collapsible Troop Reserve Toggle -->
         <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-          <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+          <div class="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
             <span class="font-semibold">
               Troops: <strong class="text-slate-800 dark:text-slate-200">{{ formatNumber(totalAllocatedTroops) }}</strong> / {{ formatNumber(squadCapacity) }}
             </span>
+
             <button
+              id="gather-reserve-toggle-btn"
               type="button"
-              :disabled="isRefreshingTroops"
-              class="cursor-pointer text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 flex items-center gap-1 text-xs"
-              title="Refresh available troops"
-              @click="refreshTroops"
+              class="cursor-pointer inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border transition-colors"
+              :class="
+                showReserveConfig || hasReserve
+                  ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-indigo-600 dark:hover:text-indigo-300'
+              "
+              title="Configure reserved troops per type kept in city for Auto-Join and Rallies"
+              :aria-expanded="showReserveConfig"
+              @click="showReserveConfig = !showReserveConfig"
             >
-              <span :class="{ 'inline-block animate-spin': isRefreshingTroops }">↻</span>
-              <span>Refresh troops</span>
+              <span>🪖</span>
+              <span v-if="hasReserve" class="font-mono">{{ reserveSummaryLabel }}</span>
+              <span v-else>Reserve</span>
             </button>
+          </div>
+
+          <!-- Collapsible Troop Reserve Panel (collapsed by default) -->
+          <div
+            v-if="showReserveConfig"
+            id="gather-reserve-panel"
+            class="rounded-lg border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-2.5 space-y-2"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] font-semibold text-indigo-900 dark:text-indigo-200">
+                Keep highest-tier troops in city for Auto-Join &amp; Rallies
+              </span>
+              <button
+                v-if="hasReserve"
+                type="button"
+                class="cursor-pointer text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                @click="resetReserveTroops"
+              >
+                Reset
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="block text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                Infantry
+                <input
+                  id="gather-reserve-infantry"
+                  v-model.number="autoSettings.reserveTroops.infantry"
+                  type="number"
+                  min="0"
+                  step="50"
+                  class="mt-0.5 block w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 font-mono"
+                  @change="saveReserveSettings"
+                />
+              </label>
+              <label class="block text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                Spearmen
+                <input
+                  id="gather-reserve-spearmen"
+                  v-model.number="autoSettings.reserveTroops.spearmen"
+                  type="number"
+                  min="0"
+                  step="50"
+                  class="mt-0.5 block w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 font-mono"
+                  @change="saveReserveSettings"
+                />
+              </label>
+              <label class="block text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                Marksmen
+                <input
+                  id="gather-reserve-marksmen"
+                  v-model.number="autoSettings.reserveTroops.marksmen"
+                  type="number"
+                  min="0"
+                  step="50"
+                  class="mt-0.5 block w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 font-mono"
+                  @change="saveReserveSettings"
+                />
+              </label>
+            </div>
           </div>
 
           <div class="grid grid-cols-3 gap-2 text-xs">
             <div
               v-for="b in troopTypeSummaries"
               :key="b.type"
-              class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800"
+              class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800"
             >
               <div class="font-semibold text-slate-800 dark:text-slate-200">
                 {{ b.label }}: {{ formatNumber(b.total) }}
               </div>
-              <div class="text-[10px] text-slate-400 mt-1 truncate" :title="b.tiersText">
+              <div class="text-[10px] text-slate-400 mt-0.5 truncate" :title="b.tiersText">
                 {{ b.tiersText }}
               </div>
             </div>
@@ -511,41 +757,13 @@ async function recallMarch(march: any) {
         </div>
       </section>
 
-      <!-- Section 2: Auto-Gather Automation Settings -->
-      <section class="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 p-4 space-y-3.5 shadow-xs">
-        <div class="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-900/40 pb-2.5">
-          <div class="flex items-center gap-2">
-            <span class="text-base">⚙️</span>
-            <div>
-              <h3 class="text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                Auto-Gather Automation
-              </h3>
-              <p class="text-[11px] text-emerald-700 dark:text-emerald-300">
-                Automatically search and dispatch squads when marches return to outpost
-              </p>
-            </div>
-          </div>
-
-          <label class="flex items-center gap-2 cursor-pointer font-bold text-emerald-800 dark:text-emerald-200">
-            <input
-              type="checkbox"
-              :checked="autoSettings.enabled"
-              class="size-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-              @change="toggleAutoGather"
-            />
-            <span>{{ autoSettings.enabled ? 'ACTIVE' : 'PAUSED' }}</span>
-          </label>
-        </div>
-
-        <label class="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-100">
-          <input v-model="autoSettings.smartEnabled" type="checkbox" @change="saveAutoSettings" />
-          Smart gathering · daily resource priorities and activity coordination
-        </label>
-        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-600 dark:text-slate-400" role="status">
-          {{ smartStatus || 'Waiting for current game data' }}
-        </p>
-        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Smart gathering automatically prioritizes daily resource bonuses and coordinates march slots.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <!-- Section 2: Smart Auto-Gather Settings (shown only when Auto is active) -->
+      <section
+        v-if="autoSettings.enabled"
+        id="gather-auto-section"
+        class="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 p-3 space-y-2.5 shadow-xs"
+      >
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <label class="block font-medium text-slate-700 dark:text-slate-300">
             Mine Target Type
             <select
@@ -553,7 +771,7 @@ async function recallMarch(march: any) {
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
-              <option value="rotate">{{ autoSettings.smartEnabled ? 'Daily priorities (Food → Iron → Stone → Wood)' : 'Auto Rotate (Food → Wood → Stone → Iron)' }}</option>
+              <option value="rotate">Daily priorities (Food → Iron → Stone → Wood)</option>
               <option value="food">🍞 Food Only</option>
               <option value="wood">🌲 Wood Only</option>
               <option value="stone">◆ Stone Only</option>
@@ -561,15 +779,15 @@ async function recallMarch(march: any) {
             </select>
           </label>
 
-          <!-- Mine Level (1 to 10) -->
+          <!-- Mine Level (1 to 10 + Nearest) -->
           <label class="block font-medium text-slate-700 dark:text-slate-300">
-            Preferred Mine Level (Max 10)
+            Preferred Mine Level
             <select
-              v-model.number="autoSettings.mineLevel"
+              v-model="autoSettings.mineLevel"
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
-              <option v-if="autoSettings.smartEnabled" value="nearest">Nearest · estimated &gt;1h</option>
+              <option value="nearest">Nearest · estimated &gt;1h</option>
               <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
                 Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Highest Yield)' : '' }}
               </option>
@@ -587,118 +805,77 @@ async function recallMarch(march: any) {
                 {{ m }} squad{{ m > 1 ? 's' : '' }}{{ m === accountMaxMarches ? ' (Account Max)' : '' }}
               </option>
             </select>
-            <span class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-normal">
-              Account limit: {{ accountMaxMarches }} squad{{ accountMaxMarches > 1 ? 's' : '' }}
-            </span>
           </label>
         </div>
 
-        <!-- Mine Defense & Intercept Controls -->
-        <div class="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2.5">
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200">
-              <input
-                v-model="autoSettings.defenseRecallEnabled"
-                type="checkbox"
-                @change="saveAutoSettings"
-              />
-              🛡️ Mine Defense · Return when under attack
-            </label>
-          </div>
-
-          <div v-if="autoSettings.defenseRecallEnabled" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Infirmary Threshold (%)
-              <input
-                v-model.number="autoSettings.defenseInfirmaryThreshold"
-                type="number"
-                min="1"
-                max="100"
-                class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-                @change="saveAutoSettings"
-              />
-            </label>
-
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Intercept Team (Optional)
-              <select
-                v-model="autoSettings.interceptTeamId"
-                class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-                @change="saveAutoSettings"
-              >
-                <option value="">None (Recall only)</option>
-                <option v-for="team in teams" :key="team.id" :value="team.id">
-                  {{ team.label }}
-                </option>
-              </select>
-            </label>
-          </div>
-
-          <p v-if="autoSettings.defenseRecallEnabled" class="text-[11px] text-slate-500 dark:text-slate-400">
-            <span v-if="autoSettings.interceptTeamId">
-              ⚡ <strong>Intercept Priority:</strong> Triggers immediately on attack signal (prioritized above auto join & gathering). Clears nearest march slot if full, swaps gatherer with intercept combat team if travel time permits, and switches back after battle or retreat. If wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}%, gatherers are recalled in final 10s without intercepting.
-            </span>
-            <span v-else>
-              🛡️ <strong>Defensive Recall (final 10s):</strong> Recalls threatened gathering squads to base when wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity.
-            </span>
-          </p>
-        </div>
-
-        <div class="rounded-lg bg-white/70 dark:bg-slate-900/60 p-2.5 text-[11px] text-slate-600 dark:text-slate-400">
-          <template v-if="autoSettings.enabled">
-            <span>Dispatches automatically on game load or when marches return to base if active marches &lt; {{ autoSettings.maxMarches }}. </span>
-            <span v-if="autoSettings.smartEnabled">{{ smartStatus }}</span>
-            <span v-else-if="autoSettings.mineType === 'rotate'">
-              Cycling: Next target is <strong>{{ (nextTargetType || 'gold').toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
-            </span>
-            <span v-else>
-              Target: <strong>{{ autoSettings.mineType.toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
-            </span>
+        <div
+          class="rounded-lg px-2.5 py-1.5 text-[11px]"
+          role="status"
+          :class="
+            waitingForTroopsReason
+              ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              : 'bg-white/70 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400'
+          "
+        >
+          <template v-if="waitingForTroopsReason">
+            ⏳ {{ waitingForTroopsReason }}
+          </template>
+          <template v-else-if="smartStatus">
+            {{ smartStatus }}
+          </template>
+          <template v-else-if="autoSettings.mineType === 'rotate'">
+            Daily priority rotation · Next target: <strong>{{ (nextTargetType || 'food').toUpperCase() }}</strong>.
           </template>
           <template v-else>
-            Auto-gathering is currently paused. Check the box above to automatically search and dispatch squads.
+            Target: <strong>{{ autoSettings.mineType.toUpperCase() }}</strong> (Lv.{{ autoSettings.mineLevel }}).
           </template>
         </div>
       </section>
 
-      <!-- Section 3: Manual Search & Dispatch -->
-      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span>🔍</span> Manual Mine Search & Dispatch
-        </h3>
+      <!-- Section 3: Manual Search & Dispatch (shown only when Auto is paused) -->
+      <section
+        v-else
+        id="gather-manual-section"
+        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2.5 shadow-xs"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <span>🔍</span> Manual Mine Search &amp; Dispatch
+          </h3>
 
-        <div class="flex flex-wrap items-center gap-2.5">
-          <select
-            v-model="manualMineType"
-            class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-          >
-            <option value="food">🌾 Food Farm</option>
-            <option value="wood">🪵 Lumber Mill</option>
-            <option value="stone">🪨 Stone Quarry</option>
-            <option value="iron">⚙️ Iron Mine</option>
-          </select>
+          <div class="flex flex-wrap items-center gap-2">
+            <select
+              v-model="manualMineType"
+              class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            >
+              <option value="food">🌾 Food Farm</option>
+              <option value="wood">🪵 Lumber Mill</option>
+              <option value="stone">🪨 Stone Quarry</option>
+              <option value="iron">⚙️ Iron Mine</option>
+            </select>
 
-          <!-- Mine Level 1 to 10 -->
-          <select
-            v-model.number="manualMineLevel"
-            class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-          >
-            <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
-              Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Max)' : '' }}
-            </option>
-          </select>
+            <!-- Mine Level 1 to 10 -->
+            <select
+              v-model.number="manualMineLevel"
+              class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            >
+              <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
+                Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Max)' : '' }}
+              </option>
+            </select>
 
-          <button
-            type="button"
-            class="cursor-pointer px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
-            :disabled="isSearching"
-            @click="handleManualSearch"
-          >
-            <span>{{ isSearching ? 'Searching...' : 'Find Full Mines' }}</span>
-          </button>
+            <button
+              type="button"
+              class="cursor-pointer px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              :disabled="isSearching"
+              @click="handleManualSearch"
+            >
+              <span>{{ isSearching ? 'Searching...' : 'Find Full Mines' }}</span>
+            </button>
+          </div>
         </div>
 
-        <div v-if="searchStatus" class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px]">
+        <div v-if="searchStatus" class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px]">
           {{ searchStatus }}
         </div>
 
@@ -712,7 +889,7 @@ async function recallMarch(march: any) {
             <div
               v-for="(mine, idx) in foundMines"
               :key="mine.mineId || idx"
-              class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
+              class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
             >
               <div>
                 <div class="font-bold text-slate-800 dark:text-slate-200">
@@ -743,25 +920,85 @@ async function recallMarch(march: any) {
         </div>
       </section>
 
-      <!-- Section 4: Active Gathering Marches -->
-      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-          <span class="flex items-center gap-2"><span>⛏️</span> Active Gathering Marches</span>
+      <!-- Section 4: Independent Mine Defense -->
+      <section
+        id="gather-defense-section"
+        class="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/40 dark:bg-amber-950/20 p-3 space-y-2 shadow-xs"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label class="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200 cursor-pointer">
+            <input
+              id="gather-defense-toggle"
+              v-model="autoSettings.defenseRecallEnabled"
+              type="checkbox"
+              class="size-3.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+              @change="saveDefenseSettings"
+            />
+            <span>🛡️ Mine Defense · Return or Intercept Under Attack</span>
+          </label>
+          <span class="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
+            Independent
+          </span>
+        </div>
+
+        <div v-if="autoSettings.defenseRecallEnabled" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Infirmary Threshold (%)
+            <input
+              v-model.number="autoSettings.defenseInfirmaryThreshold"
+              type="number"
+              min="1"
+              max="100"
+              class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+              @change="saveDefenseSettings"
+            />
+          </label>
+
+          <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Intercept Team (Optional)
+            <select
+              v-model="autoSettings.interceptTeamId"
+              class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+              @change="saveDefenseSettings"
+            >
+              <option value="">None (Recall only)</option>
+              <option v-for="team in teams" :key="team.id" :value="team.id">
+                {{ team.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <p v-if="autoSettings.defenseRecallEnabled" class="text-[11px] text-slate-500 dark:text-slate-400">
+          <span v-if="defenseStatus" class="font-medium text-amber-800 dark:text-amber-300">{{ defenseStatus }} · </span>
+          <span v-if="autoSettings.interceptTeamId">
+            Swaps threatened gatherer with intercept team immediately; recalls in final 10s if wounded exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}%.
+          </span>
+          <span v-else>
+            Recalls threatened gathering squads in final 10s when wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity.
+          </span>
+        </p>
+      </section>
+
+      <!-- Section 5: Active Gathering Marches -->
+      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2.5 shadow-xs">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span>⛏️</span> Active Gathering Marches</span>
           <span class="text-xs font-normal text-slate-400">{{ gatheringMarches.length }} active</span>
         </h3>
 
         <div v-if="gatheringOverall" class="text-xs text-teal-700 dark:text-teal-300 flex items-center justify-between">
           <span>Overall collection progress</span><span class="font-mono font-semibold">{{ gatheringOverall.progress }}%</span>
         </div>
-        <div v-if="gatheringMarches.length === 0" class="p-4 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
+        <div v-if="gatheringMarches.length === 0" class="p-3 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
           No gathering marches currently active.
         </div>
 
-        <div v-else class="space-y-2">
+        <div v-else class="space-y-1.5">
           <div
             v-for="march in gatheringMarches"
             :key="march.id"
-            class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
+            class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
           >
             <div class="flex items-center gap-2">
               <span class="text-base">{{ march.progress?.type && RESOURCE_THEMES[march.progress.type]?.icon ? RESOURCE_THEMES[march.progress.type].icon : '⛏️' }}</span>

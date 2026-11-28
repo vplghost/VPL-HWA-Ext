@@ -1,5 +1,11 @@
 import type { BasicResourceType } from './march.ts';
 
+export interface GatherTroopReserve {
+  infantry: number;
+  spearmen: number;
+  marksmen: number;
+}
+
 export interface AutoGatherSettings {
   enabled: boolean;
   smartEnabled: boolean;
@@ -9,12 +15,17 @@ export interface AutoGatherSettings {
   lastAutoMineType?: BasicResourceType | string | null;
   selectedTeam?: string;
   optimizeTeam?: boolean;
+  defenseRecallEnabled?: boolean;
+  defenseInfirmaryThreshold?: number;
+  interceptTeamId?: string;
+  reserveTroops?: GatherTroopReserve;
   [key: string]: any;
 }
 
 export interface AutoGatherPlanResult {
   action: 'idle' | 'wait' | 'refresh' | 'recall' | 'search' | 'gather' | 'target' | 'probe';
   reason?: string;
+  waitForTroops?: boolean;
   calls?: any[];
   call?: any;
   mineType?: string;
@@ -79,5 +90,6 @@ export interface SmartGatherState {
   reservation?: any;
   readTimeout?: { key: string; attempts: number };
   marchLimitBackoffUntil?: number;
+  waitingForTroops?: { since: number; reason: string } | null;
   [key: string]: any;
 }

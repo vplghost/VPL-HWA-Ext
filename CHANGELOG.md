@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.404 — 2026-11-28
+
+### Changed
+
+- **Gathering Dialog UI Overhaul, Independent Mine Defense, Troop Reserve & Zero-Troop Event Wait (`GatheringModal.vue`, `autoGather.ts`, `backgroundRuntime.ts`, `useActiveAutomations.ts`, `tests/gathering-modal-and-troop-wait.test.mjs`)**:
+  - Decoupled Mine Defense from Auto-Gather (`tickMineDefense`, independent `hwa-mine-defense` alarm & `mine-defense-update`/`mine-defense-stop` messages, standalone `#gather-defense-section` card) so gathering squads remain protected even when Auto-Gather is off.
+  - Merged `Smart Gathering` and `ACTIVE` into a single `#gather-auto-toggle` in the dialog header (`#header-actions`) alongside `#header-status` pills (`#gather-header-marches-pill`, `#gather-header-status-pill`, `#gather-header-defense-pill`), and made `#gather-auto-section` and `#gather-manual-section` mutually exclusive.
+  - Added per-type highest-tier troop reservation (`applyTroopReserve`, `reserveTroops: { infantry, spearmen, marksmen }`) with a collapsed-by-default icon toggle (`#gather-reserve-toggle-btn` / `#gather-reserve-panel`) to keep combat troops in city for Auto-Join and Rallies.
+  - Added an early zero-troop gate and `waitingForTroops` latch in `planAutoGather` / `evaluateSmartGather` to stop `searchMine`/`getMineById` spam when no surplus troops remain, waking automatically on `completeTraining`, `completeHealing`, march return, or replenished `getUnitSummary`.
+
 ## 0.11.403 — 2026-11-28
 
 ### Changed

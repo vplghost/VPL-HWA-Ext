@@ -1,6 +1,7 @@
 import type {
   AutoGatherSettings,
   AutoGatherPlanResult,
+  GatherTroopReserve,
 } from '../../types/game/gatherQueue.ts';
 import type { BasicResourceType } from '../../types/game/march.ts';
 import * as expData from '../../utils/experimentalData.ts';
@@ -71,6 +72,82 @@ export function safeList<T = any>(raw: any): T[] {
   return [];
 }
 
+export function normalizeTroopReserve(raw?: any): GatherTroopReserve {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const toNonNegInt = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.min(10_000_000, Math.floor(n)) : 0;
+  };
+  return {
+    infantry: toNonNegInt(src.infantry),
+    spearmen: toNonNegInt(src.spearmen),
+    marksmen: toNonNegInt(src.marksmen),
+  };
+}
+
+export function hasTroopReserve(reserve?: GatherTroopReserve | null): boolean {
+  if (!reserve) return false;
+  return (reserve.infantry || 0) > 0 || (reserve.spearmen || 0) > 0 || (reserve.marksmen || 0) > 0;
+}
+
+export function countAvailableTroops(unitSummary: any): number {
+  const rows = Array.isArray(unitSummary?.available)
+    ? unitSummary.available
+    : safeList(unitSummary?.available ?? unitSummary?.units);
+  let total = 0;
+  for (const item of rows) {
+    const count = Number(item?.count);
+    if (Number.isFinite(count) && count > 0) total += Math.floor(count);
+  }
+  return total;
+}
+
+/**
+ * Deducts reserved troop counts per type (infantry=0, spearmen=1, marksmen=2),
+ * preserving the HIGHEST tiers first for combat (Auto-Join / Rallies).
+ * Never mutates the original unitSummary.
+ */
+export function applyTroopReserve(unitSummary: any, reserve?: GatherTroopReserve | null): any {
+  if (!unitSummary || typeof unitSummary !== 'object') return unitSummary;
+  const norm = normalizeTroopReserve(reserve);
+  if (!hasTroopReserve(norm)) return unitSummary;
+
+  const rawRows = Array.isArray(unitSummary.available)
+    ? unitSummary.available
+    : safeList(unitSummary.available ?? unitSummary.units);
+  const cloned = rawRows.map((item: any) => ({ ...item }));
+
+  const reserveByType: [number, number, number] = [norm.infantry, norm.spearmen, norm.marksmen];
+  for (let type = 0; type < 3; type++) {
+    let toReserve = reserveByType[type] || 0;
+    if (toReserve <= 0) continue;
+
+    const matching = cloned
+      .filter((item: any) => {
+        const id = Number(item?.unitId);
+        return Number.isInteger(id) && id > 0 && Math.floor((id - 1) / 10) === type && Number(item?.count) > 0;
+      })
+      .sort((a: any, b: any) => {
+        const tierA = ((Number(a.unitId) - 1) % 10) + 1;
+        const tierB = ((Number(b.unitId) - 1) % 10) + 1;
+        return tierB - tierA;
+      });
+
+    for (const item of matching) {
+      if (toReserve <= 0) break;
+      const available = Math.max(0, Math.floor(Number(item.count) || 0));
+      const hold = Math.min(available, toReserve);
+      item.count = available - hold;
+      toReserve -= hold;
+    }
+  }
+
+  return {
+    ...unitSummary,
+    available: cloned.filter((item: any) => Number(item?.count) > 0),
+  };
+}
+
 export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGatherSettings {
   const raw = settings && typeof settings === 'object' ? settings : {};
   const baseMax =
@@ -96,6 +173,7 @@ export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGat
       : null;
   const selectedTeam = typeof raw.selectedTeam === 'string' ? raw.selectedTeam : undefined;
   const optimizeTeam = raw.optimizeTeam === true || raw.selectedTeam === 'optimized';
+  const reserveTroops = raw.reserveTroops ? normalizeTroopReserve(raw.reserveTroops) : undefined;
 
   return {
     enabled: raw.enabled === true,
@@ -106,6 +184,10 @@ export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGat
     lastAutoMineType,
     ...(selectedTeam ? { selectedTeam } : {}),
     ...(optimizeTeam ? { optimizeTeam: true } : {}),
+    ...(typeof raw.defenseRecallEnabled === 'boolean' ? { defenseRecallEnabled: raw.defenseRecallEnabled } : {}),
+    ...(Number.isFinite(raw.defenseInfirmaryThreshold) ? { defenseInfirmaryThreshold: Number(raw.defenseInfirmaryThreshold) } : {}),
+    ...(typeof raw.interceptTeamId === 'string' ? { interceptTeamId: raw.interceptTeamId } : {}),
+    ...(reserveTroops ? { reserveTroops } : {}),
   };
 }
 
@@ -207,6 +289,55 @@ export function isMarchReturnRecord(
   return false;
 }
 
+export function isTroopAvailabilityEvent(
+  record: any,
+  prevCache: any,
+  currentCache: any,
+  now: number = Date.now(),
+  reserveTroops?: GatherTroopReserve | null
+): boolean {
+  if (isMarchReturnRecord(record, prevCache, currentCache, now)) return true;
+
+  if (
+    record?.transport === 'websocket' &&
+    record.direction === 'received' &&
+    record.encoding === 'utf8'
+  ) {
+    try {
+      const type = JSON.parse(record.payload)?.result?.type;
+      if (type === 'returnFromMineCompleted' || type === 'gatheringMineCompleted') {
+        return true;
+      }
+    } catch (_) {}
+  }
+
+  if (record?.requestBody) {
+    const calls = parseCalls(record.requestBody);
+    if (
+      calls.some(
+        (c: any) =>
+          (c?.name === 'completeTraining' || c?.name === 'completeHealing') &&
+          (!c.feature || c.feature === 'unit')
+      )
+    ) {
+      return true;
+    }
+  }
+
+  const curUnitEntry = currentCache?.['getUnitSummary:unit'];
+  const prevUnitEntry = prevCache?.['getUnitSummary:unit'];
+  if (
+    curUnitEntry?.data &&
+    curUnitEntry.updatedAt &&
+    curUnitEntry.updatedAt !== prevUnitEntry?.updatedAt
+  ) {
+    const effective = applyTroopReserve(curUnitEntry.data, reserveTroops);
+    if (countAvailableTroops(effective) > 0) return true;
+  }
+
+  return false;
+}
+
 export function planAutoGather(cache: any, stored: any, now: number = Date.now()): AutoGatherPlanResult {
   if (stored?.popupRpcEnabled !== true) {
     return { action: 'idle', reason: 'Popup RPC disabled' };
@@ -266,6 +397,31 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
       reason: 'Server march limit reached (MarchLimitExceeded); waiting for squad return',
     };
   }
+
+  const { reservedHeroIds, reservedMarchSlots } = resolveGatherLocks(cache, stored, now);
+  const effectiveMaxMarches = Math.max(0, settings.maxMarches - reservedMarchSlots);
+  const marches = safeList(cache?.marchStatus?.data?.marches);
+  const activeCount = smart ? marches.length : countActiveMarches(marches, now);
+
+  const rawSummary = cache?.['getUnitSummary:unit']?.data;
+  const effectiveSummary = rawSummary ? applyTroopReserve(rawSummary, settings.reserveTroops) : null;
+  const unitSummaryFresh = !smart || smart.fresh(cache?.['getUnitSummary:unit'], now);
+  if (
+    effectiveSummary &&
+    unitSummaryFresh &&
+    activeCount < effectiveMaxMarches &&
+    countAvailableTroops(effectiveSummary) <= 0
+  ) {
+    const hasReserve = hasTroopReserve(settings.reserveTroops);
+    return {
+      action: 'wait',
+      waitForTroops: true,
+      reason: hasReserve
+        ? 'No surplus troops above reserve; waiting for training, healing, or returning march'
+        : 'No troops available; waiting for training, healing, or returning march',
+    };
+  }
+
   const resume = smart?.resumePlan(cache, stored?.smartGatherState, now);
   if (resume && resume.action !== 'target') return snapshotRefresh || resume;
 
@@ -300,10 +456,6 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
     }
   }
 
-  const { reservedHeroIds, reservedMarchSlots } = resolveGatherLocks(cache, stored, now);
-  const effectiveMaxMarches = Math.max(0, settings.maxMarches - reservedMarchSlots);
-  const marches = safeList(cache?.marchStatus?.data?.marches);
-  const activeCount = smart ? marches.length : countActiveMarches(marches, now);
   if (activeCount >= effectiveMaxMarches) {
     if (snapshotRefresh && marches.some((m: any) => !Number.isFinite(m.endsAt) || now >= m.endsAt)) {
       return snapshotRefresh;
@@ -335,8 +487,8 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
   if (!data) return { action: 'wait', reason: 'Experimental data helper unavailable' };
 
   const heroes = cache?.heroGetAll?.data || {};
-  const summary = cache?.['getUnitSummary:unit']?.data;
-  if (!summary) return { action: 'wait', reason: 'Unit summary unavailable' };
+  const summary = rawSummary;
+  if (!summary || !effectiveSummary) return { action: 'wait', reason: 'Unit summary unavailable' };
 
   const rawAvailableHeroIds = data.availableHeroIds(heroes, summary, marches);
   const availableHeroIds = reservedHeroIds.size > 0
@@ -405,7 +557,7 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
       const opt = data.buildOptimizedGatheringTeam({
         heroes,
         availableHeroIds,
-        unitSummary: summary,
+        unitSummary: effectiveSummary,
         mineType: targetMineType,
         mineLevel: targetMineLevel,
         resourcesAmount: remainingAmount,
@@ -415,7 +567,11 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
         accountId: myId,
       });
       if (!opt.heroIds.length || !opt.allocatedTroops.length) {
-        return { action: 'wait', reason: 'Could not allocate optimized gathering team' };
+        return {
+          action: 'wait',
+          waitForTroops: !opt.allocatedTroops.length,
+          reason: 'Could not allocate optimized gathering team',
+        };
       }
       squad = data.buildSquad(opt.heroIds, opt.allocatedTroops);
     } else {
@@ -432,12 +588,14 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
         data.normalizeCapacitySettings(stored?.troopCapacitySettings),
         myId
       ).total;
-      const availSummary = Array.isArray(summary?.available) ? summary : { available: safeList(summary?.units) };
+      const availSummary = Array.isArray(effectiveSummary?.available)
+        ? effectiveSummary
+        : { available: safeList(effectiveSummary?.units) };
       const troops = data.allocateTroops(availSummary, capacity);
       squad = data.buildSquad(heroIds, troops);
     }
 
-    if (!squad) return { action: 'wait', reason: 'Could not allocate squad troops' };
+    if (!squad) return { action: 'wait', waitForTroops: true, reason: 'Could not allocate squad troops' };
 
     const gatherCall = data.buildGatherCall(mapId, selectedMine.mineId, squad);
     if (!gatherCall) return { action: 'wait', reason: 'Failed to build gather call' };
@@ -467,11 +625,16 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
 export const autoGatherService = {
   BASIC_MINE_TYPES,
   safeList,
+  normalizeTroopReserve,
+  hasTroopReserve,
+  countAvailableTroops,
+  applyTroopReserve,
   normalizeAutoGatherSettings,
   resolveNextMineType,
   countActiveMarches,
   isGameLoadRecord,
   isMarchReturnRecord,
+  isTroopAvailabilityEvent,
   planAutoGather,
 };
 
