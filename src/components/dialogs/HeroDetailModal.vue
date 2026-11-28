@@ -982,10 +982,7 @@ const skinUpgradeableCount = computed(() =>
 );
 
 const glyphAndSparkUpgradeableCount = computed(() => {
-  let count = 0;
-  if (ownedRuneStones.value > 0) {
-    count += heroGlyphsAndTalisman.value.glyphs.filter((g) => !g.isMax).length;
-  }
+  let count = heroGlyphsAndTalisman.value.glyphs.filter((g) => g.canUpgrade1).length;
   if (heroSparkStatus.value.canUpgrade) {
     count += 1;
   }
@@ -1028,12 +1025,14 @@ async function handleLevelUpHero(mode: 'single' | 'max') {
 }
 
 async function upgradeGlyphTier(tier: number, steps = 1) {
-  if (!activeHero.value || upgradingGlyphTier.value !== null || ownedRuneStones.value <= 0) return;
+  if (!activeHero.value || upgradingGlyphTier.value !== null) return;
   const numId = Number(activeHero.value.id);
   const glyph = heroGlyphsAndTalisman.value.glyphs.find((g) => g.tier === tier);
-  if (!glyph || glyph.isMax) return;
+  if (!glyph || glyph.isMax || glyph.maxAffordableSteps < 1) return;
 
-  const actualSteps = Math.max(1, Math.min(steps, glyph.maxLevel - glyph.level));
+  const requestedSteps = Math.max(1, Math.min(steps, glyph.maxLevel - glyph.level));
+  if (glyph.maxAffordableSteps < requestedSteps) return;
+  const actualSteps = requestedSteps;
   upgradingGlyphTier.value = tier;
   try {
     const calls: Array<{ name: string; args?: any; feature?: string }> = [];
@@ -2286,15 +2285,24 @@ function handleSoulStoneFarm() {
             </div>
 
             <!-- 5 Glyphs Grid -->
-            <div v-if="heroGlyphsAndTalisman.glyphs.length > 0" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+            <div v-if="heroGlyphsAndTalisman.glyphs.length > 0" id="hero-glyphs-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
               <div
                 v-for="g in heroGlyphsAndTalisman.glyphs"
                 :key="'glyph-' + g.tier"
                 class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 flex flex-col justify-between gap-1.5"
+                :title="g.isMax ? `${g.statLabel}: +${formatNumber(g.currentValue)} (MAX)` : `${g.statLabel}: +${formatNumber(g.currentValue)} → +${formatNumber(g.nextValue)} (Next: ${formatNumber(g.cost1.runeStones)} Rune Stones)`"
               >
-                <div class="flex items-center justify-between text-3xs text-slate-500 dark:text-slate-400">
-                  <span class="font-semibold">Glyph {{ g.slot }}</span>
-                  <span class="font-bold text-slate-800 dark:text-slate-100">Lv. {{ g.level }}/{{ g.maxLevel }}</span>
+                <div class="flex items-center justify-between gap-1 text-3xs">
+                  <span class="font-semibold text-slate-700 dark:text-slate-200 truncate" :title="g.statLabel">
+                    {{ g.statIcon }} {{ g.statLabel }}
+                  </span>
+                  <span class="font-bold text-slate-800 dark:text-slate-100 shrink-0 tabular-nums">{{ g.level }}/{{ g.maxLevel }}</span>
+                </div>
+                <div class="flex items-center justify-between text-[10px] font-mono">
+                  <span class="font-semibold text-sky-700 dark:text-sky-300">+{{ formatNumber(g.currentValue) }}</span>
+                  <span v-if="!g.isMax && g.cost1.runeStones > 0" class="text-slate-400" :title="`Next level cost: ${formatNumber(g.cost1.runeStones)} Rune Stones`">
+                    {{ formatNumber(g.cost1.runeStones) }} 🪨
+                  </span>
                 </div>
                 <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div
@@ -2310,22 +2318,23 @@ function handleSoulStoneFarm() {
                   <button
                     :id="`btn-glyph-upgrade-${g.tier}`"
                     type="button"
-                    :disabled="upgradingGlyphTier !== null || ownedRuneStones <= 0"
+                    :disabled="upgradingGlyphTier !== null || !g.canUpgrade1"
                     class="cursor-pointer h-6 rounded text-3xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                    :title="`Upgrade Glyph ${g.slot} +1 using Rune Stones`"
+                    :title="g.canUpgrade1 ? `Upgrade ${g.statLabel} +1 (${formatNumber(g.cost1.runeStones)} Rune Stones)` : `Need ${formatNumber(g.cost1.runeStones)} Rune Stones (have ${formatNumber(ownedRuneStones)})`"
                     @click="upgradeGlyphTier(g.tier, 1)"
                   >
                     <span v-if="upgradingGlyphTier === g.tier" class="animate-spin inline-block">↻</span>
                     <span v-else>+1</span>
                   </button>
                   <button
+                    :id="`btn-glyph-upgrade5-${g.tier}`"
                     type="button"
-                    :disabled="upgradingGlyphTier !== null || ownedRuneStones <= 0"
+                    :disabled="upgradingGlyphTier !== null || !g.canUpgrade5"
                     class="cursor-pointer h-6 rounded text-3xs font-bold bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                    :title="`Upgrade Glyph ${g.slot} +5 using Rune Stones`"
-                    @click="upgradeGlyphTier(g.tier, 5)"
+                    :title="g.steps5Count < 2 ? 'Less than 2 levels remaining' : (g.canUpgrade5 ? `Upgrade ${g.statLabel} +${g.steps5Count} (${formatNumber(g.cost5.runeStones)} Rune Stones)` : `Need ${formatNumber(g.cost5.runeStones)} Rune Stones for +${g.steps5Count} (have ${formatNumber(ownedRuneStones)})`)"
+                    @click="upgradeGlyphTier(g.tier, g.steps5Count)"
                   >
-                    +5
+                    +{{ g.steps5Count || 5 }}
                   </button>
                 </div>
               </div>

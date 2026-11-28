@@ -8,6 +8,8 @@
  * - Glyphs & Talisman summary extraction
  */
 
+import { HERO_GLYPH_TYPES, GLYPH_TYPE_META, GLYPH_LEVEL_COSTS } from '../data/glyphData.ts';
+
 export const HERO_EVOLVE_GOLD_COST: Record<number, number> = {
   1: 20_000,
   2: 50_000,
@@ -252,12 +254,79 @@ export function getArtifactEvolveStatus(
   };
 }
 
+export interface GlyphUpgradeCost {
+  steps: number;
+  runeStones: number;
+  runeSpheres: number;
+  requiredHeroLevel: number;
+}
+
 export interface HeroGlyphItem {
   tier: number;
   slot: number;
+  runeTypeId: number | null;
+  statLabel: string;
+  statAbbr: string;
+  statIcon: string;
+  currentValue: number;
+  nextValue: number;
   level: number;
   maxLevel: number;
   isMax: boolean;
+  cost1: GlyphUpgradeCost;
+  cost5: GlyphUpgradeCost;
+  steps5Count: number;
+  maxAffordableSteps: number;
+  canUpgrade1: boolean;
+  canUpgrade5: boolean;
+}
+
+export function computeGlyphUpgradeCost(
+  currentLevel: number,
+  steps: number,
+  maxLevel = 40
+): GlyphUpgradeCost {
+  const start = Math.max(0, Math.floor(Number(currentLevel) || 0));
+  const cap = Math.max(start, Math.floor(Number(maxLevel) || 40));
+  const actualSteps = Math.max(0, Math.min(Math.floor(Number(steps) || 0), cap - start));
+  let runeStones = 0;
+  let runeSpheres = 0;
+  let requiredHeroLevel = 1;
+  for (let i = 1; i <= actualSteps; i++) {
+    const lv = start + i;
+    const entry = GLYPH_LEVEL_COSTS[lv];
+    if (entry) {
+      runeStones += entry.runeStones;
+      runeSpheres += entry.runeSpheres;
+      if (entry.heroLevel > requiredHeroLevel) requiredHeroLevel = entry.heroLevel;
+    }
+  }
+  return { steps: actualSteps, runeStones, runeSpheres, requiredHeroLevel };
+}
+
+export function computeMaxAffordableGlyphSteps(
+  currentLevel: number,
+  maxLevel: number,
+  ownedRuneStones: number,
+  ownedRuneSpheres = 0,
+  heroLevel?: number | null
+): number {
+  const start = Math.max(0, Math.floor(Number(currentLevel) || 0));
+  const cap = Math.max(start, Math.floor(Number(maxLevel) || 40));
+  let remStones = Math.max(0, Math.floor(Number(ownedRuneStones) || 0));
+  let remSpheres = Math.max(0, Math.floor(Number(ownedRuneSpheres) || 0));
+  const hLv = heroLevel != null && Number.isFinite(Number(heroLevel)) ? Number(heroLevel) : null;
+  let count = 0;
+  for (let lv = start + 1; lv <= cap; lv++) {
+    const entry = GLYPH_LEVEL_COSTS[lv];
+    if (!entry) break;
+    if (hLv !== null && hLv < entry.heroLevel) break;
+    if (remStones < entry.runeStones || remSpheres < entry.runeSpheres) break;
+    remStones -= entry.runeStones;
+    remSpheres -= entry.runeSpheres;
+    count++;
+  }
+  return count;
 }
 
 export interface HeroSparkStatus {
@@ -335,17 +404,68 @@ export function extractHeroGlyphsAndTalisman(hero: any, cache: Record<string, an
     }
   }
 
+  const numHeroId = Number(heroId);
+  const heroTypes = Number.isInteger(numHeroId) ? HERO_GLYPH_TYPES[numHeroId] : undefined;
+  const invCoins = cache?.inventoryGet?.data?.coin || {};
+  const ownedRuneStones = Math.max(
+    0,
+    Math.floor(
+      Number(
+        cache?.[`resource:coin:${HERO_RESOURCE_IDS.RUNE_STONE_COIN_ID}`]?.data?.amount ??
+        invCoins[HERO_RESOURCE_IDS.RUNE_STONE_COIN_ID] ??
+        0
+      ) || 0
+    )
+  );
+  const ownedRuneSpheres = Math.max(
+    0,
+    Math.floor(
+      Number(
+        cache?.[`resource:coin:${HERO_RESOURCE_IDS.RUNE_SPHERE_COIN_ID}`]?.data?.amount ??
+        invCoins[HERO_RESOURCE_IDS.RUNE_SPHERE_COIN_ID] ??
+        0
+      ) || 0
+    )
+  );
+  const heroLevel = Number(hero?.level);
+  const effectiveHeroLevel = Number.isFinite(heroLevel) && heroLevel > 0 ? heroLevel : null;
+
   const glyphs: HeroGlyphItem[] = [];
   if (matchedRuneEntry || tierLevels.size > 0) {
     for (let tier = 0; tier < 5; tier++) {
       const level = tierLevels.get(tier) ?? 0;
       const maxLevel = level > 40 ? 80 : 40;
+      const isMax = level >= maxLevel;
+      const runeTypeId = heroTypes?.[tier] ?? null;
+      const typeMeta = runeTypeId != null ? GLYPH_TYPE_META[runeTypeId] : undefined;
+      const currentValue = typeMeta?.values?.[Math.min(level, (typeMeta.values.length || 1) - 1)] ?? 0;
+      const nextValue = !isMax
+        ? (typeMeta?.values?.[Math.min(level + 1, (typeMeta.values.length || 1) - 1)] ?? currentValue)
+        : currentValue;
+      const steps5Count = isMax ? 0 : Math.min(5, maxLevel - level);
+      const cost1 = computeGlyphUpgradeCost(level, 1, maxLevel);
+      const cost5 = computeGlyphUpgradeCost(level, steps5Count, maxLevel);
+      const maxAffordableSteps = isMax
+        ? 0
+        : computeMaxAffordableGlyphSteps(level, maxLevel, ownedRuneStones, ownedRuneSpheres, effectiveHeroLevel);
       glyphs.push({
         tier,
         slot: tier + 1,
+        runeTypeId,
+        statLabel: typeMeta?.label || `Glyph ${tier + 1}`,
+        statAbbr: typeMeta?.abbr || `G${tier + 1}`,
+        statIcon: typeMeta?.icon || '✨',
+        currentValue,
+        nextValue,
         level,
         maxLevel,
-        isMax: level >= maxLevel,
+        isMax,
+        cost1,
+        cost5,
+        steps5Count,
+        maxAffordableSteps,
+        canUpgrade1: !isMax && maxAffordableSteps >= 1,
+        canUpgrade5: !isMax && steps5Count >= 2 && maxAffordableSteps >= steps5Count,
       });
     }
   }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.394 — 2026-11-28
+
+### Changed
+
+- **Hero Detail Dialog Real Glyph Stat Labels & Accurate Rune Stone Cost Gating (`glyphData.ts`, `generate-glyph-data.mjs`, `heroUpgradeService.ts`, `HeroDetailModal.vue`, `tests/hero-glyphs.test.mjs`)**:
+  - Generated static `src/data/glyphData.ts` from game splitlib protobufs (`117` heroes × 5 glyph types, `15` stat types × Lv.0..80 values, `80` level Rune Stone/Sphere costs).
+  - Replaced generic `"Glyph #"` labels in `HeroDetailModal.vue` with actual stat names, icons, current stat bonus, and next-level Rune Stone cost.
+  - Added `computeGlyphUpgradeCost()` and `computeMaxAffordableGlyphSteps()` in `heroUpgradeService.ts` so `+1` and `+5` buttons (and upgradeable count badges) are accurately gated by available Rune Stones/Spheres and remaining levels to max.
+
 ## 0.11.393 — 2026-11-28
 
 ### Added
