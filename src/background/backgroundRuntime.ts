@@ -61,6 +61,13 @@ import {
   normalizeEnergyAutoBurnSettings,
   planCampaignEnergyBurn,
 } from '../services/energyAutoBurnService.ts';
+import {
+  AUTO_EXPIRING_CLAIMS_ALARM_NAME,
+  EXPIRING_CLAIMS_ERROR_BACKOFF_MS,
+  collectExpiringClaimPlan,
+  normalizeExpiringClaimSettings,
+  pruneRecentlyClaimedMap,
+} from '../services/expiringClaimService.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
 import { recordPriorityAutoJoinDaily } from '../utils/activityStats.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
@@ -3118,6 +3125,151 @@ export async function runAutoEnergyBurn(manual = false, customChrome?: any) {
   };
 }
 
+export async function runAutoExpiringClaims(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'expiringClaimSettings',
+      'expiringClaimState',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+    ])) || {};
+  const now = Date.now();
+  const settings = normalizeExpiringClaimSettings(stored.expiringClaimSettings);
+  let state = stored.expiringClaimState ? structuredClone(stored.expiringClaimState) : {};
+
+  if (!settings.enabled) {
+    cr?.alarms?.clear?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME);
+    if (!manual) return { ok: false, error: 'Expiring claims collector is disabled.' };
+    state = { ...state, nextWakeAt: null, status: 'Disabled', updatedAt: now };
+    await cr?.storage?.local?.set({ expiringClaimState: state });
+    return { ok: true, disabled: true };
+  }
+
+  if (stored.popupRpcEnabled === false) {
+    state = { ...state, status: 'Paused: Popup RPC is disabled.', lastError: 'Popup RPC is disabled.', updatedAt: now };
+    await cr?.storage?.local?.set({ expiringClaimState: state });
+    return { ok: false, error: 'Popup RPC is disabled.' };
+  }
+
+  const recent = pruneRecentlyClaimedMap(state.recentlyClaimed, now);
+  const plan = collectExpiringClaimPlan(stored.rpcCache || {}, settings, now, {
+    recentlyClaimed: recent,
+    nextRetryAt: manual ? null : state.nextRetryAt,
+  });
+
+  if (plan.action === 'claim' && plan.calls.length > 0) {
+    const tab = await findActiveGameTab(cr);
+    if (!tab?.id) {
+      state = { ...state, status: 'No active game tab found. Retrying later.', updatedAt: now };
+      await cr?.storage?.local?.set({ expiringClaimState: state });
+      return { ok: false, error: 'No active game tab found.' };
+    }
+
+    const dispatch = rpcMessageForSettings(stored, plan.calls, false, { group: 'auto-expiring-claims' });
+    if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+    try {
+      const resp = await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+      const rpcErr = Array.isArray(resp?.results)
+        ? resp.results.map((r: any) => r?.error || r?.result?.response?.errorCode || r?.result?.response?.error).find(Boolean)
+        : null;
+      if (resp?.ok === false || rpcErr) {
+        const errMsg =
+          resp?.error || (typeof rpcErr === 'string' ? rpcErr : rpcErr?.description || JSON.stringify(rpcErr));
+        const nextRetryAt = now + EXPIRING_CLAIMS_ERROR_BACKOFF_MS;
+        cr?.alarms?.create?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME, { when: nextRetryAt });
+        state = {
+          ...state,
+          status: `Claim failed (retrying in 2m): ${errMsg}`,
+          lastError: errMsg,
+          nextRetryAt,
+          nextWakeAt: nextRetryAt,
+          lastRunAt: now,
+          updatedAt: now,
+        };
+        await cr?.storage?.local?.set({ expiringClaimState: state });
+        return { ok: false, error: errMsg, nextWakeAt: nextRetryAt };
+      }
+
+      for (const item of plan.dueItems) {
+        recent[item.dedupeKey] = now;
+      }
+      if (plan.nextWakeAt) {
+        cr?.alarms?.create?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME, { when: Math.max(now + 1500, plan.nextWakeAt) });
+      } else {
+        cr?.alarms?.clear?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME);
+      }
+
+      const summary = `Claimed ${plan.dueItems.length} expiring reward(s)`;
+      state = {
+        ...state,
+        status: `${summary} (${new Date(now).toLocaleTimeString()})${plan.nextWakeAt ? ` · next at ${new Date(plan.nextWakeAt).toLocaleTimeString()}` : ''}`,
+        lastAction: summary,
+        lastError: null,
+        nextRetryAt: null,
+        nextWakeAt: plan.nextWakeAt,
+        upcomingCount: plan.upcomingItems.length,
+        recentlyClaimed: recent,
+        lastRunAt: now,
+        updatedAt: now,
+      };
+      await cr?.storage?.local?.set({ expiringClaimState: state });
+      return { ok: true, claimed: plan.dueItems.length, calls: plan.calls, nextWakeAt: plan.nextWakeAt };
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      const nextRetryAt = now + EXPIRING_CLAIMS_ERROR_BACKOFF_MS;
+      cr?.alarms?.create?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME, { when: nextRetryAt });
+      state = {
+        ...state,
+        status: `Claim error (retrying in 2m): ${errMsg}`,
+        lastError: errMsg,
+        nextRetryAt,
+        nextWakeAt: nextRetryAt,
+        lastRunAt: now,
+        updatedAt: now,
+      };
+      await cr?.storage?.local?.set({ expiringClaimState: state });
+      return { ok: false, error: errMsg };
+    }
+  }
+
+  if (plan.nextWakeAt) {
+    const wakeAt = Math.max(now + 1500, plan.nextWakeAt);
+    cr?.alarms?.create?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME, { when: wakeAt });
+    state = {
+      ...state,
+      status:
+        plan.action === 'backoff'
+          ? `Backoff until ${new Date(wakeAt).toLocaleTimeString()}`
+          : `Watching ${plan.upcomingItems.length} reward(s) · next wake at ${new Date(wakeAt).toLocaleTimeString()}`,
+      nextWakeAt: wakeAt,
+      upcomingCount: plan.upcomingItems.length,
+      recentlyClaimed: recent,
+      ...(plan.action === 'backoff' ? {} : { lastError: null, nextRetryAt: null }),
+      lastRunAt: now,
+      updatedAt: now,
+    };
+  } else {
+    cr?.alarms?.clear?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME);
+    state = {
+      ...state,
+      status: `Idle at ${new Date(now).toLocaleTimeString()} (no ready expiring rewards)`,
+      nextWakeAt: null,
+      upcomingCount: 0,
+      recentlyClaimed: recent,
+      lastError: null,
+      nextRetryAt: null,
+      lastRunAt: now,
+      updatedAt: now,
+    };
+  }
+  await cr?.storage?.local?.set({ expiringClaimState: state });
+  return { ok: true, action: plan.action, upcoming: plan.upcomingItems.length, nextWakeAt: plan.nextWakeAt };
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -3905,6 +4057,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runAutoEnergyBurn(false, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === AUTO_EXPIRING_CLAIMS_ALARM_NAME) {
+      pending = pending.then(() => runAutoExpiringClaims(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
@@ -3982,6 +4138,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (area === 'local' && 'energyAutoBurnSettings' in changes && changes.energyAutoBurnSettings?.newValue?.enabled !== true) {
       cr.alarms?.clear?.(AUTO_ENERGY_BURN_ALARM_NAME);
+    }
+    if (area === 'local' && 'expiringClaimSettings' in changes && changes.expiringClaimSettings?.newValue?.enabled !== true) {
+      cr.alarms?.clear?.(AUTO_EXPIRING_CLAIMS_ALARM_NAME);
     }
     if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopTrainDispatch = null;
@@ -4118,6 +4277,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runAutoEnergyBurn(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'auto-expiring-claims-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runAutoExpiringClaims(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -5556,6 +5725,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     runHeroicChestVideoOpen: (manual?: boolean) => runHeroicChestVideoOpen(manual, cr),
     runAutoShopFavorites: (manual?: boolean) => runAutoShopFavorites(manual, cr),
     runAutoEnergyBurn: (manual?: boolean) => runAutoEnergyBurn(manual, cr),
+    runAutoExpiringClaims: (manual?: boolean) => runAutoExpiringClaims(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),

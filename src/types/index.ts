@@ -53,6 +53,30 @@ export interface EnergyAutoBurnState {
   updatedAt?: number;
 }
 
+export interface ExpiringClaimSettings {
+  enabled: boolean;
+  /** Claim when remaining time is <= leadMinutes (default 10, clamped 1..60) */
+  leadMinutes: number;
+  /** Timed quests with explicit endTime/availableUntil (e.g. 3x daily free Energy) */
+  includeTimedQuests: boolean;
+  /** Daily & 4X quests expiring at daily reset */
+  includeDailyResetQuests: boolean;
+  /** Special event quests & Battle Pass free rewards expiring at event end */
+  includeEventRewards: boolean;
+}
+
+export interface ExpiringClaimState {
+  status?: string;
+  lastAction?: string;
+  lastError?: string | null;
+  lastRunAt?: number;
+  nextWakeAt?: number | null;
+  nextRetryAt?: number | null;
+  upcomingCount?: number;
+  recentlyClaimed?: Record<string, number>;
+  updatedAt?: number;
+}
+
 export interface TroopUnitState {
   type: 0 | 1 | 2; // 0: Infantry, 1: Spearmen, 2: Marksmen
   label: string;

@@ -8,6 +8,7 @@ export type ActiveAutomationId =
   | 'train'
   | 'heal'
   | 'energy-burn'
+  | 'expiring-claims'
   | 'building'
   | 'research'
   | 'tower'
@@ -34,6 +35,8 @@ export const AUTOMATION_STORAGE_KEYS = [
   'autoHealState',
   'energyAutoBurnSettings',
   'energyAutoBurnState',
+  'expiringClaimSettings',
+  'expiringClaimState',
   'buildingQueue',
   'researchQueue',
   'towerRun',
@@ -143,6 +146,23 @@ export function computeActiveAutomations(stored: Record<string, any> | null | un
       storageDisableKey: {
         key: 'energyAutoBurnSettings',
         patch: { ...(stored.energyAutoBurnSettings || {}), enabled: false },
+      },
+    });
+  }
+
+  if (stored.expiringClaimSettings?.enabled === true) {
+    const statusText = stored.expiringClaimState?.lastError
+      ? 'Expiring Claims: Attention'
+      : 'Expiring Claims: Active';
+    items.push({
+      id: 'expiring-claims',
+      icon: '⏰',
+      label: statusText,
+      statusTone: stored.expiringClaimState?.lastError ? 'warning' : 'running',
+      modalName: 'shop',
+      storageDisableKey: {
+        key: 'expiringClaimSettings',
+        patch: { ...(stored.expiringClaimSettings || {}), enabled: false },
       },
     });
   }

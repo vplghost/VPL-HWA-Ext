@@ -12,6 +12,7 @@ import { useRealmResourcesAutomation } from '@/src/composables/useRealmResources
 import { useHeroicChestVideoAutomation } from '@/src/composables/useHeroicChestVideoAutomation';
 import { useShopFavoritesAutomation } from '@/src/composables/useShopFavoritesAutomation';
 import { useEnergyAutoBurn } from '@/src/composables/useEnergyAutoBurn';
+import { useExpiringClaimsAutomation } from '@/src/composables/useExpiringClaimsAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { applyTabPreset } from '@/src/utils/commandPalette';
@@ -339,6 +340,13 @@ const {
   save: saveEnergyAutoBurn,
   checkNow: checkEnergyAutoBurnNow,
 } = useEnergyAutoBurn();
+const {
+  settings: expiringClaimSettings,
+  checking: expiringClaimChecking,
+  status: expiringClaimStatus,
+  save: saveExpiringClaims,
+  checkNow: checkExpiringClaimsNow,
+} = useExpiringClaimsAutomation();
 
 const energyBurnFallbackText = computed({
   get: () => (energyBurnSettings.value.fallbackMissionIds || []).join(', '),
@@ -1274,6 +1282,53 @@ async function toggleRecording() {
             </button>
           </div>
           <p v-if="autoShopFavoritesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoShopFavoritesStatus }}</p>
+        </div>
+
+        <!-- 6. Auto-Claim Expiring Quests & Event Rewards -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1.5 md:col-span-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+              <input id="setting-auto-expiring-claims" v-model="expiringClaimSettings.enabled" type="checkbox" class="mt-0.5" @change="saveExpiringClaims" />
+              <span>Auto-claim expiring quests &amp; event rewards (e.g. 3× daily free Energy) before expiry</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <label for="setting-expiring-claims-lead-min" class="text-[11px] text-slate-500">Lead (min):</label>
+              <input
+                id="setting-expiring-claims-lead-min"
+                v-model.number="expiringClaimSettings.leadMinutes"
+                type="number"
+                min="1"
+                max="60"
+                class="w-14 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-800 dark:text-slate-200"
+                @change="saveExpiringClaims"
+              />
+              <button
+                v-if="expiringClaimSettings.enabled"
+                id="setting-expiring-claims-check-btn"
+                type="button"
+                :disabled="expiringClaimChecking"
+                class="cursor-pointer shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:text-slate-200 disabled:opacity-50"
+                @click="checkExpiringClaimsNow"
+              >
+                {{ expiringClaimChecking ? 'Checking...' : 'Check Now' }}
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 pl-5 text-[11px] text-slate-600 dark:text-slate-400">
+            <label class="inline-flex items-center gap-1 cursor-pointer">
+              <input id="setting-expiring-claims-timed" v-model="expiringClaimSettings.includeTimedQuests" type="checkbox" @change="saveExpiringClaims" />
+              <span>Timed Quests (3× Energy)</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer">
+              <input id="setting-expiring-claims-daily" v-model="expiringClaimSettings.includeDailyResetQuests" type="checkbox" @change="saveExpiringClaims" />
+              <span>Daily Reset</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer">
+              <input id="setting-expiring-claims-events" v-model="expiringClaimSettings.includeEventRewards" type="checkbox" @change="saveExpiringClaims" />
+              <span>Events &amp; Battle Pass</span>
+            </label>
+          </div>
+          <p v-if="expiringClaimStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ expiringClaimStatus }}</p>
         </div>
       </div>
     </section>

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.401 — 2026-11-28
+
+### Added
+
+- **Auto-Claim Expiring Quest & Event Rewards (`expiringClaimService.ts`, `useExpiringClaimsAutomation.ts`, `backgroundRuntime.ts`, `useActiveAutomations.ts`, `SettingsTab.vue`, `dataBackup.ts`, `tests/expiring-claims.test.mjs`)**:
+  - Added zero-polling `collectExpiringClaimPlan()` & single alarm `'hwa-auto-expiring-claims'` (`auto-expiring-claims-tick`) to auto-claim ready timed quests (e.g. 3× daily free 60-Energy quests), daily reset quests, event quests, and Battle Pass free rewards when remaining time is `<= leadMinutes` (default `10` min), with 0-Emerald safety, 5-minute deduplication, and 2-minute error backoff.
+  - Added `#setting-auto-expiring-claims` + `#setting-expiring-claims-lead-min` in `SettingsTab.vue`, `ActiveAutomationStrip` 1-click stop, and `expiringClaimSettings` backup support.
+
 ## 0.11.400 — 2026-11-28
 
 ### Added
