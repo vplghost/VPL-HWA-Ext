@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.396 — 2026-11-28
+
+### Fixed
+
+- **Shop Dialog Real Coin/Item Names & Dynamic Event Shop Naming (`shopService.ts`, `ShopModal.vue`, `tests/shop-service.test.mjs`)**:
+  - Switched `shopService.ts` to resolve all coin, gear, scroll, and consumable names through `getItemName(category, id)` instead of undefined top-level `nameData.*` keys (displaying real names like `Arena coin`, `Dungeon Coin`, `Eternal Marks`, `Adventure Coin`, `Guild Clash Trophy`).
+  - Added dynamic 3-tier naming for active event shops (`SHOP_CATALOG` → active `questEvents` match → primary event coin derivation, e.g. `1000263 → Eternal Marks Shop`, `1000266 → Adventure Shop`, `1000268 → Guild Clash Shop`) and displayed primary currency balance on the selected shop banner in `ShopModal.vue`.
+
 ## 0.11.395 — 2026-11-28
 
 ### Changed

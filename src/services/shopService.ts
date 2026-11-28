@@ -8,7 +8,7 @@
  * - Strict 0-Emerald guard: `cost.starmoney > 0` is blocked for auto/favorite buying.
  */
 
-import { nameData, getHeroName } from '../data/nameData.ts';
+import { getItemName, getHeroName } from '../data/nameData.ts';
 import { getItemIcon } from '../data/itemData.ts';
 import { getHeroAvatar } from '../data/heroMetadata.ts';
 import { getGold } from '../utils/resourceData.ts';
@@ -49,6 +49,9 @@ export interface ParsedShop {
   refreshInSec: number;
   slotCount: number;
   unboughtCount: number;
+  primaryCurrencyKey: string;
+  primaryCurrencyLabel: string;
+  primaryBalance: number | null;
 }
 
 export interface ParsedShopSlot {
@@ -181,23 +184,20 @@ function resolveRewardInfo(reward: Record<string, any> | undefined): {
         };
       }
 
-      const nameBucket =
+      const nameCategory =
         rewardType === 'fragmentGear' || rewardType === 'gear'
-          ? (nameData as any).gear
+          ? 'gear'
           : rewardType === 'fragmentScroll' || rewardType === 'scroll'
-            ? (nameData as any).scroll
-            : rewardType === 'consumable'
-              ? (nameData as any).consumable
-              : rewardType === 'coin'
-                ? (nameData as any).coin
-                : (nameData as any)[rewardType];
+            ? 'scroll'
+            : rewardType;
 
-      const baseName = nameBucket?.[itemId] || `${rewardType} #${itemId}`;
+      const resolvedName = getItemName(nameCategory, itemId) || getItemName(rewardType, itemId);
+      const baseName = resolvedName || `${rewardType} #${itemId}`;
       const itemName =
-        rewardType === 'fragmentGear' || rewardType === 'fragmentScroll'
+        (rewardType === 'fragmentGear' || rewardType === 'fragmentScroll') && !String(baseName).includes('(Frag)')
           ? `${baseName} (Frag)`
           : String(baseName);
-      const iconUrl = getItemIcon(rewardType, itemId) || '';
+      const iconUrl = getItemIcon(rewardType, itemId) || getItemIcon(nameCategory, itemId) || '';
       return { rewardType, itemId, itemKey, quantity, itemName, iconUrl, rawReward };
     }
     if (typeof payload === 'number' || typeof payload === 'string') {
@@ -262,7 +262,7 @@ function resolveCostInfo(cost: Record<string, any> | undefined): {
     const entries = Object.entries(cost.coin);
     if (entries.length > 0) {
       const [coinId, amount] = entries[0];
-      const coinName = (nameData as any).coin?.[coinId] || `Coin #${coinId}`;
+      const coinName = getItemName('coin', coinId) || `Coin #${coinId}`;
       return {
         costType: 'coin',
         costId: coinId,
@@ -281,6 +281,85 @@ function resolveCostInfo(cost: Record<string, any> | undefined): {
     costLabel: firstKey,
     costAmount: Number(cost[firstKey]) || 0,
     isEmerald: false,
+  };
+}
+
+function resolveDynamicShopMeta(
+  shopId: number,
+  rawSlots: Array<[string, any]>,
+  cache?: Record<string, any> | null
+): ShopMeta & { primaryCurrencyKey: string; primaryCurrencyLabel: string; primaryBalance: number | null } {
+  // Determine dominant non-Emerald currency across slots
+  const currencyCounts = new Map<string, { count: number; type: 'gold' | 'coin' | 'starmoney' | 'other'; id: string; label: string }>();
+  for (const [, rawSlot] of rawSlots) {
+    const cost = resolveCostInfo(rawSlot?.cost);
+    if (cost.isEmerald) continue;
+    const prev = currencyCounts.get(cost.currencyKey);
+    if (prev) prev.count++;
+    else currencyCounts.set(cost.currencyKey, { count: 1, type: cost.costType, id: cost.costId, label: cost.costLabel });
+  }
+  const primary = [...currencyCounts.entries()].sort((a, b) => b[1].count - a[1].count)[0];
+  const primaryCurrencyKey = primary?.[0] || '';
+  const primaryCurrencyLabel = primary?.[1]?.label || '';
+  const primaryBalance = primary ? getShopCurrencyBalance(cache, primary[1].type, primary[1].id) : null;
+
+  if (SHOP_CATALOG[shopId]) {
+    const base = SHOP_CATALOG[shopId];
+    return {
+      ...base,
+      primaryCurrencyKey,
+      primaryCurrencyLabel: primaryCurrencyLabel || base.currencyLabel,
+      primaryBalance,
+    };
+  }
+
+  // Check active questEvents for explicit shop/event title match
+  const events = cache?.questEvents?.data?.events;
+  if (Array.isArray(events)) {
+    const matchedEvent = events.find(
+      (ev: any) =>
+        ev &&
+        (Number(ev.shopId) === shopId ||
+          (primary?.[1]?.type === 'coin' &&
+            (String(ev.coinId ?? '') === primary[1].id ||
+              String(ev.exchangeRule?.coinId ?? '') === primary[1].id)))
+    );
+    const evTitle = matchedEvent?.title || matchedEvent?.name;
+    if (typeof evTitle === 'string' && evTitle.trim()) {
+      const clean = evTitle.trim();
+      return {
+        id: shopId,
+        name: /shop/i.test(clean) ? clean : `${clean} Shop`,
+        shortName: clean.replace(/\s+Shop$/i, ''),
+        icon: '🎉',
+        currencyLabel: primaryCurrencyLabel || 'Event Coin',
+        primaryCurrencyKey,
+        primaryCurrencyLabel: primaryCurrencyLabel || 'Event Coin',
+        primaryBalance,
+      };
+    }
+  }
+
+  // Derive clean event shop name from its real primary coin name (e.g., "Adventure Coin" -> "Adventure Shop")
+  if (primaryCurrencyLabel && !/^Coin #\d+$/.test(primaryCurrencyLabel)) {
+    const stem = primaryCurrencyLabel.replace(/\s+(Coin|Coins|Trophy|Trophies)$/i, '').trim() || primaryCurrencyLabel;
+    return {
+      id: shopId,
+      name: /shop/i.test(stem) ? stem : `${stem} Shop`,
+      shortName: stem,
+      icon: '🎁',
+      currencyLabel: primaryCurrencyLabel,
+      primaryCurrencyKey,
+      primaryCurrencyLabel,
+      primaryBalance,
+    };
+  }
+
+  return {
+    ...getShopMeta(shopId),
+    primaryCurrencyKey,
+    primaryCurrencyLabel: primaryCurrencyLabel || 'Event Coin',
+    primaryBalance,
   };
 }
 
@@ -305,13 +384,13 @@ export function parseShopCatalog(
     .sort((a, b) => a.shopId - b.shopId);
 
   for (const { shopId, shop } of shopEntries) {
-    const meta = getShopMeta(shopId);
+    const rawSlots = shop.slots && typeof shop.slots === 'object' ? Object.entries(shop.slots) : [];
+    const meta = resolveDynamicShopMeta(shopId, rawSlots, cache);
     const refreshTime = Number(shop.refreshTime || 0);
     const availableUntil = Number(shop.availableUntil || 0);
     const canFreeRefresh = canFreeRefreshShop(shop, nowSec);
     const refreshInSec = refreshTime > nowSec ? refreshTime - nowSec : 0;
 
-    const rawSlots = shop.slots && typeof shop.slots === 'object' ? Object.entries(shop.slots) : [];
     let unboughtCount = 0;
 
     for (const [slotKey, rawSlot] of rawSlots) {
@@ -366,6 +445,9 @@ export function parseShopCatalog(
       refreshInSec,
       slotCount: rawSlots.length,
       unboughtCount,
+      primaryCurrencyKey: meta.primaryCurrencyKey,
+      primaryCurrencyLabel: meta.primaryCurrencyLabel,
+      primaryBalance: meta.primaryBalance,
     });
   }
 

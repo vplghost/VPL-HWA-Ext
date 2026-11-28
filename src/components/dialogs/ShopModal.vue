@@ -393,10 +393,16 @@ onUnmounted(() => {
         v-if="selectedShopObj"
         class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs"
       >
-        <div class="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200">
+        <div class="flex flex-wrap items-center gap-2 font-semibold text-slate-700 dark:text-slate-200">
           <span>{{ selectedShopObj.icon }} {{ selectedShopObj.name }}</span>
           <span class="text-[11px] font-normal text-slate-500">
             {{ selectedShopObj.unboughtCount }}/{{ selectedShopObj.slotCount }} available
+          </span>
+          <span
+            v-if="selectedShopObj.primaryCurrencyLabel"
+            class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[11px] font-mono"
+          >
+            {{ selectedShopObj.primaryCurrencyLabel }}: {{ selectedShopObj.primaryBalance != null ? formatNumber(selectedShopObj.primaryBalance) : '—' }}
           </span>
         </div>
         <div class="flex items-center gap-2">

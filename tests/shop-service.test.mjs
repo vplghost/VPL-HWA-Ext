@@ -156,3 +156,51 @@ test('P2-43 & P2-44: DashboardTab mounts #open-shop-dialog icon button and ShopM
   assert.match(modalSrc, /id="btn-shop-renew-favorites"/);
   assert.match(modalSrc, /id="shop-dialog-footer"/);
 });
+
+test('P2-46: parseShopCatalog resolves real coin/item names via getItemName and names active event shops dynamically', () => {
+  const eventShops = {
+    '4': SAMPLE_SHOPS['4'],
+    '1000263': {
+      id: 1000263,
+      refreshTime: 0,
+      slots: {
+        '1': { id: 1, reward: { coin: { '18': 200 } }, bought: 0, cost: { coin: { '40181': 1100 } } },
+      },
+    },
+    '1000266': {
+      id: 1000266,
+      refreshTime: 0,
+      slots: {
+        '1': { id: 1, reward: { consumable: { '102': 4 } }, bought: 0, cost: { coin: { '40194': 500 } } },
+      },
+    },
+    '1000268': {
+      id: 1000268,
+      refreshTime: 0,
+      slots: {
+        '1': { id: 1, reward: { fragmentGear: { '96': 1 } }, bought: 0, cost: { coin: { '40188': 300 } } },
+      },
+    },
+  };
+  const cache = {
+    'resource:coin:40181': { data: { amount: 41600 } },
+    'resource:coin:40194': { data: { amount: 750 } },
+    'resource:coin:40188': { data: { amount: 500 } },
+  };
+  const parsed = parseShopCatalog(eventShops, cache, 1795849200);
+  const arenaSlot = parsed.slots.find((s) => s.shopId === 4);
+  assert.equal(arenaSlot?.costLabel, 'Arena coin');
+
+  const eternalShop = parsed.shops.find((s) => s.shopId === 1000263);
+  assert.equal(eternalShop?.name, 'Eternal Marks Shop');
+  assert.equal(eternalShop?.primaryCurrencyLabel, 'Eternal Marks');
+  assert.equal(eternalShop?.primaryBalance, 41600);
+
+  const adventureShop = parsed.shops.find((s) => s.shopId === 1000266);
+  assert.equal(adventureShop?.name, 'Adventure Shop');
+  assert.equal(adventureShop?.primaryCurrencyLabel, 'Adventure Coin');
+
+  const clashShop = parsed.shops.find((s) => s.shopId === 1000268);
+  assert.equal(clashShop?.name, 'Guild Clash Shop');
+  assert.equal(clashShop?.primaryCurrencyLabel, 'Guild Clash Trophy');
+});
