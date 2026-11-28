@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.407 — 2026-11-28
+
+### Changed
+
+- **Release Build & Version Sync (`package.json`, `package-lock.json`, `extension/manifest.json`, `dist/`, `.output/chrome-mv3/`)**:
+  - Synchronized extension version to `0.11.407` across manifests and dual-built clean Production (`dist/`, `VITE_DEBUG_BRIDGE=false`) and Debug/Unpacked (`.output/chrome-mv3/`, `VITE_DEBUG_BRIDGE=true`) artifacts.
+
 ## 0.11.405 — 2026-11-28
 
 ### Changed
