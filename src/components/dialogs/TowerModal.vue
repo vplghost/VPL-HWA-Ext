@@ -504,85 +504,64 @@ watch(() => props.modelValue, (open) => {
   <ModalDialog
     :model-value="modelValue"
     title="Tower Automation"
+    icon="🗼"
     max-width="max-w-3xl"
+    modal-name="tower"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <template #header-status>
+      <div id="tower-header-status" class="flex items-center gap-1.5 flex-wrap">
+        <span
+          id="tower-modal-badge"
+          class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+          :class="
+            isComplete
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+              : 'bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300'
+          "
+        >
+          {{ isComplete ? 'Completed ✓' : `Floor ${floorNumber} / ${TOWER_FLOOR_COUNT}` }}
+        </span>
+        <span
+          v-if="isRunning || towerRunState?.phase"
+          class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+          :class="
+            isRunning
+              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse'
+              : 'bg-slate-200/80 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+          "
+          :title="towerRunState?.reason || towerAutomationMessage || 'Tower automation status'"
+        >
+          {{ isRunning ? `Running · F${towerRunState?.floor || floorNumber}` : towerRunState?.phase }}
+        </span>
+      </div>
+    </template>
+
+    <template #header-actions>
+      <button
+        id="btn-tower-refresh"
+        type="button"
+        :disabled="isRefreshing"
+        title="Refresh Magic Tower data"
+        aria-label="Refresh Magic Tower data"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+        @click="refreshTower"
+      >
+        <span class="text-sm leading-none" :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+      </button>
+    </template>
+
     <div class="space-y-4 text-xs">
-      <!-- Status & Automation Banner -->
-      <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <span class="text-3xl">🗼</span>
-          <div>
-            <div class="flex items-center gap-2">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Magic Tower Auto-Climb</h3>
-              <span
-                id="tower-modal-badge"
-                class="rounded-full px-2 py-0.5 text-xs font-semibold"
-                :class="
-                  isComplete
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                    : 'bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300'
-                "
-              >
-                {{ isComplete ? 'Completed ✓' : `Floor ${floorNumber} / ${TOWER_FLOOR_COUNT}` }}
-              </span>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5">
-              Automates door selection, skull buff purchases, and 1 free chest per chest floor.
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            :disabled="isRefreshing"
-            class="cursor-pointer text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
-            @click="refreshTower"
-          >
-            <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
-            <span>Refresh</span>
-          </button>
-
-          <!-- Tower Cleared Status Badge (Hides Start Auto when cleared) -->
-          <div
-            v-if="isComplete && !isRunning"
-            id="tower-modal-cleared-badge"
-            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-          >
-            <span>✅</span>
-            <span>Tower Cleared Today</span>
-          </div>
-
-          <button
-            v-else
-            type="button"
-            :disabled="selectedHeroIds.length !== 5"
-            class="cursor-pointer px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="
-              isRunning
-                ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
-                : 'bg-violet-600 hover:bg-violet-500 text-white'
-            "
-            @click="toggleTowerRun"
-          >
-            <span>{{ isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
-          </button>
-        </div>
-      </section>
-
       <!-- Live Run Status Message -->
       <div
-        v-if="towerRunState || towerAutomationMessage"
-        class="rounded-lg p-3 text-xs border"
+        v-if="towerRunState?.reason || towerAutomationMessage"
+        class="rounded-lg px-3 py-2 text-xs border"
         :class="isRunning ? 'bg-violet-50/70 border-violet-200 text-violet-900 dark:bg-violet-950/40 dark:border-violet-800 dark:text-violet-200' : 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'"
       >
-        <div v-if="towerRunState" class="font-bold">
-          Status: {{ towerRunState.phase }}
-          {{ towerRunState.floor ? ` · Floor ${towerRunState.floor}, Room ${towerRunState.room}` : '' }}
-          {{ towerRunState.reason ? ` · ${towerRunState.reason}` : '' }}
+        <div v-if="towerRunState?.reason" class="font-semibold">
+          {{ towerRunState.phase }}{{ towerRunState.floor ? ` · Floor ${towerRunState.floor}, Room ${towerRunState.room}` : '' }} · {{ towerRunState.reason }}
         </div>
-        <div v-if="towerAutomationMessage" class="mt-0.5 text-slate-600 dark:text-slate-400">
+        <div v-if="towerAutomationMessage" class="text-slate-600 dark:text-slate-400">
           {{ towerAutomationMessage }}
         </div>
       </div>
@@ -944,5 +923,37 @@ watch(() => props.modelValue, (open) => {
         </div>
       </section>
     </div>
+
+    <template #footer>
+      <div id="tower-dialog-footer" class="w-full flex flex-wrap items-center justify-between gap-2">
+        <span class="text-[11px] text-slate-500 dark:text-slate-400">
+          Automates door selection, skull buffs, and 1 free chest per chest floor.
+        </span>
+        <div class="flex items-center gap-2 ml-auto">
+          <div
+            v-if="isComplete && !isRunning"
+            id="tower-modal-cleared-badge"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+          >
+            <span>✅</span>
+            <span>Tower Cleared Today</span>
+          </div>
+          <button
+            v-else
+            type="button"
+            :disabled="selectedHeroIds.length !== 5"
+            class="cursor-pointer px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="
+              isRunning
+                ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
+                : 'bg-violet-600 hover:bg-violet-500 text-white'
+            "
+            @click="toggleTowerRun"
+          >
+            <span>{{ isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
+          </button>
+        </div>
+      </div>
+    </template>
   </ModalDialog>
 </template>

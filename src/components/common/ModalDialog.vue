@@ -79,22 +79,31 @@ onUnmounted(() => {
         :class="maxWidth || 'max-w-2xl'"
       >
         <!-- Header -->
-        <div class="shrink-0 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50/80 dark:bg-slate-800/50">
-          <div class="flex items-center gap-2">
-            <span v-if="icon" class="text-lg">{{ icon }}</span>
-            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">
-              {{ title }}
-            </h3>
+        <div class="shrink-0 flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/50">
+          <div class="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span v-if="icon" class="text-lg">{{ icon }}</span>
+              <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {{ title }}
+              </h3>
+            </div>
+            <div v-if="$slots['header-status']" class="flex items-center gap-1.5 flex-wrap min-w-0">
+              <slot name="header-status" />
+            </div>
           </div>
 
-          <button
-            type="button"
-            :aria-label="`Close ${title}`"
-            class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            @click="close"
-          >
-            ✕
-          </button>
+          <div class="flex items-center gap-1 shrink-0">
+            <slot name="header-actions" />
+            <button
+              type="button"
+              :aria-label="`Close ${title}`"
+              :title="`Close ${title}`"
+              class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              @click="close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <!-- Body -->

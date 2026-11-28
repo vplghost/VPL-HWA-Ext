@@ -495,35 +495,39 @@ watch(
     modal-name="grandArena"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div id="grand-arena-dialog-content" class="flex flex-col gap-4 text-xs sm:text-sm">
-      <!-- Overview Banner -->
-      <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
-            🏆 Rank: #{{ overview.place ?? '—' }}
-          </span>
-          <span
-            id="grand-arena-free-battles-badge"
-            class="px-2.5 py-1 rounded-lg border font-semibold"
-            :class="(overview.freeBattlesLeft ?? 0) > 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'"
-          >
-            🛡️ Free Battles: {{ overview.freeBattlesLeft ?? '—' }}
-          </span>
-          <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-semibold">
-            ⚡ 3-Team Power: {{ totalAttackPower.toLocaleString() }}
-          </span>
-        </div>
-
-        <button
-          id="btn-grand-arena-refresh"
-          type="button"
-          :disabled="isLoading || isAutoRunning"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs disabled:opacity-50 transition"
-          @click="refreshGrandArena"
+    <template #header-status>
+      <div id="grand-arena-header-status" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold">
+          🏆 #{{ overview.place ?? '—' }}
+        </span>
+        <span
+          id="grand-arena-free-battles-badge"
+          class="px-2 py-0.5 rounded-full border font-semibold"
+          :class="(overview.freeBattlesLeft ?? 0) > 0 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'"
         >
-          {{ isLoading ? 'Refreshing...' : '↻ Refresh Grand Arena' }}
-        </button>
+          🛡️ Free: {{ overview.freeBattlesLeft ?? '—' }}
+        </span>
+        <span class="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-500/30 font-semibold tabular-nums">
+          ⚡ {{ totalAttackPower.toLocaleString() }}
+        </span>
       </div>
+    </template>
+
+    <template #header-actions>
+      <button
+        id="btn-grand-arena-refresh"
+        type="button"
+        :disabled="isLoading || isAutoRunning"
+        title="Refresh Grand Arena data"
+        aria-label="Refresh Grand Arena data"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+        @click="refreshGrandArena"
+      >
+        <span class="text-sm leading-none" :class="{ 'inline-block animate-spin': isLoading }">↻</span>
+      </button>
+    </template>
+
+    <div id="grand-arena-dialog-content" class="flex flex-col gap-3.5 text-xs sm:text-sm">
 
       <!-- Server Grand Team Integrity Warning -->
       <div

@@ -383,44 +383,46 @@ watch(
     modal-name="arena"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div id="arena-dialog-content" class="flex flex-col gap-4 text-xs sm:text-sm">
-      <!-- Overview Banner -->
-      <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
-            🏆 Rank: #{{ overview.place ?? '—' }}
-          </span>
-          <span v-if="overview.bestPlace != null" class="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
-            Best: #{{ overview.bestPlace }}
-          </span>
-          <span v-if="overview.leagueId != null" class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-medium">
-            League #{{ overview.leagueId }}
-          </span>
-          <span
-            id="arena-free-battles-badge"
-            class="px-2.5 py-1 rounded-lg border font-semibold"
-            :class="(overview.freeBattlesLeft ?? 0) > 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'"
-          >
-            ⚔️ Free Battles: {{ overview.freeBattlesLeft ?? '—' }}
-          </span>
-          <span v-if="overview.numBattles > 0" class="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-            Record: {{ overview.numWins }}W / {{ overview.numBattles }}B
-          </span>
-          <span v-if="overview.winStreak > 0" class="px-2.5 py-1 rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
-            🔥 Streak: {{ overview.winStreak }}
-          </span>
-        </div>
-
-        <button
-          id="btn-arena-refresh"
-          type="button"
-          :disabled="isLoading || isAutoRunning"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs disabled:opacity-50 transition"
-          @click="refreshArenaData"
+    <template #header-status>
+      <div id="arena-header-status" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span
+          class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold"
+          :title="[
+            overview.bestPlace != null ? `Best: #${overview.bestPlace}` : '',
+            overview.leagueId != null ? `League #${overview.leagueId}` : '',
+            overview.numBattles > 0 ? `Record: ${overview.numWins}W / ${overview.numBattles}B` : '',
+          ].filter(Boolean).join(' · ') || 'Current Arena Rank'"
         >
-          {{ isLoading ? 'Refreshing...' : '↻ Refresh Arena' }}
-        </button>
+          🏆 #{{ overview.place ?? '—' }}
+        </span>
+        <span
+          id="arena-free-battles-badge"
+          class="px-2 py-0.5 rounded-full border font-semibold"
+          :class="(overview.freeBattlesLeft ?? 0) > 0 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'"
+        >
+          ⚔️ Free: {{ overview.freeBattlesLeft ?? '—' }}
+        </span>
+        <span v-if="overview.winStreak > 0" class="px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-500/30 font-semibold">
+          🔥 {{ overview.winStreak }}
+        </span>
       </div>
+    </template>
+
+    <template #header-actions>
+      <button
+        id="btn-arena-refresh"
+        type="button"
+        :disabled="isLoading || isAutoRunning"
+        title="Refresh Arena data"
+        aria-label="Refresh Arena data"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+        @click="refreshArenaData"
+      >
+        <span class="text-sm leading-none" :class="{ 'inline-block animate-spin': isLoading }">↻</span>
+      </button>
+    </template>
+
+    <div id="arena-dialog-content" class="flex flex-col gap-3.5 text-xs sm:text-sm">
 
       <!-- Error / Status Alert -->
       <div v-if="errorMessage" class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium">

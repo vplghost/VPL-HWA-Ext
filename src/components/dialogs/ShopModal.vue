@@ -283,9 +283,37 @@ onUnmounted(() => {
     modal-name="shop"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <template #header-status>
+      <div id="shop-header-status" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span class="px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+          {{ catalog.shops.length }} Shops
+        </span>
+        <span
+          v-if="catalog.freeRefreshCount > 0"
+          class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold"
+        >
+          🔄 {{ catalog.freeRefreshCount }} Free Refresh
+        </span>
+      </div>
+    </template>
+
+    <template #header-actions>
+      <button
+        id="btn-shop-refresh-all"
+        type="button"
+        :disabled="isRefreshingAll || isBusy"
+        title="Refresh all shops from game (shopGetMany)"
+        aria-label="Refresh all shops"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+        @click="refreshAllShops"
+      >
+        <span class="text-sm leading-none" :class="{ 'inline-block animate-spin': isRefreshingAll }">↻</span>
+      </button>
+    </template>
+
     <div id="shop-dialog-content" class="space-y-3">
       <!-- Top Filter Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[200px]">
           <input
             id="shop-search-input"
@@ -322,17 +350,6 @@ onUnmounted(() => {
             <span>Available</span>
           </label>
         </div>
-
-        <button
-          id="btn-shop-refresh-all"
-          type="button"
-          :disabled="isRefreshingAll || isBusy"
-          class="cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-50"
-          title="Refresh all shops from game (shopGetMany)"
-          @click="refreshAllShops"
-        >
-          {{ isRefreshingAll ? 'Refreshing...' : '↻ Refresh Shops' }}
-        </button>
       </div>
 
       <!-- Shop Filter Pills -->

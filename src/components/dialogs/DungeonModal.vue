@@ -679,16 +679,17 @@ function handleImgError(e: Event) {
               <span>Stop Auto</span>
             </button>
 
-            <!-- Refresh Button -->
+            <!-- Refresh Button (subtle icon-only matching close button) -->
             <button
               id="dungeon-refresh-btn"
               type="button"
-              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 shadow-2xs"
+              class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
               title="Refresh dungeon data from game (dungeonGetInfo)"
+              aria-label="Refresh dungeon data"
               @click="refreshDungeon"
             >
               <svg
-                class="size-3.5 text-slate-500 dark:text-slate-400 shrink-0"
+                class="size-4 shrink-0"
                 :class="{ 'animate-spin': isRefreshing }"
                 viewBox="0 0 24 24"
                 fill="none"
@@ -702,7 +703,7 @@ function handleImgError(e: Event) {
                 <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
                 <path d="M16 21h5v-5" />
               </svg>
-              <span class="dungeon-refresh-label">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
+              <span class="dungeon-refresh-label sr-only">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
             </button>
 
             <!-- Close Button -->

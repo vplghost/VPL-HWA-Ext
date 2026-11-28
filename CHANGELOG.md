@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.395 — 2026-11-28
+
+### Changed
+
+- **Dialog Header Status Pills & Subtle Icon-Only Actions (`ModalDialog.vue`, `TowerModal.vue`, `ArenaModal.vue`, `GrandArenaModal.vue`, `HydraModal.vue`, `ShopModal.vue`, `DungeonModal.vue`, `tests/status-alert-banner.test.mjs`)**:
+  - Extended `ModalDialog.vue` with `#header-status` and `#header-actions` slots right next to the Close button.
+  - Moved live status pills (`Floor/Running/Cleared`, `Rank/Free Battles/Streak`, `3-Team Power`, `Horns/Reset`, `Shops/Free Refresh`) into `#header-status` and converted Refresh actions into subtle `size-7` icon-only buttons with `title`/`aria-label` in `#header-actions` across `TowerModal`, `ArenaModal`, `GrandArenaModal`, `HydraModal`, `ShopModal`, and `DungeonModal`, removing bulky body overview banners.
+  - Pinned `TowerModal`'s `Start/Stop Auto Tower` / `Tower Cleared Today` control in `#tower-dialog-footer`.
+
 ## 0.11.394 — 2026-11-28
 
 ### Changed

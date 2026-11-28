@@ -160,40 +160,41 @@ onMounted(() => {
 <template>
   <ModalDialog
     :model-value="modelValue"
-    title="Hydra — Guild Boss & Overkill Guard Planner"
+    title="Hydra"
     icon="🐉"
     max-width="max-w-5xl"
     modal-name="hydra"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div class="space-y-4 text-xs">
-      <!-- Header Status Bar -->
-      <section
-        id="hydra-status-bar"
-        class="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
-      >
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold">
-            📯 Regular Horns: {{ hydraState.regularTries }}
-          </span>
-          <span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
-            ✨ Golden Horns: {{ hydraState.superTries }}
-          </span>
-          <span class="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono">
-            ⏱️ Reset: {{ resetCountdownText }}
-          </span>
-        </div>
+    <template #header-status>
+      <div id="hydra-status-bar" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold" title="Regular Horns remaining">
+          📯 {{ hydraState.regularTries }}
+        </span>
+        <span class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold" title="Golden Horns remaining">
+          ✨ {{ hydraState.superTries }}
+        </span>
+        <span class="px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono" title="Daily Hydra reset countdown">
+          ⏱️ {{ resetCountdownText }}
+        </span>
+      </div>
+    </template>
 
-        <button
-          id="btn-hydra-refresh"
-          type="button"
-          :disabled="isRefreshing"
-          class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold disabled:opacity-50"
-          @click="refreshHydraState"
-        >
-          {{ isRefreshing ? 'Refreshing...' : '↻ Refresh Hydra' }}
-        </button>
-      </section>
+    <template #header-actions>
+      <button
+        id="btn-hydra-refresh"
+        type="button"
+        :disabled="isRefreshing"
+        title="Refresh Hydra data"
+        aria-label="Refresh Hydra data"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+        @click="refreshHydraState"
+      >
+        <span class="text-sm leading-none" :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+      </button>
+    </template>
+
+    <div class="space-y-4 text-xs">
 
       <!-- 5-Tier Selector & 6-Head Grid -->
       <section id="hydra-heads-grid" class="space-y-3">

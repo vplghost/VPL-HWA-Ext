@@ -125,3 +125,25 @@ test('P2-41: Arena, GrandArena, PvP Optimizer, and Expeditions dialogs pin prima
     assert.ok(actionIdx > footerSlotIdx, `${file} must place ${primaryAction} inside pinned #footer`);
   }
 });
+
+test('P2-42: ModalDialog supports #header-status/#header-actions and dialogs use compact header status + subtle icon-only refresh', async () => {
+  const modalBase = await readFile(new URL('../src/components/common/ModalDialog.vue', import.meta.url), 'utf8');
+  assert.ok(modalBase.includes('name="header-status"'), 'ModalDialog must expose #header-status slot');
+  assert.ok(modalBase.includes('name="header-actions"'), 'ModalDialog must expose #header-actions slot');
+
+  const dialogs = [
+    ['dialogs/TowerModal.vue', 'id="tower-header-status"', 'id="btn-tower-refresh"', 'id="tower-dialog-footer"'],
+    ['dialogs/ArenaModal.vue', 'id="arena-header-status"', 'id="btn-arena-refresh"', null],
+    ['dialogs/GrandArenaModal.vue', 'id="grand-arena-header-status"', 'id="btn-grand-arena-refresh"', null],
+    ['dialogs/HydraModal.vue', 'id="hydra-status-bar"', 'id="btn-hydra-refresh"', null],
+    ['dialogs/ShopModal.vue', 'id="shop-header-status"', 'id="btn-shop-refresh-all"', null],
+  ];
+  for (const [file, statusId, refreshId, footerId] of dialogs) {
+    const src = await readFile(new URL('../src/components/' + file, import.meta.url), 'utf8');
+    assert.ok(src.includes('<template #header-status>'), `${file} must use #header-status`);
+    assert.ok(src.includes(statusId), `${file} must render ${statusId}`);
+    assert.ok(src.includes('<template #header-actions>'), `${file} must use #header-actions`);
+    assert.ok(src.includes(refreshId), `${file} must render subtle icon-only ${refreshId}`);
+    if (footerId) assert.ok(src.includes(footerId), `${file} must render ${footerId}`);
+  }
+});
