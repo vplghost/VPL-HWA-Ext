@@ -232,3 +232,17 @@ test('private Brigand trace replays the captured victory and 10 energy deduction
   assert.equal(state.brigandCampStatus.data.campId, campId);
   assert.equal(state['resource:world-energy'].data.amount, 90);
 });
+
+test('P2-53: BrigandCampModal uses header cost/sync slots, 3-column camp grid without energy spam, and horizontal icon rewards', async () => {
+  const source = await readFile(new URL('../src/components/dialogs/BrigandCampModal.vue', import.meta.url), 'utf8');
+  assert.match(source, /<template #header-status>/);
+  assert.match(source, /id="brigand-header-cost-pill"/);
+  assert.match(source, /<template #header-actions>/);
+  assert.match(source, /id="brigand-sync-btn"/);
+  assert.doesNotMatch(source, /<strong>World Energy:/, 'Redundant World Energy banner must be removed from dialog body');
+  assert.match(source, /id="brigand-camp-list"[^>]*sm:grid-cols-3/, 'Camp list must use 3-column grid');
+  assert.doesNotMatch(source, /BRIGAND_ENERGY_COST\s*\}\}\s*World Energy/, 'Camp cards must not repeat World Energy text');
+  assert.match(source, /id="brigand-last-result"/);
+  assert.match(source, /id="brigand-rewards-list"[^>]*flex flex-wrap/, 'Battle rewards must render horizontally');
+  assert.match(source, /getRewardIcon\(reward\)/, 'Battle rewards must display icons');
+});

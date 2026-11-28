@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.405 — 2026-11-28
+
+### Changed
+
+- **Brigand Camp Dialog UI Polish (`BrigandCampModal.vue`, `tests/brigand-camp.test.mjs`)**:
+  - Removed the redundant body `World Energy` banner and moved energy cost (`#brigand-header-cost-pill`), camp count (`#brigand-header-camps-pill`), and sync action (`#brigand-sync-btn`) into the dialog header slots.
+  - Switched `#brigand-camp-list` to a compact 3-column grid (`sm:grid-cols-3`), removed repeated energy labels and raw UUID text from camp cards, and added level badges.
+  - Redesigned `#brigand-last-result` with a single-line status header and horizontal icon reward pills (`#brigand-rewards-list`).
+
 ## 0.11.404 — 2026-11-28
 
 ### Changed

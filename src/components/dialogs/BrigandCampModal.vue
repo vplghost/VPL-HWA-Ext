@@ -24,6 +24,20 @@ const teamOptions = computed(() => {
 });
 function heroName(id: number) { return getHeroMetadata(id)?.name || `Hero #${id}`; }
 function heroAvatar(id: number) { return getHeroMetadata(id)?.avatarFile || ''; }
+function getRewardIcon(reward: any): string {
+  const type = String(reward?.type || '').toLowerCase();
+  if (type === 'gold' || type === 'coin') return '🪙';
+  if (type === 'experience') return '⭐';
+  if (type.includes('lootbox')) return '🎁';
+  if (type === 'consumable') return '🧪';
+  if (type.includes('fragment') || type === 'gear') return '🧩';
+  return '📦';
+}
+function getRewardLabel(reward: any): string {
+  if (reward?.type === 'gold') return 'Gold';
+  if (reward?.type === 'experience') return 'XP';
+  return getItemName(reward?.type, reward?.id);
+}
 const now = ref(Date.now());
 let energyTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => { energyTimer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -273,45 +287,118 @@ async function attack() {
 
 <template>
   <ModalDialog :model-value="modelValue" title="Brigand Camp" icon="⛺" max-width="max-w-3xl" @update:model-value="emit('update:modelValue', $event)">
-    <div class="space-y-4 text-sm">
-      <div class="flex items-center justify-between gap-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 p-3">
-        <div><strong>World Energy: {{ energy ?? 'Unknown' }}</strong><p class="text-xs text-slate-500">{{ BRIGAND_ENERGY_COST }} per camp · Levels 1–3</p></div>
-        <button class="rounded-lg px-3 py-2 bg-slate-200 dark:bg-slate-700 disabled:opacity-50" :disabled="refreshing || !!pending" @click="sync">{{ refreshing ? 'Syncing…' : 'Sync Team & Energy' }}</button>
-      </div>
+    <template #header-status>
+      <span
+        id="brigand-header-cost-pill"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/70"
+        :title="`Current World Energy: ${energy ?? 'Unknown'} (${BRIGAND_ENERGY_COST} per camp)`"
+      >
+        <span>⚡</span>
+        <span>{{ BRIGAND_ENERGY_COST }} / camp</span>
+      </span>
+
+      <span
+        v-if="summary"
+        id="brigand-header-camps-pill"
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+        :title="`Next respawn: ${respawnText}`"
+      >
+        <span>⛺</span>
+        <span>{{ filteredCamps.length }}</span>
+      </span>
+    </template>
+
+    <template #header-actions>
+      <button
+        id="brigand-sync-btn"
+        type="button"
+        title="Sync Team & Energy"
+        aria-label="Sync Team and Energy"
+        :disabled="refreshing || !!pending"
+        class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+        @click="sync"
+      >
+        <span :class="{ 'inline-block animate-spin': refreshing }">↻</span>
+      </button>
+    </template>
+
+    <div class="space-y-3 text-xs">
       <section class="space-y-2" aria-label="Available Brigand camps">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <strong>Available Camps · {{ filteredCamps.length }}</strong>
+            <strong class="text-slate-800 dark:text-slate-200">Available Camps · {{ filteredCamps.length }}</strong>
             <select v-model.number="campLevel" aria-label="Camp level" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-              <option :value="0">All levels</option><option v-for="level in 3" :key="level" :value="level">Level {{ level }}</option>
+              <option :value="0">All levels</option>
+              <option v-for="level in 3" :key="level" :value="level">Level {{ level }}</option>
             </select>
+            <span v-if="summary" class="text-[11px] text-slate-400 hidden sm:inline">Respawn: {{ respawnText }}</span>
           </div>
-          <button id="brigand-search" class="rounded-lg bg-orange-600 hover:bg-orange-500 px-3 py-2 text-white font-semibold disabled:opacity-50" :disabled="!!searchPending || !!pending" @click="searchCamps">{{ searchPending ? 'Searching…' : 'Search Camps' }}</button>
-        </div>
-        <p v-if="summary" class="text-xs text-slate-500">Next respawn: {{ respawnText }}</p>
-        <p v-if="searchError" role="alert" class="text-red-600 dark:text-red-400">{{ searchError }}</p>
-        <p v-if="searchMessage" role="status" class="text-xs text-slate-500">{{ searchMessage }}</p>
-        <p v-if="expired" class="text-xs text-amber-600">Camp list expired. Search again for current targets.</p>
-        <p v-else-if="!summary" class="text-xs text-slate-500">Search to load camps from the game.</p>
-        <p v-else-if="!filteredCamps.length" class="text-xs text-slate-500">No available camps for this level.</p>
-        <div class="grid sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
-          <button v-for="camp in filteredCamps" :key="camp.id" :aria-pressed="campId === camp.id" :disabled="!!pending || !!searchPending" class="rounded-lg border p-3 text-left disabled:opacity-50" :class="campId === camp.id ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40' : 'border-slate-200 dark:border-slate-700'" @click="chooseCamp(camp.id)">
-            <strong>Level {{ camp.campConfigId }} · {{ BRIGAND_ENERGY_COST }} World Energy</strong>
-            <span class="block text-xs text-slate-500 break-all">{{ camp.id }}</span>
-            <span class="block mt-1 text-xs">{{ camp.defendersPack?.map(hero => (getHeroMetadata(hero.id)?.name || 'Hero #' + hero.id) + ' · Lv.' + (hero.level ?? '?')).join(', ') || 'Defenders unavailable' }}</span>
+          <button
+            id="brigand-search"
+            type="button"
+            class="cursor-pointer rounded-lg bg-orange-600 hover:bg-orange-500 px-3 py-1.5 text-white font-semibold text-xs disabled:opacity-50 transition-colors"
+            :disabled="!!searchPending || !!pending"
+            @click="searchCamps"
+          >
+            {{ searchPending ? 'Searching…' : 'Search Camps' }}
           </button>
         </div>
-        <p v-if="selectedCamp" class="text-xs text-orange-600">Selected: Level {{ selectedCamp.campConfigId }} · {{ selectedCamp.id }}</p>
+
+        <p v-if="searchError" role="alert" class="text-red-600 dark:text-red-400">{{ searchError }}</p>
+        <p v-if="searchMessage" role="status" class="text-[11px] text-slate-500">{{ searchMessage }}</p>
+        <p v-if="expired" class="text-[11px] text-amber-600">Camp list expired. Search again for current targets.</p>
+        <p v-else-if="!summary" class="text-[11px] text-slate-500">Search to load camps from the game.</p>
+        <p v-else-if="!filteredCamps.length" class="text-[11px] text-slate-500">No available camps for this level.</p>
+
+        <div id="brigand-camp-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+          <button
+            v-for="camp in filteredCamps"
+            :key="camp.id"
+            type="button"
+            :aria-pressed="campId === camp.id"
+            :disabled="!!pending || !!searchPending"
+            :title="`Camp ID: ${camp.id}`"
+            class="cursor-pointer rounded-lg border p-2.5 text-left transition-colors disabled:opacity-50 space-y-1"
+            :class="
+              campId === camp.id
+                ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40 ring-1 ring-orange-400/50'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-orange-300 dark:hover:border-orange-700'
+            "
+            @click="chooseCamp(camp.id)"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold"
+                :class="
+                  camp.campConfigId === 3
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                    : camp.campConfigId === 2
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                "
+              >
+                Lv.{{ camp.campConfigId }}
+              </span>
+              <span v-if="campId === camp.id" class="text-[11px] font-bold text-orange-600 dark:text-orange-400">✓ Selected</span>
+            </div>
+            <span class="block text-[11px] leading-snug text-slate-600 dark:text-slate-300 line-clamp-2">
+              {{ camp.defendersPack?.map(hero => (getHeroMetadata(hero.id)?.name || 'Hero #' + hero.id) + ' Lv.' + (hero.level ?? '?')).join(', ') || 'Defenders unavailable' }}
+            </span>
+          </button>
+        </div>
       </section>
-      <p class="text-xs text-slate-500">Attack sends a camp victory request directly; it does not open the in-game battle.</p>
-      <section class="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
-        <label for="brigand-team-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400">Select Team</label>
-        <select id="brigand-team-select" :value="selectedPreset" :disabled="!!pending" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm" @change="selectSavedTeam(($event.target as HTMLSelectElement).value)">
+
+      <section class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label for="brigand-team-select" class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Team</label>
+          <span class="text-[11px] text-slate-400">Direct instant battle</span>
+        </div>
+        <select id="brigand-team-select" :value="selectedPreset" :disabled="!!pending" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs" @change="selectSavedTeam(($event.target as HTMLSelectElement).value)">
           <option v-for="team in teamOptions" :key="team.id" :value="team.id">{{ team.label }} ({{ team.heroIds.length }}/5)</option>
         </select>
-        <div v-if="heroIds.length" class="flex flex-wrap items-center gap-2" aria-label="Selected camp team">
-          <span v-for="id in heroIds" :key="id" class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700">
-            <span class="size-6 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border" :class="starGlowClass(Number(owned[String(id)]?.star) || 1)">
+        <div v-if="heroIds.length" class="flex flex-wrap items-center gap-1.5" aria-label="Selected camp team">
+          <span v-for="id in heroIds" :key="id" class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
+            <span class="size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border" :class="starGlowClass(Number(owned[String(id)]?.star) || 1)">
               <img v-if="heroAvatar(id)" :src="heroAvatar(id)" :alt="heroName(id)" class="size-full object-cover" />
               <span v-else aria-hidden="true">👤</span>
             </span>
@@ -319,22 +406,64 @@ async function attack() {
             <HeroHoverCard :hero-id="id" :hero="owned[String(id)]" :inventory="cache.inventoryGet?.data" />
           </span>
         </div>
-        <p v-else class="text-xs text-amber-600 dark:text-amber-400">Select a saved team or sync the Brigand Camp team.</p>
+        <p v-else class="text-[11px] text-amber-600 dark:text-amber-400">Select a saved team or sync the Brigand Camp team.</p>
       </section>
+
       <p v-if="error" role="alert" class="text-red-600 dark:text-red-400">{{ error }}</p>
       <p v-if="message" role="status" class="text-slate-600 dark:text-slate-300">{{ message }}</p>
       <p v-if="alreadyWon" class="text-emerald-600">This camp has already been defeated. Choose another camp.</p>
-      <div v-if="result" class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-1">
-        <strong>Last camp: {{ result.data.success ? 'Victory' : 'Failed' }}</strong>
-        <p class="break-all font-mono text-xs text-slate-500">{{ result.data.campId }}</p>
-        <p v-if="!result.data.success" class="text-red-600">{{ result.data.error }}</p>
-        <ul v-else class="text-xs space-y-1"><li v-for="(reward, index) in result.data.rewards" :key="index">{{ reward.amount.toLocaleString() }} × {{ reward.type === 'gold' ? 'Gold' : reward.type === 'experience' ? 'Experience' : getItemName(reward.type, reward.id) }}</li></ul>
+
+      <div
+        v-if="result"
+        id="brigand-last-result"
+        class="rounded-xl border p-2.5 space-y-2"
+        :class="
+          result.data.success
+            ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20'
+            : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20'
+        "
+      >
+        <div class="flex items-center justify-between gap-2">
+          <span
+            class="inline-flex items-center gap-1 font-bold text-xs"
+            :class="result.data.success ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'"
+            :title="`Camp ID: ${result.data.campId}`"
+          >
+            <span>{{ result.data.success ? '🏆' : '❌' }}</span>
+            <span>Last Camp: {{ result.data.success ? 'Victory' : 'Failed' }}</span>
+          </span>
+          <span v-if="result.data.success && result.data.rewards?.length" class="text-[11px] text-slate-400">
+            {{ result.data.rewards.length }} reward{{ result.data.rewards.length > 1 ? 's' : '' }}
+          </span>
+        </div>
+
+        <p v-if="!result.data.success" class="text-rose-600 dark:text-rose-400">{{ result.data.error }}</p>
+        <div v-else id="brigand-rewards-list" class="flex flex-wrap items-center gap-1.5">
+          <span
+            v-for="(reward, index) in result.data.rewards"
+            :key="index"
+            class="inline-flex items-center gap-1 rounded-md bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 shadow-2xs"
+          >
+            <span aria-hidden="true">{{ getRewardIcon(reward) }}</span>
+            <strong class="font-mono">{{ reward.amount.toLocaleString() }}</strong>
+            <span class="text-slate-500 dark:text-slate-400">{{ getRewardLabel(reward) }}</span>
+          </span>
+        </div>
       </div>
     </div>
+
     <template #footer>
       <div class="flex flex-wrap justify-end items-center gap-3">
         <span v-if="!pending && validation" class="text-xs text-slate-500">{{ validation }}</span>
-        <button id="brigand-attack" class="rounded-lg bg-orange-600 hover:bg-orange-500 px-4 py-2 font-semibold text-white disabled:opacity-50" :disabled="!!pending || !!searchPending || !!validation || alreadyWon" @click="attack">{{ pending ? 'Waiting…' : 'Attack Camp' }}</button>
+        <button
+          id="brigand-attack"
+          type="button"
+          class="cursor-pointer rounded-lg bg-orange-600 hover:bg-orange-500 px-4 py-1.5 font-semibold text-white text-xs disabled:opacity-50 transition-colors"
+          :disabled="!!pending || !!searchPending || !!validation || alreadyWon"
+          @click="attack"
+        >
+          {{ pending ? 'Waiting…' : `Attack Camp · ⚡ ${BRIGAND_ENERGY_COST}` }}
+        </button>
       </div>
     </template>
   </ModalDialog>
