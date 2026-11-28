@@ -42,6 +42,17 @@ import {
   needsTroopHealRefresh,
   normalizeTroopHealSettings,
 } from '../services/troopHealService.ts';
+import {
+  AUTO_SHOP_ALARM_NAME,
+  buildGrandFarmCoinsCall,
+  buildShopBuyCall,
+  buildShopRefreshCall,
+  computeNextAutoShopWakeAt,
+  findFreeRenewableFavoriteShops,
+  parseShopCatalog,
+  planFavoriteShopPurchases,
+  shouldClaimGrandArenaCoins,
+} from '../services/shopService.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
 import { recordPriorityAutoJoinDaily } from '../utils/activityStats.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
@@ -2807,6 +2818,136 @@ export async function runHeroicChestVideoOpen(manual = false, customChrome?: any
   }
 }
 
+export async function runAutoShopFavorites(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'autoShopFavoritesEnabled',
+      'autoShopFavoritesState',
+      'shopFavorites',
+      'shopCurrencyReserves',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+    ])) || {};
+  const cache = stored.rpcCache || {};
+  const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id ?? 'default';
+  const now = Date.now();
+  const nowSec = Math.floor(now / 1000);
+  let state = stored.autoShopFavoritesState ? structuredClone(stored.autoShopFavoritesState) : null;
+
+  if (!stored.autoShopFavoritesEnabled) {
+    cr?.alarms?.clear?.(AUTO_SHOP_ALARM_NAME);
+    if (!manual) return { ok: false, error: 'Auto shop favorites is disabled.' };
+    if (state) {
+      state.nextWakeAt = 0;
+      state.status = 'Disabled';
+      await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    }
+    return { ok: true, disabled: true };
+  }
+
+  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
+
+  if (state && String(state.accountId) !== String(accountId)) {
+    state = null;
+  }
+  state = state || { accountId, lastRunAt: 0 };
+
+  const favorites = stored.shopFavorites && typeof stored.shopFavorites === 'object' ? stored.shopFavorites : {};
+  const reserves = stored.shopCurrencyReserves && typeof stored.shopCurrencyReserves === 'object' ? stored.shopCurrencyReserves : {};
+
+  const tab = await findActiveGameTab(cr);
+  if (!tab?.id) {
+    state.status = 'No active game tab found. Retrying later.';
+    await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  const shopData = cache.shopGetMany?.data;
+  if (!shopData || typeof shopData !== 'object' || Object.keys(shopData).length === 0) {
+    const refreshMsg = rpcMessageForSettings(
+      stored,
+      [{ name: 'shopGetMany', args: { shopIds: [1, 4, 5, 6, 8, 10, 11, 13, 14, 15, 16, 17] } }],
+      false,
+      { group: 'auto-shop-favorites' }
+    );
+    if (refreshMsg) {
+      await cr?.tabs?.sendMessage?.(tab.id, refreshMsg).catch(() => {});
+    }
+    const retryAt = now + 20_000;
+    state.nextWakeAt = retryAt;
+    state.status = 'Syncing shops (shopGetMany)...';
+    await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    cr?.alarms?.create?.(AUTO_SHOP_ALARM_NAME, { when: retryAt });
+    return { ok: true, refreshed: true, nextWakeAt: retryAt };
+  }
+
+  const catalog = parseShopCatalog(shopData, cache, nowSec);
+  const calls: Array<{ name: string; args?: Record<string, any> }> = [];
+
+  // 1. On-demand or anti-cap Grand Arena coin claim (verified `grandFarmCoins`)
+  const gaDecision = shouldClaimGrandArenaCoins(cache, catalog.slots, favorites, reserves, nowSec, {
+    allowAntiCap: true,
+  });
+  if (gaDecision.shouldClaim) {
+    calls.push(buildGrandFarmCoinsCall());
+  }
+
+  // 2. Strict free-only refresh for shops with bought favorites whose refreshTime has elapsed
+  const renewableShopIds = findFreeRenewableFavoriteShops(catalog.shops, catalog.slots, favorites, nowSec);
+  for (const shopId of renewableShopIds) {
+    calls.push(buildShopRefreshCall(shopId));
+  }
+
+  // 3. Strict 0-Emerald favorite purchases
+  const balances: Record<string, number> = {};
+  for (const s of catalog.slots) {
+    if (s.balance != null && !(s.currencyKey in balances)) balances[s.currencyKey] = s.balance;
+  }
+  const { plan } = planFavoriteShopPurchases(catalog.slots, favorites, balances, reserves);
+  for (const slot of plan) {
+    if (slot.isEmerald || slot.bought) continue;
+    calls.push(buildShopBuyCall(slot));
+  }
+
+  const nextWakeAt = computeNextAutoShopWakeAt(catalog.shops, catalog.slots, favorites, cache, now);
+
+  if (calls.length === 0) {
+    state.lastRunAt = now;
+    state.nextWakeAt = nextWakeAt;
+    state.lastError = undefined;
+    state.status = `Next check scheduled at ${new Date(nextWakeAt).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    cr?.alarms?.create?.(AUTO_SHOP_ALARM_NAME, { when: nextWakeAt });
+    return { ok: true, scheduled: true, calls: [], nextWakeAt };
+  }
+
+  const dispatch = rpcMessageForSettings(stored, calls, false, { group: 'auto-shop-favorites' });
+  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+  try {
+    await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+    state.lastRunAt = now;
+    state.nextWakeAt = nextWakeAt;
+    state.lastError = undefined;
+    const summaryParts: string[] = [];
+    if (gaDecision.shouldClaim) summaryParts.push('GA coins');
+    if (renewableShopIds.length > 0) summaryParts.push(`free-renew ${renewableShopIds.length}`);
+    if (plan.length > 0) summaryParts.push(`buy ${plan.length}`);
+    state.status = `Dispatched (${summaryParts.join(', ')}) · next at ${new Date(nextWakeAt).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    cr?.alarms?.create?.(AUTO_SHOP_ALARM_NAME, { when: nextWakeAt });
+    return { ok: true, dispatched: calls.length, calls, nextWakeAt, queued: dispatch.kind === 'queue-rpc' };
+  } catch (err: any) {
+    state.lastError = err?.message || String(err);
+    state.status = `Shop auto dispatch failed: ${state.lastError}`;
+    await cr?.storage?.local?.set({ autoShopFavoritesState: state });
+    return { ok: false, error: state.lastError };
+  }
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -3586,6 +3727,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runHeroicChestVideoOpen(false, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === AUTO_SHOP_ALARM_NAME) {
+      pending = pending.then(() => runAutoShopFavorites(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
@@ -3657,6 +3802,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (area === 'local' && 'autoHeroicChestVideoEnabled' in changes && changes.autoHeroicChestVideoEnabled?.newValue !== true) {
       cr.alarms?.clear?.('hwa-auto-heroic-chest-video');
+    }
+    if (area === 'local' && 'autoShopFavoritesEnabled' in changes && changes.autoShopFavoritesEnabled?.newValue !== true) {
+      cr.alarms?.clear?.(AUTO_SHOP_ALARM_NAME);
     }
     if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopTrainDispatch = null;
@@ -3773,6 +3921,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runHeroicChestVideoOpen(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'auto-shop-favorites-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runAutoShopFavorites(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -5209,6 +5367,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     runFrontierRewardsClaim: (manual?: boolean) => runFrontierRewardsClaim(manual, cr),
     runRealmResourcesClaim: (manual?: boolean) => runRealmResourcesClaim(manual, cr),
     runHeroicChestVideoOpen: (manual?: boolean) => runHeroicChestVideoOpen(manual, cr),
+    runAutoShopFavorites: (manual?: boolean) => runAutoShopFavorites(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),

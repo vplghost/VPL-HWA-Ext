@@ -569,3 +569,132 @@ export function formatShopCountdown(seconds: number): string {
   if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
   return `${sec}s`;
 }
+
+// ============================================================================
+// P3-11: Verified `grandFarmCoins` RPC & Zero-Polling Auto Shop Routine
+// ============================================================================
+
+export const GRAND_ARENA_SHOP_ID = 5;
+export const GRAND_ARENA_COIN_ID = '2';
+export const GA_COIN_MIN_CLAIM_COOLDOWN_SEC = 15 * 60; // 15 minutes
+export const GA_COIN_ANTI_CAP_INTERVAL_SEC = 6 * 3600; // 6 hours
+export const AUTO_SHOP_ALARM_NAME = 'hwa-auto-shop-favorites';
+
+export function buildGrandFarmCoinsCall(): { name: 'grandFarmCoins'; args: Record<string, never> } {
+  return { name: 'grandFarmCoins', args: {} };
+}
+
+export interface GrandArenaCoinClaimDecision {
+  shouldClaim: boolean;
+  reason: 'on_demand_shortfall' | 'anti_cap' | 'cooldown' | 'not_needed';
+  lastClaimSec: number;
+  nextAntiCapAtMs: number;
+}
+
+/**
+ * Evaluates whether `grandFarmCoins` should be dispatched:
+ * 1. Respects a minimum cooldown (default 15m) since `cache.grandFarmCoins.data.grandCoinTime`.
+ * 2. On-Demand: triggers if Grand Arena Shop (shopId 5) has unbought non-Emerald favorite(s)
+ *    whose total `coin:2` cost exceeds `(currentBalance - reserve)`.
+ * 3. Anti-Cap: triggers periodically (default every 6h) when `allowAntiCap` is true.
+ */
+export function shouldClaimGrandArenaCoins(
+  cache: Record<string, any> | null | undefined,
+  slots: ParsedShopSlot[],
+  favorites: ShopFavoriteRule[] | Record<string, ShopFavoriteRule>,
+  reserves: Record<string, number> = {},
+  nowSec = Math.floor(Date.now() / 1000),
+  options?: {
+    allowAntiCap?: boolean;
+    cooldownSec?: number;
+    antiCapIntervalSec?: number;
+  }
+): GrandArenaCoinClaimDecision {
+  const cooldownSec = Math.max(60, Number(options?.cooldownSec ?? GA_COIN_MIN_CLAIM_COOLDOWN_SEC));
+  const antiCapIntervalSec = Math.max(cooldownSec, Number(options?.antiCapIntervalSec ?? GA_COIN_ANTI_CAP_INTERVAL_SEC));
+  const allowAntiCap = options?.allowAntiCap !== false;
+
+  const lastClaimSec = Number(cache?.grandFarmCoins?.data?.grandCoinTime || 0);
+  const nextAntiCapAtMs =
+    lastClaimSec > 0
+      ? (lastClaimSec + antiCapIntervalSec) * 1000 + 5000
+      : (nowSec + antiCapIntervalSec) * 1000 + 5000;
+
+  if (lastClaimSec > 0 && nowSec - lastClaimSec < cooldownSec) {
+    return { shouldClaim: false, reason: 'cooldown', lastClaimSec, nextAntiCapAtMs };
+  }
+
+  const rules = Array.isArray(favorites) ? favorites : Object.values(favorites || {});
+  const gaFavSlots = (slots || []).filter(
+    (s) =>
+      s.shopId === GRAND_ARENA_SHOP_ID &&
+      !s.bought &&
+      !s.isEmerald &&
+      s.costType === 'coin' &&
+      s.costId === GRAND_ARENA_COIN_ID &&
+      rules.some((r) => matchesFavoriteRule(s, r))
+  );
+
+  if (gaFavSlots.length > 0) {
+    const neededCoins = gaFavSlots.reduce((sum, s) => sum + Math.max(0, Number(s.costAmount) || 0), 0);
+    const balance = getShopCurrencyBalance(cache, 'coin', GRAND_ARENA_COIN_ID) ?? 0;
+    const reserve = Math.max(0, Number(reserves[`coin:${GRAND_ARENA_COIN_ID}`] || 0));
+    if (balance - reserve < neededCoins) {
+      return { shouldClaim: true, reason: 'on_demand_shortfall', lastClaimSec, nextAntiCapAtMs };
+    }
+  }
+
+  if (allowAntiCap && (lastClaimSec <= 0 || nowSec - lastClaimSec >= antiCapIntervalSec)) {
+    return { shouldClaim: true, reason: 'anti_cap', lastClaimSec, nextAntiCapAtMs };
+  }
+
+  return { shouldClaim: false, reason: 'not_needed', lastClaimSec, nextAntiCapAtMs };
+}
+
+/**
+ * Computes the single next wake timestamp (ms) for `'hwa-auto-shop-favorites'` (zero-polling):
+ * earliest of:
+ * - `shop.refreshTime * 1000 + 5000` across shops containing any favorite item
+ * - next Grand Arena coin anti-cap timestamp
+ */
+export function computeNextAutoShopWakeAt(
+  shops: ParsedShop[],
+  slots: ParsedShopSlot[],
+  favorites: ShopFavoriteRule[] | Record<string, ShopFavoriteRule>,
+  cache: Record<string, any> | null | undefined,
+  nowMs = Date.now(),
+  antiCapIntervalSec = GA_COIN_ANTI_CAP_INTERVAL_SEC
+): number {
+  const nowSec = Math.floor(nowMs / 1000);
+  const rules = Array.isArray(favorites) ? favorites : Object.values(favorites || {});
+  const favShopIds = new Set<number>();
+
+  for (const slot of slots || []) {
+    if (!slot.isEmerald && rules.some((r) => matchesFavoriteRule(slot, r))) {
+      favShopIds.add(slot.shopId);
+    }
+  }
+
+  let earliestMs: number | null = null;
+  for (const shop of shops || []) {
+    if (favShopIds.size > 0 && !favShopIds.has(shop.shopId)) continue;
+    if (shop.refreshTime > nowSec) {
+      const wakeMs = shop.refreshTime * 1000 + 5000;
+      if (earliestMs == null || wakeMs < earliestMs) {
+        earliestMs = wakeMs;
+      }
+    }
+  }
+
+  const lastClaimSec = Number(cache?.grandFarmCoins?.data?.grandCoinTime || 0);
+  const antiCapMs =
+    lastClaimSec > 0 && lastClaimSec + antiCapIntervalSec > nowSec
+      ? (lastClaimSec + antiCapIntervalSec) * 1000 + 5000
+      : nowMs + antiCapIntervalSec * 1000;
+
+  if (earliestMs == null || antiCapMs < earliestMs) {
+    earliestMs = antiCapMs;
+  }
+
+  return Math.max(nowMs + 60_000, earliestMs);
+}

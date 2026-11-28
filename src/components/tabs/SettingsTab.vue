@@ -10,6 +10,7 @@ import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
 import { useHeroicChestVideoAutomation } from '@/src/composables/useHeroicChestVideoAutomation';
+import { useShopFavoritesAutomation } from '@/src/composables/useShopFavoritesAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { applyTabPreset } from '@/src/utils/commandPalette';
@@ -322,6 +323,13 @@ const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAuto
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 const { enabled: autoRealmResourcesEnabled, status: autoRealmResourcesStatus, save: saveAutoRealmResources } = useRealmResourcesAutomation();
 const { enabled: autoHeroicChestVideoEnabled, status: autoHeroicChestVideoStatus, save: saveAutoHeroicChestVideo } = useHeroicChestVideoAutomation();
+const {
+  enabled: autoShopFavoritesEnabled,
+  running: autoShopFavoritesRunning,
+  status: autoShopFavoritesStatus,
+  save: saveAutoShopFavorites,
+  runNow: runAutoShopFavoritesNow,
+} = useShopFavoritesAutomation();
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
@@ -1224,6 +1232,27 @@ async function toggleRecording() {
             <span>Auto open Free Heroic Chest (Video) when cooldown expires</span>
           </label>
           <p v-if="autoHeroicChestVideoStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoHeroicChestVideoStatus }}</p>
+        </div>
+
+        <!-- 5. Auto Shop Favorites & Grand Arena Coins -->
+        <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 p-2.5 space-y-1 md:col-span-2">
+          <div class="flex items-start justify-between gap-2">
+            <label class="flex items-start gap-2 text-xs font-medium cursor-pointer">
+              <input id="setting-auto-shop-favorites" v-model="autoShopFavoritesEnabled" type="checkbox" class="mt-0.5" @change="saveAutoShopFavorites" />
+              <span>Auto Shop Favorites &amp; Grand Arena Coins (0-Emerald, free-renew on reset &amp; 6h GA coin anti-cap)</span>
+            </label>
+            <button
+              v-if="autoShopFavoritesEnabled"
+              id="setting-auto-shop-favorites-run-btn"
+              type="button"
+              :disabled="autoShopFavoritesRunning"
+              class="cursor-pointer shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:text-slate-200 disabled:opacity-50"
+              @click="runAutoShopFavoritesNow"
+            >
+              {{ autoShopFavoritesRunning ? 'Running...' : 'Run Now' }}
+            </button>
+          </div>
+          <p v-if="autoShopFavoritesStatus" role="status" class="text-[11px] text-slate-500 pl-5">{{ autoShopFavoritesStatus }}</p>
         </div>
       </div>
     </section>

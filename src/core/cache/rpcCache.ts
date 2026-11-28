@@ -54,6 +54,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     shopGetMany: 'items',
     shopBuy: 'items',
     shopRefresh: 'items',
+    grandFarmCoins: 'items',
     offerGetAll: 'items',
     titanGetAll: 'titans',
     titan_artifactGetCounters: 'titans',
@@ -2787,6 +2788,26 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               updatedAt: record.timestamp,
             });
           }
+          return actions;
+        }
+        if (call.name === 'grandFarmCoins' && result?.response && !result.error) {
+          const resp = result.response;
+          const actions = [];
+          if (resp.reward && typeof resp.reward === 'object') {
+            actions.push(...extractRewardActions(record, call, resp.reward, 'grandFarmCoins:reward'));
+          }
+          actions.push({
+            key: 'grandFarmCoins',
+            method: call.name,
+            feature: null,
+            group: 'items',
+            data: {
+              grandCoin: Number(resp.grandCoin ?? 0),
+              grandCoinTime: Number(resp.grandCoinTime ?? 0),
+              lastClaimed: Number(resp.reward?.coin?.['2'] ?? 0),
+            },
+            updatedAt: record.timestamp,
+          });
           return actions;
         }
         if (call.name === 'chatGetAll' && (call.args?.chatType === 'clan' || call.args?.chatType === 'announcement') && result?.response) {

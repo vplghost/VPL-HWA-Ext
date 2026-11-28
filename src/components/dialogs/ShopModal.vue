@@ -9,9 +9,12 @@ import {
   canFreeRefreshShop,
   buildShopBuyCall,
   buildShopRefreshCall,
+  buildGrandFarmCoinsCall,
+  shouldClaimGrandArenaCoins,
   planFavoriteShopPurchases,
   findFreeRenewableFavoriteShops,
   formatShopCountdown,
+  GRAND_ARENA_SHOP_ID,
   type ParsedShopSlot,
 } from '@/src/services/shopService';
 
@@ -180,10 +183,40 @@ async function handleRenewFavoriteShops() {
   }
 }
 
+async function handleCollectGaCoins() {
+  if (isBusy.value) return;
+  isBusy.value = true;
+  errorMessage.value = '';
+  try {
+    const res = await dispatchRpc([buildGrandFarmCoinsCall()]);
+    const resp = res?.results?.[0]?.result?.response;
+    const claimed = Number(resp?.reward?.coin?.['2'] ?? 0);
+    if (res?.ok === false && res?.error) {
+      errorMessage.value = String(res.error);
+    } else if (claimed > 0) {
+      statusMessage.value = `Collected ${formatNumber(claimed)} Grand Arena coin(s).`;
+    } else {
+      statusMessage.value = 'Requested Grand Arena coin collection.';
+    }
+  } catch (err: any) {
+    errorMessage.value = err?.message || String(err);
+  } finally {
+    isBusy.value = false;
+  }
+}
+
 async function handleBuyAllFavorites() {
   if (isBusy.value) return;
+  const gaCheck = shouldClaimGrandArenaCoins(
+    cache.value,
+    catalog.value.slots,
+    favoritesMap.value,
+    reserves.value,
+    Math.floor(Date.now() / 1000),
+    { allowAntiCap: false }
+  );
   const initialPlan = favoriteBuyPlan.value.plan;
-  if (initialPlan.length === 0 && (!autoFreeRenewAfterBuy.value || freeRenewableShopIds.value.length === 0)) {
+  if (initialPlan.length === 0 && !gaCheck.shouldClaim && (!autoFreeRenewAfterBuy.value || freeRenewableShopIds.value.length === 0)) {
     statusMessage.value = 'No affordable favorite items available right now.';
     return;
   }
@@ -192,9 +225,29 @@ async function handleBuyAllFavorites() {
   errorMessage.value = '';
   let boughtTotal = 0;
   let renewedTotal = 0;
+  let claimedGaCoins = 0;
   try {
+    if (gaCheck.shouldClaim) {
+      try {
+        const gaRes = await dispatchRpc([buildGrandFarmCoinsCall()]);
+        const claimed = Number(gaRes?.results?.[0]?.result?.response?.reward?.coin?.['2'] ?? 0);
+        if (claimed > 0) claimedGaCoins = claimed;
+      } catch (_) {}
+    }
+
+    const activeCatalog = claimedGaCoins > 0
+      ? parseShopCatalog(cache.value?.shopGetMany?.data, cache.value, Math.floor(Date.now() / 1000))
+      : catalog.value;
+    const activeBalances: Record<string, number> = {};
+    for (const s of activeCatalog.slots) {
+      if (s.balance != null && !(s.currencyKey in activeBalances)) activeBalances[s.currencyKey] = s.balance;
+    }
+    const buyPlan = claimedGaCoins > 0
+      ? planFavoriteShopPurchases(activeCatalog.slots, favoritesMap.value, activeBalances, reserves.value).plan
+      : initialPlan;
+
     const touchedShops = new Set<number>();
-    for (const slot of initialPlan) {
+    for (const slot of buyPlan) {
       if (slot.isEmerald || slot.bought) continue;
       busySlotKey.value = slotUid(slot);
       const res = await dispatchRpc([buildShopBuyCall(slot)]);
@@ -242,6 +295,7 @@ async function handleBuyAllFavorites() {
     }
 
     const parts: string[] = [];
+    if (claimedGaCoins > 0) parts.push(`Collected ${formatNumber(claimedGaCoins)} GA coins`);
     if (boughtTotal > 0) parts.push(`Bought ${boughtTotal} favorite(s)`);
     if (renewedTotal > 0) parts.push(`free-renewed ${renewedTotal} shop(s)`);
     statusMessage.value = parts.length > 0 ? `${parts.join(' · ')}.` : 'Nothing bought.';
@@ -404,6 +458,17 @@ onUnmounted(() => {
           >
             {{ selectedShopObj.primaryCurrencyLabel }}: {{ selectedShopObj.primaryBalance != null ? formatNumber(selectedShopObj.primaryBalance) : '—' }}
           </span>
+          <button
+            v-if="selectedShopObj.shopId === GRAND_ARENA_SHOP_ID"
+            id="shop-collect-ga-coins-btn"
+            type="button"
+            :disabled="isBusy"
+            title="Collect accumulated Grand Arena Coins (grandFarmCoins)"
+            class="cursor-pointer px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold transition-colors disabled:opacity-50"
+            @click="handleCollectGaCoins"
+          >
+            🪙 Collect GA Coins
+          </button>
         </div>
         <div class="flex items-center gap-2">
           <span v-if="!selectedShopObj.canFreeRefresh && selectedShopObj.refreshInSec > 0" class="text-[11px] font-mono text-slate-500">

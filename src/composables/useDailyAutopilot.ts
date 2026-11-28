@@ -11,6 +11,15 @@ import {
   SOUL_SWEEP_RESERVE_STORAGE_KEY,
 } from '../services/heroSoulSweepService.ts';
 import {
+  buildGrandFarmCoinsCall,
+  buildShopBuyCall,
+  buildShopRefreshCall,
+  findFreeRenewableFavoriteShops,
+  parseShopCatalog,
+  planFavoriteShopPurchases,
+  shouldClaimGrandArenaCoins,
+} from '../services/shopService.ts';
+import {
   DAILY_AUTOPILOT_SETTINGS_KEY,
   DAILY_AUTOPILOT_STATE_KEY,
   DAILY_STEP_LABELS,
@@ -409,6 +418,75 @@ export function useDailyAutopilot(
       runtimeState.steps['soul-sweep'] = {
         status: 'done',
         detail: `Swept ${completedRaids} Heroic raids (${plan.plannedEnergy}⚡, reserve ${plan.reserveEnergy}⚡)`,
+        completedAt: Date.now(),
+      };
+      return;
+    }
+
+    if (stepId === 'shop-favorites') {
+      let favorites: Record<string, any> = {};
+      let reserves: Record<string, number> = {};
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+        try {
+          const stored: any = await chrome.storage.local.get(['shopFavorites', 'shopCurrencyReserves']);
+          if (stored?.shopFavorites && typeof stored.shopFavorites === 'object') favorites = stored.shopFavorites;
+          if (stored?.shopCurrencyReserves && typeof stored.shopCurrencyReserves === 'object') reserves = stored.shopCurrencyReserves;
+        } catch (_) {}
+      }
+      if (Object.keys(favorites).length === 0) {
+        runtimeState.steps['shop-favorites'] = {
+          status: 'skipped',
+          detail: 'No favorite shop items configured.',
+        };
+        return;
+      }
+
+      const nowSec = Math.floor(Date.now() / 1000);
+      let catalog = parseShopCatalog(cacheRef.value?.shopGetMany?.data, cacheRef.value, nowSec);
+      if (catalog.shops.length === 0) {
+        await dispatchRpc([{ name: 'shopGetMany', args: { shopIds: [1, 4, 5, 6, 8, 10, 11, 13, 14, 15, 16, 17] } }]);
+        catalog = parseShopCatalog(cacheRef.value?.shopGetMany?.data, cacheRef.value, Math.floor(Date.now() / 1000));
+      }
+
+      let claimedGa = false;
+      const gaDecision = shouldClaimGrandArenaCoins(cacheRef.value, catalog.slots, favorites, reserves, nowSec, {
+        allowAntiCap: true,
+      });
+      if (gaDecision.shouldClaim) {
+        try {
+          const gaRes = await dispatchRpc([buildGrandFarmCoinsCall()]);
+          if (gaRes?.ok !== false) claimedGa = true;
+        } catch (_) {}
+      }
+
+      const renewableIds = findFreeRenewableFavoriteShops(catalog.shops, catalog.slots, favorites, Math.floor(Date.now() / 1000));
+      let renewed = 0;
+      for (const shopId of renewableIds) {
+        const res = await dispatchRpc([buildShopRefreshCall(shopId)]);
+        if (res?.ok !== false) renewed++;
+      }
+
+      catalog = parseShopCatalog(cacheRef.value?.shopGetMany?.data, cacheRef.value, Math.floor(Date.now() / 1000));
+      const balances: Record<string, number> = {};
+      for (const s of catalog.slots) {
+        if (s.balance != null && !(s.currencyKey in balances)) balances[s.currencyKey] = s.balance;
+      }
+      const { plan } = planFavoriteShopPurchases(catalog.slots, favorites, balances, reserves);
+      let bought = 0;
+      for (const slot of plan) {
+        if (slot.isEmerald || slot.bought) continue;
+        const res = await dispatchRpc([buildShopBuyCall(slot)]);
+        if (res?.ok === false) break;
+        bought++;
+      }
+
+      const summaryParts: string[] = [];
+      if (claimedGa) summaryParts.push('claimed GA coins');
+      if (renewed > 0) summaryParts.push(`free-renewed ${renewed} shop(s)`);
+      if (bought > 0) summaryParts.push(`bought ${bought} favorite(s)`);
+      runtimeState.steps['shop-favorites'] = {
+        status: 'done',
+        detail: summaryParts.length > 0 ? summaryParts.join(' · ') : 'No eligible favorite purchases right now',
         completedAt: Date.now(),
       };
       return;

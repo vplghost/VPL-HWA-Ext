@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.398 — 2026-11-28
+
+### Added
+
+- **Auto Shop Routine & Grand Arena Coin Auto-Claim (`rpcCache.ts`, `shopService.ts`, `backgroundRuntime.ts`, `ShopModal.vue`, `SettingsTab.vue`, `useShopFavoritesAutomation.ts`, `dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `tests/shop-service.test.mjs`)**:
+  - Added verified `grandFarmCoins` RPC cache merge in `rpcCache.ts` (automatically adds `reward.coin["2"]` into `inventoryGet.data.coin["2"]` and caches `grandCoin` / `grandCoinTime`).
+  - Added `shouldClaimGrandArenaCoins()` (on-demand before `shopId: 5` shortfall + 6h anti-cap with 15m cooldown) and `computeNextAutoShopWakeAt()` zero-polling single-alarm scheduler (`hwa-auto-shop-favorites`) in `backgroundRuntime.ts` (strict free-only refresh & 0-Emerald purchases).
+  - Added `#shop-collect-ga-coins-btn` (`Collect GA Coins`) + auto-claim before `Buy All Favorites` in `ShopModal.vue`, `#setting-auto-shop-favorites` in `SettingsTab.vue`, and `shop-favorites` step in Daily Autopilot.
+
 ## 0.11.397 — 2026-11-28
 
 ### Added

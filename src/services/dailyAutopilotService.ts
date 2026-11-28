@@ -32,6 +32,7 @@ export type DailyActivityId =
   | 'frontier'
   | 'quests'
   | 'soul-sweep'
+  | 'shop-favorites'
   | 'tower'
   | 'hydra'
   | 'arena'
@@ -70,6 +71,7 @@ export const DEFAULT_DAILY_STEP_ORDER: DailyActivityId[] = [
   'frontier',
   'quests',
   'soul-sweep',
+  'shop-favorites',
   'tower',
   'hydra',
   'arena',
@@ -83,6 +85,7 @@ export const DAILY_STEP_LABELS: Record<DailyActivityId, string> = {
   frontier: 'Frontier Chest',
   quests: 'Daily Quests & Mail',
   'soul-sweep': 'Favorite Soul Stones',
+  'shop-favorites': 'Shop Favorites & GA Coins',
   tower: 'Tower',
   hydra: 'Hydra',
   arena: 'Arena',
