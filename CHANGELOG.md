@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.393 — 2026-11-28
+
+### Added
+
+- **Unified In-Game Shop Hub, Favorites, 1-Click Buy All & Smart Free-Renew (`ShopModal.vue`, `shopService.ts`, `useShopFavorites.ts`, `DashboardTab.vue`, `rpcCache.ts`, `commandPalette.ts`, `tests/shop-service.test.mjs`)**:
+  - Added `shopService.ts` parsing all shops from `rpcCache.shopGetMany` with strict 0-Emerald guards (`isEmeraldShopSlot`), scheduled-only free refresh (`canFreeRefreshShop`), projected-balance favorite batch planner (`planFavoriteShopPurchases`), and bought-favorite free-renew detector (`findFreeRenewableFavoriteShops`).
+  - Added `ShopModal.vue` displaying all in-game shops on a single unified UI with search, shop pills, Hide Emerald (default on), Affordable/Available/Favorites filters, star favorite toggles, 1-click **Buy All Favorites** (with optional auto free-renew), and **Free Renew** in `#shop-dialog-footer`.
+  - Added `#open-shop-dialog` (`🛒`) icon button to `#dashboard-actions` in `DashboardTab.vue`, live `shopBuy`/`shopRefresh` cache merging in `rpcCache.ts`, and `In-Game Shops` entry in Command Palette (`Ctrl+K`).
+
 ## 0.11.392 — 2026-11-28
 
 ### Fixed

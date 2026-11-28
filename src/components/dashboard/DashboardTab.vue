@@ -10,6 +10,7 @@ import { useModals } from '@/src/composables/useModals';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import { useNow } from '@/src/composables/useNow';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
+import { parseShopCatalog } from '@/src/services/shopService';
 
 const { dispatchRpc, cache } = useRpcCache();
 const { openModal } = useModals();
@@ -131,6 +132,8 @@ async function refreshAllDashboard() {
     dashboardRefreshing.value = false;
   }
 }
+
+const freeRefreshShopsCount = computed(() => parseShopCatalog(cache.value?.shopGetMany?.data, cache.value).freeRefreshCount);
 </script>
 
 <template>
@@ -244,6 +247,23 @@ async function refreshAllDashboard() {
           @click="openModal('campaign')"
         >
           <span>🗺️</span> <span>Campaign Raid</span>
+        </button>
+
+        <!-- In-Game Shops Icon Button -->
+        <button
+          id="open-shop-dialog"
+          type="button"
+          class="relative cursor-pointer size-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:border-amber-300 dark:hover:border-amber-700 inline-flex items-center justify-center text-sm transition-colors shadow-2xs"
+          title="Open In-Game Shops"
+          aria-label="Open In-Game Shops"
+          @click="openModal('shop')"
+        >
+          <span>🛒</span>
+          <span
+            v-if="freeRefreshShopsCount > 0"
+            class="absolute -top-1 -right-1 size-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"
+            :title="`${freeRefreshShopsCount} shop(s) ready for free refresh`"
+          />
         </button>
       </div>
 

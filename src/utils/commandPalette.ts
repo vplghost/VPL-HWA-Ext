@@ -62,6 +62,7 @@ const PALETTE_MODALS: Array<{ modalName: ModalName; label: string; subtitle: str
   { modalName: 'questDetail', label: 'Daily Quests', subtitle: 'View & claim daily quest rewards', icon: '📜', keywords: ['quests', 'tasks'] },
   { modalName: 'battlePass', label: 'Battle Pass', subtitle: 'Hero Way / Battle Pass milestones', icon: '🎫', keywords: ['pass', 'season'] },
   { modalName: 'chest', label: 'Chests', subtitle: 'Open inventory chests & dolls', icon: '🎁', keywords: ['boxes', 'open', 'inventory'] },
+  { modalName: 'shop', label: 'In-Game Shops', subtitle: 'Browse all shops, favorites & free refresh', icon: '🛒', keywords: ['shop', 'store', 'merchant', 'buy', 'favorite'] },
   { modalName: 'log', label: 'Activity Logs', subtitle: 'Inspect RPC, MQTT & automation logs', icon: '📋', keywords: ['debug', 'rpc', 'mqtt', 'diagnostics'] },
 ];
 

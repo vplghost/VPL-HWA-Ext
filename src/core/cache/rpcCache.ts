@@ -52,6 +52,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     inventoryGet: 'items',
     'getInventory:inventory': 'items',
     shopGetMany: 'items',
+    shopBuy: 'items',
+    shopRefresh: 'items',
     offerGetAll: 'items',
     titanGetAll: 'titans',
     titan_artifactGetCounters: 'titans',
@@ -2774,6 +2776,17 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           if (reward) {
             actions.push(...extractRewardActions(record, call, reward, `shopBuy:reward:${slotId}`));
           }
+          if (resp && typeof resp === 'object') {
+            actions.push({
+              key: 'shopBuy',
+              method: call.name,
+              feature: null,
+              group: 'items',
+              args: call.args,
+              data: resp,
+              updatedAt: record.timestamp,
+            });
+          }
           return actions;
         }
         if (call.name === 'chatGetAll' && (call.args?.chatType === 'clan' || call.args?.chatType === 'announcement') && result?.response) {
@@ -3415,6 +3428,49 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             updatedAt: entry.updatedAt,
           };
           changed = true;
+          continue;
+        }
+        if (entry.key === 'shopBuy' && entry.data && typeof entry.data === 'object') {
+          const shopId = String(entry.args?.shopId ?? '');
+          const slotObj = entry.data.slot;
+          const slotId = slotObj?.id != null ? String(slotObj.id) : String(entry.args?.slot ?? '');
+          if (shopId && slotId && next.shopGetMany?.data?.[shopId]) {
+            const existingShop = next.shopGetMany.data[shopId];
+            next.shopGetMany = {
+              ...next.shopGetMany,
+              data: {
+                ...next.shopGetMany.data,
+                [shopId]: {
+                  ...existingShop,
+                  ...(entry.data.refreshTime != null ? { refreshTime: entry.data.refreshTime } : {}),
+                  slots: {
+                    ...(existingShop.slots || {}),
+                    [slotId]: slotObj || { ...(existingShop.slots?.[slotId] || {}), bought: 1 },
+                  },
+                },
+              },
+              updatedAt: entry.updatedAt,
+            };
+            changed = true;
+          }
+          continue;
+        }
+        if (entry.key === 'shopRefresh' && entry.data && typeof entry.data === 'object') {
+          const shopId = String(entry.data.id ?? entry.args?.shopId ?? '');
+          if (shopId) {
+            next.shopGetMany = {
+              key: 'shopGetMany',
+              method: 'shopGetMany',
+              feature: null,
+              group: 'items',
+              data: {
+                ...(next.shopGetMany?.data || {}),
+                [shopId]: entry.data,
+              },
+              updatedAt: entry.updatedAt,
+            };
+            changed = true;
+          }
           continue;
         }
         if (entry.key === 'heroChest_openChest' && entry.data && typeof entry.data === 'object') {

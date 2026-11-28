@@ -28,6 +28,7 @@ export type ModalName =
   | 'grandArena'
   | 'pvpOptimizer'
   | 'hydra'
+  | 'shop'
   | 'commandPalette';
 
 const modalState = reactive<Record<ModalName, boolean>>({
@@ -58,6 +59,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   grandArena: false,
   pvpOptimizer: false,
   hydra: false,
+  shop: false,
   commandPalette: false,
 });
 
