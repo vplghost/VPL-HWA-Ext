@@ -176,3 +176,84 @@ export function calculateTitanArtifactEvolvePlan(
     chestsOwnedTotal,
   };
 }
+
+export interface TitanArtifactLevelPlan {
+  capLevel: number;
+  isMaxed: boolean;
+  dustCost1: number;
+  goldCost1: number;
+  canLevelUp1: boolean;
+  milestoneTarget: number;
+  milestoneDelta: number;
+  milestoneDustCost: number;
+  milestoneGoldCost: number;
+  canLevelToMilestone: boolean;
+}
+
+/**
+ * Computes +1 and next-multiple-of-10 upgrade plan for a Titan Artifact,
+ * clamped to `Math.min(120, titanLevel)` with exact cumulative Dust & Gold gating.
+ */
+export function computeTitanArtifactLevelPlan(
+  level: number,
+  titanLevel: number,
+  fairyDust: number,
+  gold: number,
+  getLevelCost: (targetLevel: number) => [number, number] | readonly [number, number] | null | undefined
+): TitanArtifactLevelPlan {
+  const curLevel = Math.max(1, Math.floor(Number(level) || 1));
+  const capLevel = Math.min(120, Math.max(1, Math.floor(Number(titanLevel) || 1)));
+  const ownedDust = Math.max(0, Number(fairyDust) || 0);
+  const ownedGold = Math.max(0, Number(gold) || 0);
+  const isMaxed = curLevel >= 120;
+
+  const cost1 = !isMaxed && curLevel + 1 <= 120 ? getLevelCost(curLevel + 1) : null;
+  const dustCost1 = cost1 ? Number(cost1[0]) || 0 : 0;
+  const goldCost1 = cost1 ? Number(cost1[1]) || 0 : 0;
+  const canLevelUp1 =
+    !isMaxed &&
+    curLevel < capLevel &&
+    dustCost1 > 0 &&
+    ownedDust >= dustCost1 &&
+    ownedGold >= goldCost1;
+
+  const rawNextTen = Math.floor(curLevel / 10) * 10 + 10;
+  const milestoneTarget = Math.min(capLevel, rawNextTen);
+  const milestoneDelta = Math.max(0, milestoneTarget - curLevel);
+
+  let milestoneDustCost = 0;
+  let milestoneGoldCost = 0;
+  let validAllSteps = milestoneDelta > 1;
+  if (validAllSteps) {
+    for (let lvl = curLevel + 1; lvl <= milestoneTarget; lvl++) {
+      const c = getLevelCost(lvl);
+      const d = c ? Number(c[0]) || 0 : 0;
+      const g = c ? Number(c[1]) || 0 : 0;
+      if (d <= 0) {
+        validAllSteps = false;
+        break;
+      }
+      milestoneDustCost += d;
+      milestoneGoldCost += g;
+    }
+  }
+
+  const canLevelToMilestone =
+    validAllSteps &&
+    !isMaxed &&
+    ownedDust >= milestoneDustCost &&
+    ownedGold >= milestoneGoldCost;
+
+  return {
+    capLevel,
+    isMaxed,
+    dustCost1,
+    goldCost1,
+    canLevelUp1,
+    milestoneTarget,
+    milestoneDelta,
+    milestoneDustCost,
+    milestoneGoldCost,
+    canLevelToMilestone,
+  };
+}

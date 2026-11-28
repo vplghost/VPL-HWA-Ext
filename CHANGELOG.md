@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.403 — 2026-11-28
+
+### Changed
+
+- **Titan Dialog UI Polish & Next-10 Artifact Upgrade Milestone (`TitanDetailModal.vue`, `titanArtifactChestHelper.ts`, `tests/titan-artifact-upgrade.test.mjs`)**:
+  - Added `computeTitanArtifactLevelPlan()` to calculate exact next-multiple-of-10 artifact upgrade targets (`1→10`, `10→20`, `23→30`, clamped to `min(120, titanLevel)`) with cumulative Fairy Dust & Gold cost gating.
+  - Removed redundant `"Level"` wording from `+1` buttons (`+1`, `+10 (Lv. X)`, `Max (Lv. X)`), added side-by-side `+1` and `+N (→M)` artifact upgrade buttons with cost tooltips, and displayed a compact `MAX (Lv.120)` badge at max level.
+
 ## 0.11.402 — 2026-11-28
 
 ### Changed

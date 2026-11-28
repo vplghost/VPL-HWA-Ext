@@ -19,6 +19,7 @@ import { getGold } from '@/src/utils/resourceData';
 import { getItemIcon } from '@/src/utils/itemResources';
 import {
   calculateTitanArtifactEvolvePlan,
+  computeTitanArtifactLevelPlan,
   type TitanArtifactChestOption,
 } from '@/src/utils/titanArtifactChestHelper';
 import {
@@ -325,6 +326,12 @@ export interface TitanArtifactSlot {
   dustCost: number;
   goldCost: number;
   canLevelUp: boolean;
+  isMaxed: boolean;
+  milestoneTarget: number;
+  milestoneDelta: number;
+  milestoneDustCost: number;
+  milestoneGoldCost: number;
+  canLevelToMilestone: boolean;
   fragCost: number;
   ownedFrags: number;
   canEvolve: boolean;
@@ -352,18 +359,14 @@ const detailedArtifacts = computed<TitanArtifactSlot[]>(() => {
     const level = Number(rawArt.level) || 1;
     const star = Number(rawArt.star) || 1;
 
-    // Level cost
-    const nextLvl = level + 1;
-    const levelCost = nextLvl <= 120 ? getTitanArtifactLevelCost(nextLvl) : null;
-    const dustCost = levelCost ? levelCost[0] : 0;
-    const goldCostVal = levelCost ? levelCost[1] : 0;
-
-    const canLevelUp =
-      level < titanCurrentLevel.value &&
-      level < 120 &&
-      dustCost > 0 &&
-      fairyDust.value >= dustCost &&
-      gold.value >= goldCostVal;
+    // Level & Next-10 milestone cost
+    const levelPlan = computeTitanArtifactLevelPlan(
+      level,
+      titanCurrentLevel.value,
+      fairyDust.value,
+      gold.value,
+      getTitanArtifactLevelCost
+    );
 
     // Evolve cost
     const nextStar = star + 1;
@@ -381,9 +384,15 @@ const detailedArtifacts = computed<TitanArtifactSlot[]>(() => {
       artifactId,
       level,
       star,
-      dustCost,
-      goldCost: goldCostVal,
-      canLevelUp,
+      dustCost: levelPlan.dustCost1,
+      goldCost: levelPlan.goldCost1,
+      canLevelUp: levelPlan.canLevelUp1,
+      isMaxed: levelPlan.isMaxed,
+      milestoneTarget: levelPlan.milestoneTarget,
+      milestoneDelta: levelPlan.milestoneDelta,
+      milestoneDustCost: levelPlan.milestoneDustCost,
+      milestoneGoldCost: levelPlan.milestoneGoldCost,
+      canLevelToMilestone: levelPlan.canLevelToMilestone,
       fragCost,
       ownedFrags,
       canEvolve,
@@ -402,20 +411,28 @@ const detailedArtifacts = computed<TitanArtifactSlot[]>(() => {
 const isUpgradingArtifact = ref<Record<number, boolean>>({});
 const isEvolvingArtifact = ref<Record<number, boolean>>({});
 
-async function handleArtifactLevelUp(slotId: number, artifactId: number) {
+async function handleArtifactLevelUp(slotId: number, artifactId: number, steps = 1) {
   if (!activeTitan.value || isUpgradingArtifact.value[slotId]) return;
+  const art = detailedArtifacts.value[slotId];
+  const count = Math.max(1, Math.min(10, Math.floor(Number(steps) || 1)));
+  if (!art) return;
+  if (count === 1 && !art.canLevelUp) return;
+  if (count > 1 && (!art.canLevelToMilestone || count !== art.milestoneDelta)) return;
+
   const numTitanId = Number(internalTitanId.value);
   isUpgradingArtifact.value[slotId] = true;
   try {
-    await dispatchRpc([
-      {
+    const calls: Array<{ name: string; args?: any }> = [];
+    for (let i = 0; i < count; i++) {
+      calls.push({
         name: 'artifact_LevelUpCost',
         args: { unitId: numTitanId, artifactId },
-      },
-      { name: 'titanGetAll' },
-      { name: 'inventoryGet' },
-      { name: 'userGetInfo' },
-    ]);
+      });
+    }
+    calls.push({ name: 'titanGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+    await dispatchRpc(calls);
   } catch (err) {
     console.error('Failed to upgrade titan artifact level:', err);
   } finally {
@@ -782,7 +799,7 @@ const skillsList = computed(() => {
 
             <!-- Level Up Action Buttons -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-              <!-- +1 Level -->
+              <!-- +1 -->
               <button
                 id="btn-titan-levelup-1"
                 type="button"
@@ -791,13 +808,13 @@ const skillsList = computed(() => {
                 :class="planPlus1.canLevelUp ? 'bg-teal-50 hover:bg-teal-100 border-teal-300 text-teal-800 dark:bg-teal-950/40 dark:border-teal-800 dark:text-teal-200' : 'bg-slate-50 border-slate-200 text-slate-400 dark:bg-slate-800/40 dark:border-slate-700'"
                 @click="handleLevelUp(planPlus1.potionsNeeded)"
               >
-                <span class="font-bold">+1 Level</span>
+                <span class="font-bold">+1</span>
                 <span class="text-3xs text-slate-500 dark:text-slate-400">
                   {{ formatNumber(planPlus1.potionsNeeded) }} potions
                 </span>
               </button>
 
-              <!-- +10 Levels -->
+              <!-- +10 -->
               <button
                 id="btn-titan-levelup-10"
                 type="button"
@@ -806,13 +823,13 @@ const skillsList = computed(() => {
                 :class="planPlus10.canLevelUp ? 'bg-teal-50 hover:bg-teal-100 border-teal-300 text-teal-800 dark:bg-teal-950/40 dark:border-teal-800 dark:text-teal-200' : 'bg-slate-50 border-slate-200 text-slate-400 dark:bg-slate-800/40 dark:border-slate-700'"
                 @click="handleLevelUp(planPlus10.potionsNeeded)"
               >
-                <span class="font-bold">+10 Levels (Lvl {{ planPlus10.targetLevel }})</span>
+                <span class="font-bold">+10 (Lv. {{ planPlus10.targetLevel }})</span>
                 <span class="text-3xs text-slate-500 dark:text-slate-400">
                   {{ formatNumber(planPlus10.potionsNeeded) }} potions
                 </span>
               </button>
 
-              <!-- Max Level -->
+              <!-- Max -->
               <button
                 id="btn-titan-levelup-max"
                 type="button"
@@ -821,7 +838,7 @@ const skillsList = computed(() => {
                 :class="planMax.canLevelUp ? 'bg-teal-600 hover:bg-teal-700 border-teal-600 text-white shadow-xs' : 'bg-slate-50 border-slate-200 text-slate-400 dark:bg-slate-800/40 dark:border-slate-700'"
                 @click="handleLevelUp(planMax.potionsNeeded)"
               >
-                <span class="font-bold">Max Level (Lvl {{ planMax.targetLevel }})</span>
+                <span class="font-bold">Max (Lv. {{ planMax.targetLevel }})</span>
                 <span class="text-3xs" :class="planMax.canLevelUp ? 'text-teal-100' : 'text-slate-400'">
                   {{ formatNumber(planMax.potionsNeeded) }} potions
                 </span>
@@ -893,26 +910,50 @@ const skillsList = computed(() => {
                   </div>
                 </div>
 
-                <!-- Level Up Button & Cost -->
-                <div class="pt-1 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1">
-                  <div class="flex items-center justify-between text-3xs text-slate-500 dark:text-slate-400">
-                    <span>Level Up Cost:</span>
-                    <span class="font-mono">
-                      {{ formatNumber(art.dustCost) }} dust • {{ formatNumber(art.goldCost) }} gold
+                <!-- Level Up Buttons & Cost -->
+                <div class="pt-1 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1.5">
+                  <div v-if="art.isMaxed" class="flex items-center justify-center py-1">
+                    <span class="px-2 py-0.5 rounded-full text-3xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      MAX (Lv.120)
                     </span>
                   </div>
+                  <template v-else>
+                    <div class="flex items-center justify-between text-3xs text-slate-500 dark:text-slate-400">
+                      <span>+1 Cost:</span>
+                      <span class="font-mono">
+                        {{ formatNumber(art.dustCost) }} dust • {{ formatNumber(art.goldCost) }} gold
+                      </span>
+                    </div>
 
-                  <button
-                    :id="`btn-titan-art-lvl-${art.slotId}`"
-                    type="button"
-                    :disabled="!art.canLevelUp || isUpgradingArtifact[art.slotId]"
-                    class="cursor-pointer w-full py-1 rounded text-2xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    :class="art.canLevelUp ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-2xs' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
-                    @click="handleArtifactLevelUp(art.slotId, art.artifactId)"
-                  >
-                    <span v-if="isUpgradingArtifact[art.slotId]" class="animate-spin inline-block">🔄</span>
-                    <span>+1 Level</span>
-                  </button>
+                    <div class="grid gap-1.5" :class="art.milestoneDelta > 1 ? 'grid-cols-2' : 'grid-cols-1'">
+                      <button
+                        :id="`btn-titan-art-lvl-${art.slotId}`"
+                        type="button"
+                        :disabled="!art.canLevelUp || isUpgradingArtifact[art.slotId]"
+                        :title="`Upgrade +1 to Lv.${art.level + 1} · Cost: ${formatNumber(art.dustCost)} Dust · ${formatNumber(art.goldCost)} Gold`"
+                        class="cursor-pointer w-full py-1 rounded text-2xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        :class="art.canLevelUp ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-2xs' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
+                        @click="handleArtifactLevelUp(art.slotId, art.artifactId, 1)"
+                      >
+                        <span v-if="isUpgradingArtifact[art.slotId]" class="animate-spin inline-block">🔄</span>
+                        <span v-else>+1</span>
+                      </button>
+
+                      <button
+                        v-if="art.milestoneDelta > 1"
+                        :id="`btn-titan-art-lvl-ten-${art.slotId}`"
+                        type="button"
+                        :disabled="!art.canLevelToMilestone || isUpgradingArtifact[art.slotId]"
+                        :title="`Upgrade +${art.milestoneDelta} to Lv.${art.milestoneTarget} · Cost: ${formatNumber(art.milestoneDustCost)} Dust · ${formatNumber(art.milestoneGoldCost)} Gold`"
+                        class="cursor-pointer w-full py-1 rounded text-2xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        :class="art.canLevelToMilestone ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-2xs' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
+                        @click="handleArtifactLevelUp(art.slotId, art.artifactId, art.milestoneDelta)"
+                      >
+                        <span v-if="isUpgradingArtifact[art.slotId]" class="animate-spin inline-block">🔄</span>
+                        <span v-else>+{{ art.milestoneDelta }} (→{{ art.milestoneTarget }})</span>
+                      </button>
+                    </div>
+                  </template>
                 </div>
 
                 <!-- Star Evolve Button & Cost -->
