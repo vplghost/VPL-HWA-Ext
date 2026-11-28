@@ -751,7 +751,7 @@ watch(
           <span>Skip opponents with ≥ 2 hidden teams (Top 20)</span>
         </label>
 
-        <AutomationLogPanel :logs="logs" empty-text="No Grand Arena automation events yet." />
+        <AutomationLogPanel :entries="logs" empty-text="No Grand Arena automation events yet." @clear="logs = []" />
       </div>
     </div>
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.392 — 2026-11-28
+
+### Fixed
+
+- **Runtime Error Hardening (`AutomationLogPanel.vue`, `GrandArenaModal.vue`, `useRpcCache.ts`, `backgroundRuntime.ts`, `tests/p1-22-runtime-fixes.test.mjs`)**:
+  - Fixed `<AutomationLogPanel>` `TypeError: Cannot read properties of undefined (reading 'length')` by defaulting `entries` safely, supporting legacy `logs` (`{ time, tone, text }`) + `emptyText`, and updating `GrandArenaModal.vue` to bind `:entries="logs"` + `@clear`.
+  - Fixed `DataCloneError` in `useRpcCache.updateCacheLocally()` by replacing shallow `structuredClone(toRaw(cache.value))` with deep plain cloning (`clonePlainCache`) so nested Vue reactive `Proxy` objects never fail to clone.
+  - Downgraded transient `advanceCityQueue` summary-request rejections from repeated `console.error` (`[object Object]`) to deduplicated `warn` with 30s backoff.
+
 ## 0.11.391 — 2026-11-28
 
 ### Changed

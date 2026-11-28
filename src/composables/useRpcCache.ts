@@ -129,6 +129,16 @@ export function updateRecordingState(next: any) {
   recordingState.value = typeof next.active === 'boolean' ? next : { active: Boolean(next) };
 }
 
+export function clonePlainCache<T>(value: T): T {
+  const raw = toRaw(value);
+  if (raw == null || typeof raw !== 'object') return raw;
+  try {
+    return JSON.parse(JSON.stringify(raw)) as T;
+  } catch {
+    return structuredClone(raw);
+  }
+}
+
 export function useRpcCache() {
   onMounted(() => {
     ensureStorageListener();
@@ -138,7 +148,8 @@ export function useRpcCache() {
   async function updateCacheLocally(updater: (draft: RpcCache) => void) {
     // The background reducer owns persisted RPC state. Optimistic UI changes
     // must never replace its entire cache with a potentially stale snapshot.
-    const next = structuredClone(toRaw(cache.value));
+    // Use JSON deep-plain clone so nested Vue reactive Proxies never throw DataCloneError.
+    const next = clonePlainCache(cache.value);
     updater(next);
     cache.value = next;
   }

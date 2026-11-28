@@ -3,19 +3,26 @@ import { ref, computed } from 'vue';
 
 export interface AutomationLogEntry {
   ts?: string;
+  time?: string;
   level?: 'info' | 'warn' | 'error';
+  tone?: 'info' | 'ok' | 'warn' | 'err';
   text: string;
 }
 
 const props = withDefaults(
   defineProps<{
-    entries: AutomationLogEntry[];
+    entries?: AutomationLogEntry[];
+    logs?: AutomationLogEntry[];
     title?: string;
     maxHeight?: string;
+    emptyText?: string;
   }>(),
   {
+    entries: undefined,
+    logs: undefined,
     title: 'Automation Log',
     maxHeight: 'max-h-44',
+    emptyText: 'No log entries yet.',
   }
 );
 
@@ -26,12 +33,29 @@ const emit = defineEmits<{
 const filterLevel = ref<'all' | 'warn' | 'error'>('all');
 const copied = ref(false);
 
+function normalizeLevel(entry: AutomationLogEntry): 'info' | 'warn' | 'error' {
+  if (entry.level === 'error' || entry.tone === 'err') return 'error';
+  if (entry.level === 'warn' || entry.tone === 'warn') return 'warn';
+  return 'info';
+}
+
+const normalizedEntries = computed<Array<{ ts?: string; level: 'info' | 'warn' | 'error'; text: string }>>(() => {
+  const raw = Array.isArray(props.entries) ? props.entries : Array.isArray(props.logs) ? props.logs : [];
+  return raw
+    .filter((e): e is AutomationLogEntry => Boolean(e && typeof e === 'object'))
+    .map((e) => ({
+      ts: e.ts || e.time,
+      level: normalizeLevel(e),
+      text: String(e.text ?? ''),
+    }));
+});
+
 const filteredEntries = computed(() => {
-  if (filterLevel.value === 'all') return props.entries;
+  if (filterLevel.value === 'all') return normalizedEntries.value;
   if (filterLevel.value === 'warn') {
-    return props.entries.filter((e) => e.level === 'warn' || e.level === 'error');
+    return normalizedEntries.value.filter((e) => e.level === 'warn' || e.level === 'error');
   }
-  return props.entries.filter((e) => e.level === 'error');
+  return normalizedEntries.value.filter((e) => e.level === 'error');
 });
 
 async function copyLog() {
@@ -77,7 +101,7 @@ async function copyLog() {
       </div>
     </div>
     <div :class="maxHeight" class="overflow-y-auto p-2.5 font-mono text-[11px] space-y-1">
-      <div v-if="filteredEntries.length === 0" class="text-slate-500 italic">No log entries yet.</div>
+      <div v-if="filteredEntries.length === 0" class="text-slate-500 italic">{{ emptyText }}</div>
       <div
         v-for="(entry, idx) in filteredEntries"
         :key="idx"

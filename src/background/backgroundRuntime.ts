@@ -568,12 +568,13 @@ export async function appendQueueLog(type: string, logEntry: any, customChrome?:
     await cr?.storage?.local?.set({ [key]: updatedLogs });
 
     const logPrefix = `[HWA-QUEUE][${type.toUpperCase()}]`;
+    const summaryText = entry.message || entry.action || '';
     if (entry.status === 'error' || entry.error) {
-      console.error(logPrefix, entry.message || entry.action, entry);
+      console.error(`${logPrefix} ${summaryText}`, typeof entry.error === 'string' ? entry.error : '');
     } else if (entry.status === 'warn') {
-      console.warn(logPrefix, entry.message || entry.action, entry);
+      console.warn(`${logPrefix} ${summaryText}`);
     } else {
-      console.log(logPrefix, entry.message || entry.action, entry);
+      console.log(`${logPrefix} ${summaryText}`);
     }
     return entry;
   } catch (err) {
@@ -994,13 +995,23 @@ export async function runCityQueue(
       }
       return;
     }
+    const prevBlocked = queue.lastBlocked;
     queue.lastBlocked = null;
     queue.lastVerifiedAt = now;
     queue.wakeAt = now + 15000;
     await save();
     try {
       const reply = await cr?.tabs?.sendMessage(tabId, { ...dispatch, group: type + '-queue-check', expiresAt: now + 120000 });
-      if (reply?.error || reply?.ok === false) throw new Error(reply.error || 'Game tab rejected summary request.');
+      if (reply?.error || reply?.ok === false) {
+        const detail = typeof reply?.error === 'string' ? reply.error : 'Game tab rejected summary request.';
+        queue.lastBlocked = 'verify';
+        queue.wakeAt = now + 30000;
+        await save();
+        if (prevBlocked !== 'verify') {
+          await log('verify-deferred', `Queue verify deferred: ${detail}`, 'warn');
+        }
+        return;
+      }
       await log('verify', reason + ' Requested current server summary.', 'info', {
         hasStatus: Boolean(status),
         statusMethod: status?.method || null,
@@ -1010,7 +1021,13 @@ export async function runCityQueue(
         maxSlots: Number(queue.maxSlots) || 1,
       });
     } catch (error: any) {
-      await log('error', 'Could not verify queue: ' + (error?.message || String(error)), 'error');
+      const detail = error instanceof Error ? error.message : String(error);
+      queue.lastBlocked = 'verify';
+      queue.wakeAt = now + 30000;
+      await save();
+      if (prevBlocked !== 'verify') {
+        await log('verify-deferred', `Queue verify deferred: ${detail}`, 'warn');
+      }
     }
   }
 
