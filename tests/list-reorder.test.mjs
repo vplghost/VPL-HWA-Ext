@@ -46,7 +46,10 @@ test('Reorderable Vue lists expose Move to first buttons, SettingsTab uses dragg
   for (const [relPath, idPrefix] of checks) {
     const src = await readFile(resolve(root, relPath), 'utf8');
     assert.ok(src.includes(idPrefix), `${relPath} must render #${idPrefix}* button`);
-    assert.ok(src.includes('title="Move to first"'), `${relPath} must have English Move to first tooltip`);
+    assert.ok(
+      src.includes('title="Move to first"') || src.includes("'Move to first'"),
+      `${relPath} must have English Move to first tooltip`
+    );
   }
 
   const settingsSrc = await readFile(resolve(root, 'src/components/tabs/SettingsTab.vue'), 'utf8');

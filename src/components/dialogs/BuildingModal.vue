@@ -23,6 +23,7 @@ import {
 } from '@/src/composables/useModals';
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 import { extractResearchLevels } from '@/src/services/queues/researchQueue';
+import { getCityQueueMoveBounds, formatCityQueueMoveTitles } from '@/src/utils/cityQueueReorder';
 
 const bHelper = buildingDataHelper;
 const bQueueHelper = buildingQueueService;
@@ -259,6 +260,18 @@ function moveQueueItem(idx: number, direction: 'up' | 'down' | 'first') {
   const item = buildingQueue.value.items[idx];
   if (item) void commandQueue('move', { item: { ...item }, direction });
 }
+
+const queueMoveMeta = computed(() => {
+  const items = queueTimeline.value.items || [];
+  return items.map((_item, idx) => {
+    const bounds = getCityQueueMoveBounds('building', items, idx);
+    const titles = formatCityQueueMoveTitles(
+      bounds,
+      (it: any) => `${getBuildingName(it.buildingId, it.name)} Lv.${it.nextLevel}`
+    );
+    return { bounds, titles };
+  });
+});
 
 function removeQueueItem(idx: number) {
   const item = buildingQueue.value.items[idx];
@@ -825,12 +838,12 @@ async function refreshBuildings() {
                   <button
                     :id="`building-queue-move-first-${idx}`"
                     type="button"
-                    title="Move to first"
-                    aria-label="Move to first"
-                    :disabled="idx === 0"
+                    :title="queueMoveMeta[Number(idx)]?.titles.first || 'Move to first'"
+                    :aria-label="queueMoveMeta[Number(idx)]?.titles.first || 'Move to first'"
+                    :disabled="!queueMoveMeta[Number(idx)]?.bounds.canMoveFirst"
                     class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
                     :class="
-                      idx === 0
+                      !queueMoveMeta[Number(idx)]?.bounds.canMoveFirst
                         ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                         : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
                     "
@@ -840,11 +853,11 @@ async function refreshBuildings() {
                   </button>
                   <button
                     type="button"
-                    title="Move up"
-                    :disabled="idx === 0"
+                    :title="queueMoveMeta[Number(idx)]?.titles.up || 'Move up'"
+                    :disabled="!queueMoveMeta[Number(idx)]?.bounds.canMoveUp"
                     class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
                     :class="
-                      idx === 0
+                      !queueMoveMeta[Number(idx)]?.bounds.canMoveUp
                         ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                         : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
                     "
@@ -854,11 +867,11 @@ async function refreshBuildings() {
                   </button>
                   <button
                     type="button"
-                    title="Move down"
-                    :disabled="idx === queueTimeline.items.length - 1"
+                    :title="queueMoveMeta[Number(idx)]?.titles.down || 'Move down'"
+                    :disabled="!queueMoveMeta[Number(idx)]?.bounds.canMoveDown"
                     class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
                     :class="
-                      idx === queueTimeline.items.length - 1
+                      !queueMoveMeta[Number(idx)]?.bounds.canMoveDown
                         ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                         : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
                     "

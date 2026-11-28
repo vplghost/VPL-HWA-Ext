@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.399 — 2026-11-28
+
+### Changed
+
+- **Dependency-Aware Building & Research Queue Reordering (`cityQueueReorder.ts`, `backgroundRuntime.ts`, `BuildingModal.vue`, `ResearchModal.vue`, `tests/city-queue-reorder.test.mjs`)**:
+  - Added `getCityQueueMoveBounds()`, `computeConstrainedCityQueueMove()`, and `formatCityQueueMoveTitles()` to enforce same-entity sequential level ordering (`Lv.20` before `Lv.21`), cross-building/research tree prerequisites (e.g. `Garrison Wall Lv.22` before `Hall of Heroes Lv.23`), Hall of Heroes level cap, and transitive dependency chains.
+  - Updated `Move to First` (`⤒`) so it stops immediately after the item's last prerequisite (`minIndex`), enforced the bounds inside `runCityQueueMutation()` in `backgroundRuntime.ts`, and bound disabled states + descriptive English tooltips (`Move right after ...`, `Blocked by ...`, `Required by ...`) in `BuildingModal.vue` and `ResearchModal.vue`.
+
 ## 0.11.398 — 2026-11-28
 
 ### Added
