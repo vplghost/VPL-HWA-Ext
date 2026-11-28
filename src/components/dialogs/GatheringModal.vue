@@ -771,7 +771,7 @@ async function recallMarch(march: any) {
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
-              <option value="rotate">Daily priorities (Food → Iron → Stone → Wood)</option>
+              <option value="rotate">Smart balance (Daily quests → Lowest weighted stock)</option>
               <option value="food">🍞 Food Only</option>
               <option value="wood">🌲 Wood Only</option>
               <option value="stone">◆ Stone Only</option>

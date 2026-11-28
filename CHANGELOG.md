@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.411 — 2026-11-28
+
+### Changed
+
+- **Auto-Gather Full Max-Marches Split, 5% Daily Margin & Weighted Stock Balancing (`autoGather.ts`, `smartGather.ts`, `GatheringModal.vue`, `tests/gathering-modal-and-troop-wait.test.mjs`)**:
+  - Updated `computeBalancedGatherAllocation()` to respect user-configured `Max Gathering Marches` (removed the `maxMarches - 1` cap while keeping troop reservation and even troop splitting).
+  - Raised daily quest completion margin in `dailyPlan()` from `102%` to `105%` (`5%` margin) with immediate recall upon completion while preserving top priority for Raid/Monster interrupted mines (`resumePlan`).
+  - Replaced fixed resource rotation with `selectBalancedResourceType()`: selects the mine type with the lowest `(cityNonChestStock + inFlightGatheringAndMarchingAmount) * RESOURCE_CARGO_WEIGHT[type]` (`Food ×1`, `Wood ×1`, `Stone ×5`, `Iron ×20`).
+
 ## 0.11.409 — 2026-11-28
 
 ### Added

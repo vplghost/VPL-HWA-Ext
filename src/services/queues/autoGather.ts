@@ -6,6 +6,12 @@ import type {
 import type { BasicResourceType } from '../../types/game/march.ts';
 import * as expData from '../../utils/experimentalData.ts';
 import { calculateAccountMaxMarches } from '../../utils/dashboardState.ts';
+import {
+  RESOURCE_CARGO_WEIGHT,
+  TROOP_CARGO_CAPACITY_BY_LEVEL,
+  calculateMineCargo,
+} from '../../utils/mineData.ts';
+import { resolveMarchResourceType, isMarchExpired } from '../../utils/resourceData.ts';
 import smartGatherService from './smartGather.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
 import { ResourceLockManager, type ResourceReservation } from '../../background/resourceLock.ts';
@@ -159,7 +165,7 @@ export function computeBalancedGatherAllocation(params: {
     };
   }
 
-  const targetSlots = Math.max(1, maxMarches - 1);
+  const targetSlots = Math.max(1, maxMarches);
   const perMarchCap = Math.max(1, Math.min(squadCap, Math.floor(netTroops / targetSlots)));
   const remainingSlots = Math.max(1, targetSlots - active);
   const surplusInCity = countAvailableTroops(params.effectiveSummary);
@@ -175,6 +181,118 @@ export function computeBalancedGatherAllocation(params: {
     perMarchCap,
     dispatchCap,
   };
+}
+
+export function getCityResourceStock(cache: any): {
+  hasStockData: boolean;
+  stock: Record<BasicResourceType, number>;
+} {
+  const keys: Record<BasicResourceType, [string, string]> = {
+    food: ['resource:material:5', 'resource:food'],
+    wood: ['resource:material:4', 'resource:wood'],
+    stone: ['resource:material:3', 'resource:stone'],
+    iron: ['resource:material:2', 'resource:iron'],
+  };
+  let hasStockData = false;
+  const stock: Record<BasicResourceType, number> = { food: 0, wood: 0, stone: 0, iron: 0 };
+  for (const type of BASIC_MINE_TYPES) {
+    const [primary, fallback] = keys[type];
+    const raw = cache?.[primary]?.data?.amount ?? cache?.[fallback]?.data?.amount;
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      hasStockData = true;
+      stock[type] = Math.max(0, raw);
+    }
+  }
+  return { hasStockData, stock };
+}
+
+export function estimateMarchInFlightResourceAmount(
+  march: any,
+  type: BasicResourceType,
+  cache: any
+): number {
+  const weight = RESOURCE_CARGO_WEIGHT[type] ?? 1;
+  const squadId = march?.squadId ?? march?.id;
+  const plan =
+    cache?.gatheringStatus?.data?.plans?.[squadId] ||
+    safeList(cache?.gatheringStatus?.data?.gatherings).find(
+      (g: any) => (g?.squadId ?? g?.id) === squadId && (!march?.mineId || g?.mineId === march.mineId)
+    );
+  const planned = Number(plan?.plannedGatheredResourceAmount ?? march?.gatheringTotalAmount);
+  if (Number.isFinite(planned) && planned > 0) return planned;
+
+  const mineRemaining = Number(
+    march?.resourceAmount ??
+      march?.resourcesAmount ??
+      cache?.mineMap?.[march?.mineId]?.resourceAmount ??
+      cache?.mineMap?.[march?.mineId]?.resourcesAmount
+  );
+
+  // Estimate cargo from deployed squad units (for marches still moving to the mine)
+  const squads = safeList(cache?.['getUnitSummary:unit']?.data?.squads);
+  const squad = squads.find((s: any) => (s?.squadId ?? s?.id) === squadId);
+  if (squad && Array.isArray(squad.units) && squad.units.length > 0) {
+    let totalCargo = 0;
+    for (const u of squad.units) {
+      const count = Number(u?.state?.survived ?? u?.count);
+      const id = Number(u?.unitId ?? u?.id);
+      if (!Number.isFinite(count) || count <= 0 || !Number.isInteger(id) || id <= 0) continue;
+      const tier = ((id - 1) % 10) + 1;
+      const capPerTroop = TROOP_CARGO_CAPACITY_BY_LEVEL[tier] ?? 1900;
+      totalCargo += count * capPerTroop;
+    }
+    if (totalCargo > 0) {
+      const fromSquad = Math.floor(totalCargo / weight);
+      return Number.isFinite(mineRemaining) && mineRemaining > 0
+        ? Math.min(fromSquad, mineRemaining)
+        : fromSquad;
+    }
+  }
+
+  if (Number.isFinite(mineRemaining) && mineRemaining > 0) return mineRemaining;
+  const level = Number(march?.mineLevel ?? cache?.mineMap?.[march?.mineId]?.level) || 7;
+  return Math.floor(calculateMineCargo(type, level) / weight);
+}
+
+/**
+ * Selects the next basic resource type by lowest capacity-weighted projected stock:
+ *   score[type] = (cityStock[type] + inFlightAmount[type]) * RESOURCE_CARGO_WEIGHT[type]
+ * Excludes unopened chests; includes marching, gathering, and returning gathering marches.
+ */
+export function selectBalancedResourceType(
+  cache: any,
+  now: number = Date.now()
+): {
+  type: BasicResourceType;
+  hasStockData: boolean;
+  scores: Record<BasicResourceType, number>;
+  stock: Record<BasicResourceType, number>;
+  inFlight: Record<BasicResourceType, number>;
+} {
+  const { hasStockData, stock } = getCityResourceStock(cache);
+  const inFlight: Record<BasicResourceType, number> = { food: 0, wood: 0, stone: 0, iron: 0 };
+
+  for (const m of safeList(cache?.marchStatus?.data?.marches)) {
+    if (!m || isMarchExpired(m, now)) continue;
+    const resolved = resolveMarchResourceType(m, cache);
+    const normType = resolved === 'gold' ? 'food' : resolved;
+    if (!normType || !(BASIC_MINE_TYPES as readonly string[]).includes(normType)) continue;
+    const t = normType as BasicResourceType;
+    inFlight[t] += estimateMarchInFlightResourceAmount(m, t, cache);
+  }
+
+  const tieOrder: readonly BasicResourceType[] = ['food', 'iron', 'stone', 'wood'];
+  const scores: Record<BasicResourceType, number> = { food: 0, wood: 0, stone: 0, iron: 0 };
+  for (const t of tieOrder) {
+    scores[t] = (stock[t] + inFlight[t]) * (RESOURCE_CARGO_WEIGHT[t] ?? 1);
+  }
+
+  let best: BasicResourceType = tieOrder[0];
+  for (const t of tieOrder.slice(1)) {
+    if (scores[t] < scores[best]) best = t;
+  }
+
+  return { type: best, hasStockData, scores, stock, inFlight };
 }
 
 /**
@@ -610,17 +728,14 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
     effectiveMaxMarches,
     activeCount,
   });
-  if (balanced.constrained && activeCount >= balanced.targetSlots) {
-    return {
-      action: 'wait',
-      reason: `Balanced gathering active (${activeCount}/${balanced.targetSlots} squads; reserving 1 march slot while army is below full capacity)`,
-      activeCount,
-      maxMarches: balanced.targetSlots,
-    };
-  }
 
+  const weightedPick = settings.mineType === 'rotate' ? selectBalancedResourceType(cache, now) : null;
   const targetMineType =
-    resume?.type || daily?.type || resolveNextMineType(settings.mineType, settings.lastAutoMineType);
+    resume?.type ||
+    daily?.type ||
+    (weightedPick?.hasStockData
+      ? weightedPick.type
+      : resolveNextMineType(settings.mineType, settings.lastAutoMineType));
   const nearest =
     smart && !resume && settings.mineLevel === 'nearest'
       ? smart.nearestPlan(cache, stored?.smartGatherState, targetMineType, now)
@@ -739,6 +854,9 @@ export const autoGatherService = {
   countDeployedTroops,
   countTotalTroops,
   computeBalancedGatherAllocation,
+  getCityResourceStock,
+  estimateMarchInFlightResourceAmount,
+  selectBalancedResourceType,
   applyTroopReserve,
   normalizeAutoGatherSettings,
   resolveNextMineType,

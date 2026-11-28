@@ -71,8 +71,8 @@ test('daily final chain targets and priority match confirmed user rules', () => 
   const c = cache();
   let result = smart.dailyPlan(c, {}, now);
   assert.equal(result.type, 'food');
-  assert.deepEqual(result.rows.map(row => [row.type, row.target]), [['food', 255000], ['iron', 15300], ['stone', 51000], ['wood', 255000]]);
-  c['getDailyQuests:quest'].data.quests[0].progress = 255000;
+  assert.deepEqual(result.rows.map(row => [row.type, row.target]), [['food', 262500], ['iron', 15750], ['stone', 52500], ['wood', 262500]]);
+  c['getDailyQuests:quest'].data.quests[0].progress = 262500;
   assert.equal(smart.dailyPlan(c, {}, now).type, 'iron');
 });
 test('first milestone completion is not full-chain completion; stale days require refresh', () => {
@@ -89,7 +89,7 @@ test('observed daily progress and gathering increments are not counted twice', (
   c.marchStatus.data.marches = [m];
   assert.equal(smart.collectedSince(m, c, now - 60000, now), 50000);
   assert.equal(smart.dailyPlan(c, {}, now).type, 'iron', 'do not dispatch another food squad');
-  c['getDailyQuests:quest'].data.quests[0].progress = 205000;
+  c['getDailyQuests:quest'].data.quests[0].progress = 212500;
   assert.equal(smart.dailyPlan(c, {}, now).action, 'recall');
   delete m.gatheringTotalAmount;
   assert.equal(smart.dailyPlan(c, {}, now).action, 'target', 'missing plan cannot trigger recall');

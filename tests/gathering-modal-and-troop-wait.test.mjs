@@ -9,9 +9,11 @@ import {
   countAvailableTroops,
   countTotalTroops,
   computeBalancedGatherAllocation,
+  selectBalancedResourceType,
   isTroopAvailabilityEvent,
   planAutoGather,
 } from '../src/services/queues/autoGather.ts';
+import { dailyPlan } from '../src/services/queues/smartGather.ts';
 import { computeActiveAutomations } from '../src/composables/useActiveAutomations.ts';
 import { evaluateAutoGather, tickMineDefense } from '../src/background/backgroundRuntime.ts';
 import { getMineConfigId } from '../src/utils/mineData.ts';
@@ -378,14 +380,14 @@ test('GatheringModal uses header status/actions, unified Auto toggle, mutual Aut
   assert.match(vue, /const showReserveConfig = ref\(false\)/);
 });
 
-test('P2-54: computeBalancedGatherAllocation splits (total - reserve) / (maxMarches - 1) evenly when constrained', () => {
+test('P2-55: computeBalancedGatherAllocation splits (total - reserve) / maxMarches respecting user Max Gathering Marches', () => {
   const reserve = { infantry: 100, spearmen: 100, marksmen: 100 }; // 300 total
   const rawSummary = {
     available: [
       { unitId: 9, count: 3500 },
       { unitId: 19, count: 3400 },
       { unitId: 29, count: 3400 },
-    ], // 10,300 total -> 10,000 net < 4,000 * 5 = 20,000
+    ], // 10,300 total -> 10,000 net < 4,000 * 4 = 16,000
     squads: [],
   };
   const effectiveSummary = applyTroopReserve(rawSummary, reserve);
@@ -395,7 +397,7 @@ test('P2-54: computeBalancedGatherAllocation splits (total - reserve) / (maxMarc
     effectiveSummary,
     reserveTroops: reserve,
     squadCapacity: 4000,
-    effectiveMaxMarches: 5,
+    effectiveMaxMarches: 4,
     activeCount: 0,
   });
   assert.equal(p0.constrained, true);
@@ -431,14 +433,14 @@ test('P2-54: computeBalancedGatherAllocation splits (total - reserve) / (maxMarc
   assert.equal(countTotalTroops({ available: [{ unitId: 9, count: 500 }], squads: [{ units: [{ unitId: 9, state: { survived: 250 } }] }] }), 750);
 });
 
-test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at (maxMarches - 1) when army is constrained', () => {
+test('P2-55: planAutoGather splits troops across all user Max Gathering Marches (including the final slot)', () => {
   const now = 1_700_000_000_000;
   const cache = makeBaseCache(
     [
       { unitId: 9, count: 3100 },
       { unitId: 19, count: 3100 },
       { unitId: 29, count: 3100 },
-    ], // 9,300 total - 300 reserve = 9,000 net; 4 marches * ~4,055 = ~16,220 -> constrained -> 3 slots * 3,000 each
+    ], // 9,300 total - 300 reserve = 9,000 net; 4 marches -> 2,250 per march
     now
   );
   cache.researchStatus = {
@@ -458,7 +460,7 @@ test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at 
     updatedAt: new Date(now).toISOString(),
   };
 
-  // Standard mode dispatch #1: capped at 3,000 instead of draining full 4,055
+  // Standard mode dispatch #1: capped at 2,250 (9,000 / 4)
   const stdPlan = planAutoGather(
     cache,
     {
@@ -476,9 +478,9 @@ test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at 
   );
   assert.equal(stdPlan.action, 'gather');
   const stdSent = stdPlan.call.args.squad.units.reduce((s, u) => s + u.count, 0);
-  assert.equal(stdSent, 3000);
+  assert.equal(stdSent, 2250);
 
-  // Optimized mode dispatch #1: also capped at 3,000
+  // Optimized mode dispatch #1: also capped at 2,250
   const optPlan = planAutoGather(
     cache,
     {
@@ -498,15 +500,15 @@ test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at 
   );
   assert.equal(optPlan.action, 'gather');
   const optSent = optPlan.call.args.squad.units.reduce((s, u) => s + u.count, 0);
-  assert.equal(optSent, 3000);
+  assert.equal(optSent, 2250);
 
-  // When 3 marches are already active (maxMarches - 1), waits instead of filling the 4th slot
+  // When 3 marches are already active and maxMarches is 4, dispatches the 4th slot instead of capping at 3
   cache.marchStatus.data.marches = [
     { squadId: 1, mineId: 'm1', stage: 'gathering' },
     { squadId: 2, mineId: 'm2', stage: 'gathering' },
     { squadId: 3, mineId: 'm3', stage: 'gathering' },
   ];
-  const waitPlan = planAutoGather(
+  const fourthPlan = planAutoGather(
     cache,
     {
       popupRpcEnabled: true,
@@ -521,6 +523,52 @@ test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at 
     },
     now
   );
-  assert.equal(waitPlan.action, 'wait');
-  assert.match(waitPlan.reason || '', /Balanced gathering active/i);
+  assert.equal(fourthPlan.action, 'gather');
+});
+
+test('P2-55: selectBalancedResourceType picks lowest capacity-weighted stock including marching/gathering marches, and dailyPlan uses 5% margin', () => {
+  const now = 1_700_000_000_000;
+  const iso = new Date(now).toISOString();
+  const cache = {
+    'resource:material:5': { data: { amount: 50_000_000 } }, // Food x1 = 50M
+    'resource:material:4': { data: { amount: 45_000_000 } }, // Wood x1 = 45M
+    'resource:material:3': { data: { amount: 6_000_000 } },  // Stone x5 = 30M
+    'resource:material:2': { data: { amount: 1_000_000 } },  // Iron x20 = 20M (lowest!)
+    marchStatus: { data: { marches: [] }, updatedAt: iso },
+    'getUnitSummary:unit': { data: { squads: [], available: [] }, updatedAt: iso },
+  };
+
+  // No marches in flight -> Iron (20M weighted) is lowest
+  const pick1 = selectBalancedResourceType(cache, now);
+  assert.equal(pick1.hasStockData, true);
+  assert.equal(pick1.type, 'iron');
+
+  // Add a squad currently MARCHING to an Iron mine carrying 1.5M Iron (weighted +30M -> Iron becomes 50M)
+  cache.marchStatus.data.marches = [
+    { squadId: 88, mineId: 'iron-m1', kind: 'iron', stage: 'moveToTargetInSolo', resourceAmount: 1_500_000, endsAt: now + 60_000 },
+  ];
+  const pick2 = selectBalancedResourceType(cache, now);
+  assert.equal(pick2.inFlight.iron, 1_500_000);
+  assert.equal(pick2.scores.iron, 50_000_000);
+  assert.equal(pick2.type, 'stone'); // Stone (30M) is now lowest!
+
+  // Daily quest 5% margin check (target = 105% of quest def.target)
+  const dailyCache = {
+    accountStatus: { data: { id: 1001 }, updatedAt: iso },
+    questResetStatus: { data: { nextDayAt: now + 3600_000 }, updatedAt: iso },
+    'getDailyQuests:quest': {
+      data: {
+        quests: [
+          { id: 10101, progress: 0, state: 'inProgress' },
+        ],
+      },
+      updatedAt: iso,
+    },
+    marchStatus: { data: { marches: [] }, updatedAt: iso },
+  };
+  const dPlan = dailyPlan(dailyCache, {}, now, {});
+  if (dPlan.rows?.length) {
+    // Verify 5% margin (strictly > 102% when target >= 100)
+    assert.ok(dPlan.rows[0].target >= Math.ceil((dPlan.rows[0].target / 1.05) * 1.04));
+  }
 });

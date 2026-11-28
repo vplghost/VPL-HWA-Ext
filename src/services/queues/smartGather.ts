@@ -6,7 +6,7 @@ import smartGatherData from '../../data/smartGatherData.ts';
 import { routeSpeeds } from '../../utils/marchRules.ts';
 import * as expData from '../../utils/experimentalData.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
-import { normalizeAutoGatherSettings } from './autoGather.ts';
+import { normalizeAutoGatherSettings, selectBalancedResourceType } from './autoGather.ts';
 
 function getSmartGatherData(): any {
   return smartGatherData;
@@ -377,7 +377,7 @@ export function dailyPlan(cache: any, settings: any, now: number, state: any = {
     const finished =
       current.step.id === def.steps.at(-1).id && ['completed', 'claimed', 'rewarded'].includes(current.quest.state);
     const squads = marches.filter((m: any) => typeOf(m, cache) === type);
-    const target = Math.ceil((def.target * 102) / 100);
+    const target = Math.ceil((def.target * 105) / 100);
     if (!baselines[type] || baselines[type].progress !== progress) {
       baselines[type] = { progress, since: at };
     }
@@ -406,6 +406,18 @@ export function dailyPlan(cache: any, settings: any, now: number, state: any = {
       action: 'target',
       type: unserved.type,
       reason: `Daily ${unserved.type}: ${Math.floor(unserved.estimated)}/${unserved.target}`,
+      rows,
+    };
+  }
+  const weighted = selectBalancedResourceType(cache, now);
+  if (weighted.hasStockData) {
+    const hasUnfinishedDaily = rows.some((row) => !row.done);
+    return {
+      action: 'target',
+      type: weighted.type,
+      reason: hasUnfinishedDaily
+        ? `Daily resource squads active; balancing lowest weighted stock (${weighted.type})`
+        : `Daily chains covered; balancing lowest weighted stock (${weighted.type})`,
       rows,
     };
   }
