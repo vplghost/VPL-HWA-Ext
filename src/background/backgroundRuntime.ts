@@ -54,6 +54,13 @@ import {
   planFavoriteShopPurchases,
   shouldClaimGrandArenaCoins,
 } from '../services/shopService.ts';
+import {
+  AUTO_ENERGY_BURN_ALARM_NAME,
+  ENERGY_BURN_ERROR_BACKOFF_MS,
+  evaluateWorldEnergyMonsterFallback,
+  normalizeEnergyAutoBurnSettings,
+  planCampaignEnergyBurn,
+} from '../services/energyAutoBurnService.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
 import { recordPriorityAutoJoinDaily } from '../utils/activityStats.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
@@ -2958,6 +2965,159 @@ export async function runAutoShopFavorites(manual = false, customChrome?: any) {
   }
 }
 
+export async function runAutoEnergyBurn(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'energyAutoBurnSettings',
+      'energyAutoBurnState',
+      'favoriteHeroes',
+      'campaign_disabled_missions',
+      'raidEnergyAuto',
+      'raidQueue',
+      'monsterQueue',
+      'monsterPreferences',
+      'troopCapacitySettings',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+    ])) || {};
+  const now = Date.now();
+  const settings = normalizeEnergyAutoBurnSettings(stored.energyAutoBurnSettings);
+  let state = stored.energyAutoBurnState ? structuredClone(stored.energyAutoBurnState) : {};
+
+  if (!settings.enabled) {
+    cr?.alarms?.clear?.(AUTO_ENERGY_BURN_ALARM_NAME);
+    if (!manual) return { ok: false, error: 'Anti-cap energy auto-burner is disabled.' };
+    state = { ...state, nextWakeAt: null, status: 'Disabled', updatedAt: now };
+    await cr?.storage?.local?.set({ energyAutoBurnState: state });
+    return { ok: true, disabled: true };
+  }
+
+  if (stored.popupRpcEnabled === false) {
+    state = { ...state, status: 'Paused: Popup RPC is disabled.', lastError: 'Popup RPC is disabled.', updatedAt: now };
+    await cr?.storage?.local?.set({ energyAutoBurnState: state });
+    return { ok: false, error: 'Popup RPC is disabled.' };
+  }
+
+  const cache = stored.rpcCache || {};
+  const effectiveStored = manual
+    ? { ...stored, energyAutoBurnState: { ...(stored.energyAutoBurnState || {}), nextRetryAt: null } }
+    : stored;
+
+  const campaignPlan = planCampaignEnergyBurn(cache, effectiveStored, settings, now);
+  const worldPlan = evaluateWorldEnergyMonsterFallback(cache, effectiveStored, settings, now, {
+    isRaidActive: !raidQueueService.terminal(stored.raidQueue),
+    isMonsterActive: !monsterQueueService.terminal(stored.monsterQueue),
+  });
+
+  const tab = await findActiveGameTab(cr);
+  const actionsTaken: string[] = [];
+  let dispatchError: string | null = null;
+
+  if (campaignPlan.action === 'burn' && campaignPlan.calls.length > 0) {
+    if (!tab?.id) {
+      dispatchError = 'No active game tab found.';
+    } else {
+      const dispatch = rpcMessageForSettings(stored, campaignPlan.calls, false, { group: 'auto-energy-burn' });
+      if (!dispatch) {
+        dispatchError = 'Could not prepare RPC message for current settings.';
+      } else {
+        try {
+          const resp = await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+          const rpcErr = Array.isArray(resp?.results)
+            ? resp.results.map((r: any) => r?.error || r?.result?.response?.errorCode || r?.result?.response?.error).find(Boolean)
+            : null;
+          if (resp?.ok === false || rpcErr) {
+            dispatchError =
+              resp?.error ||
+              (typeof rpcErr === 'string' ? rpcErr : rpcErr?.description || JSON.stringify(rpcErr));
+          } else {
+            actionsTaken.push(`Campaign: ${campaignPlan.plannedRaids} raid(s) (-${campaignPlan.plannedEnergy}⚡)`);
+          }
+        } catch (err: any) {
+          dispatchError = err?.message || String(err);
+        }
+      }
+    }
+  }
+
+  if (!dispatchError && worldPlan.action === 'start_monster' && worldPlan.monsterOptions && tab?.id) {
+    const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id;
+    const transition = monsterQueueService.start(
+      worldPlan.monsterOptions,
+      tab.id,
+      accountId,
+      now,
+      cache,
+      experimentalDataHelper.normalizeCapacitySettings(stored.troopCapacitySettings)
+    );
+    if (transition) {
+      await saveMonsterTransition(transition, stored, cr);
+      actionsTaken.push(`World: started ${worldPlan.attacks} solo monster(s)`);
+    }
+  }
+
+  if (dispatchError) {
+    const nextRetryAt = now + ENERGY_BURN_ERROR_BACKOFF_MS;
+    cr?.alarms?.create?.(AUTO_ENERGY_BURN_ALARM_NAME, { when: nextRetryAt });
+    state = {
+      ...state,
+      status: `Dispatch failed (backing off 15m): ${dispatchError}`,
+      lastError: dispatchError,
+      nextRetryAt,
+      nextWakeAt: nextRetryAt,
+      lastRunAt: now,
+      updatedAt: now,
+    };
+    await cr?.storage?.local?.set({ energyAutoBurnState: state });
+    return { ok: false, error: dispatchError, nextWakeAt: nextRetryAt };
+  }
+
+  const candidateWakes = [campaignPlan.nextWakeAt, worldPlan.nextWakeAt].filter(
+    (w): w is number => Number.isFinite(w) && (w as number) > now
+  );
+  const nextWakeAt = candidateWakes.length > 0 ? Math.min(...candidateWakes) : null;
+  if (nextWakeAt) {
+    cr?.alarms?.create?.(AUTO_ENERGY_BURN_ALARM_NAME, { when: Math.max(now + 1500, nextWakeAt) });
+  } else {
+    cr?.alarms?.clear?.(AUTO_ENERGY_BURN_ALARM_NAME);
+  }
+
+  let statusText: string;
+  if (actionsTaken.length > 0) {
+    statusText = `Dispatched ${actionsTaken.join(' · ')} (${new Date(now).toLocaleTimeString()})`;
+  } else if (campaignPlan.action === 'over_cap_preserved') {
+    statusText = campaignPlan.reason || 'Preserving over-cap energy — user managed.';
+  } else if (worldPlan.action === 'over_cap_preserved') {
+    statusText = worldPlan.reason || 'Preserving over-cap World Energy — user managed.';
+  } else if (nextWakeAt) {
+    statusText = `Waiting for threshold · next wake at ${new Date(nextWakeAt).toLocaleTimeString()}`;
+  } else {
+    statusText = campaignPlan.reason || worldPlan.reason || 'Idle';
+  }
+
+  state = {
+    ...state,
+    status: statusText,
+    lastAction: actionsTaken.length > 0 ? actionsTaken.join(' · ') : state.lastAction,
+    lastError: null,
+    nextRetryAt: null,
+    nextWakeAt,
+    lastRunAt: now,
+    updatedAt: now,
+  };
+  await cr?.storage?.local?.set({ energyAutoBurnState: state });
+  return {
+    ok: true,
+    campaignAction: campaignPlan.action,
+    worldAction: worldPlan.action,
+    actionsTaken,
+    nextWakeAt,
+  };
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -3741,6 +3901,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runAutoShopFavorites(false, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === AUTO_ENERGY_BURN_ALARM_NAME) {
+      pending = pending.then(() => runAutoEnergyBurn(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
@@ -3815,6 +3979,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (area === 'local' && 'autoShopFavoritesEnabled' in changes && changes.autoShopFavoritesEnabled?.newValue !== true) {
       cr.alarms?.clear?.(AUTO_SHOP_ALARM_NAME);
+    }
+    if (area === 'local' && 'energyAutoBurnSettings' in changes && changes.energyAutoBurnSettings?.newValue?.enabled !== true) {
+      cr.alarms?.clear?.(AUTO_ENERGY_BURN_ALARM_NAME);
     }
     if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopTrainDispatch = null;
@@ -3941,6 +4108,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runAutoShopFavorites(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'auto-energy-burn-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runAutoEnergyBurn(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -5378,6 +5555,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     runRealmResourcesClaim: (manual?: boolean) => runRealmResourcesClaim(manual, cr),
     runHeroicChestVideoOpen: (manual?: boolean) => runHeroicChestVideoOpen(manual, cr),
     runAutoShopFavorites: (manual?: boolean) => runAutoShopFavorites(manual, cr),
+    runAutoEnergyBurn: (manual?: boolean) => runAutoEnergyBurn(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),

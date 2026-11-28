@@ -7,6 +7,7 @@ export type ActiveAutomationId =
   | 'gather'
   | 'train'
   | 'heal'
+  | 'energy-burn'
   | 'building'
   | 'research'
   | 'tower'
@@ -31,6 +32,8 @@ export const AUTOMATION_STORAGE_KEYS = [
   'autoTrainState',
   'troopHealSettings',
   'autoHealState',
+  'energyAutoBurnSettings',
+  'energyAutoBurnState',
   'buildingQueue',
   'researchQueue',
   'towerRun',
@@ -123,6 +126,23 @@ export function computeActiveAutomations(stored: Record<string, any> | null | un
       storageDisableKey: {
         key: 'troopHealSettings',
         patch: { ...(stored.troopHealSettings || {}), autoHealEnabled: false },
+      },
+    });
+  }
+
+  if (stored.energyAutoBurnSettings?.enabled === true) {
+    const statusText = stored.energyAutoBurnState?.lastError
+      ? 'Energy Burn: Attention'
+      : 'Energy Burn: Active';
+    items.push({
+      id: 'energy-burn',
+      icon: '⚡',
+      label: statusText,
+      statusTone: stored.energyAutoBurnState?.lastError ? 'warning' : 'running',
+      modalName: 'campaignRaid',
+      storageDisableKey: {
+        key: 'energyAutoBurnSettings',
+        patch: { ...(stored.energyAutoBurnSettings || {}), enabled: false },
       },
     });
   }

@@ -29,6 +29,30 @@ export interface AutoHealState {
   queued?: boolean;
 }
 
+export interface EnergyAutoBurnSettings {
+  enabled: boolean;
+  campaignEnabled: boolean;
+  campaignTriggerPct: number;
+  campaignReserveEnergy: number;
+  campaignMaxRaidsPerTick: number;
+  useFavoriteSoulMissionsFirst: boolean;
+  fallbackMissionIds: number[];
+  worldFallbackEnabled: boolean;
+  worldTriggerPct: number;
+  worldReserveEnergy: number;
+  worldMaxAttacksPerTick: number;
+}
+
+export interface EnergyAutoBurnState {
+  status?: string;
+  lastAction?: string;
+  lastError?: string | null;
+  lastRunAt?: number;
+  nextWakeAt?: number | null;
+  nextRetryAt?: number | null;
+  updatedAt?: number;
+}
+
 export interface TroopUnitState {
   type: 0 | 1 | 2; // 0: Infantry, 1: Spearmen, 2: Marksmen
   label: string;

@@ -31,6 +31,7 @@ export const CONFIG_KEYS = [
   'troopCapacitySettings',
   'troopTrainSettings',
   'troopHealSettings',
+  'energyAutoBurnSettings',
   'autoShopFavoritesEnabled',
   'shopFavorites',
   'shopCurrencyReserves',

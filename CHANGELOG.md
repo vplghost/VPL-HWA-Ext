@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.400 — 2026-11-28
+
+### Added
+
+- **Anti-Cap Energy Auto-Burner (`energyAutoBurnService.ts`, `useEnergyAutoBurn.ts`, `backgroundRuntime.ts`, `useActiveAutomations.ts`, `SettingsTab.vue`, `dataBackup.ts`, `tests/energy-auto-burn.test.mjs`)**:
+  - Added zero-polling `planCampaignEnergyBurn()` & `evaluateWorldEnergyMonsterFallback()` with strict **Over-Cap Preservation Guard** (only burns within natural regen window `triggerTarget <= energy <= cap`; preserves user-claimed over-cap energy `> cap` untouched) and 0-Emerald / 0-Bottle safety.
+  - Reuses `planFavoriteSoulStoneSweep()` (Favorite Hero Soul Stones) as Tier 1 and falls back to up to 3 user-configured 3★ missions (`fallbackMissionIds`), respecting `campaign_disabled_missions` and `reserveEnergy`; optionally falls back World Energy to Solo Monsters when `raidEnergyAuto` is off.
+  - Added single alarm `'hwa-auto-energy-burn'` (`auto-energy-burn-tick`), 15m error backoff, `ActiveAutomationStrip` 1-click stop, `#settings-auto-energy-burn-section` in `SettingsTab.vue`, and `energyAutoBurnSettings` backup support.
+
 ## 0.11.399 — 2026-11-28
 
 ### Changed

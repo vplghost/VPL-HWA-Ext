@@ -11,6 +11,7 @@ import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useRealmResourcesAutomation } from '@/src/composables/useRealmResourcesAutomation';
 import { useHeroicChestVideoAutomation } from '@/src/composables/useHeroicChestVideoAutomation';
 import { useShopFavoritesAutomation } from '@/src/composables/useShopFavoritesAutomation';
+import { useEnergyAutoBurn } from '@/src/composables/useEnergyAutoBurn';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
 import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { applyTabPreset } from '@/src/utils/commandPalette';
@@ -330,6 +331,26 @@ const {
   save: saveAutoShopFavorites,
   runNow: runAutoShopFavoritesNow,
 } = useShopFavoritesAutomation();
+const {
+  settings: energyBurnSettings,
+  checking: energyBurnChecking,
+  status: energyBurnStatus,
+  lastError: energyBurnLastError,
+  save: saveEnergyAutoBurn,
+  checkNow: checkEnergyAutoBurnNow,
+} = useEnergyAutoBurn();
+
+const energyBurnFallbackText = computed({
+  get: () => (energyBurnSettings.value.fallbackMissionIds || []).join(', '),
+  set: (raw: string) => {
+    const ids = raw
+      .split(/[\s,]+/)
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isInteger(n) && n > 0)
+      .slice(0, 3);
+    energyBurnSettings.value = { ...energyBurnSettings.value, fallbackMissionIds: ids };
+  },
+});
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
@@ -1449,6 +1470,129 @@ async function toggleRecording() {
             @change="saveAutoHeal"
           />
           <span>Stop once march + defense target is met</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Anti-Cap Energy Auto-Burner -->
+    <section id="settings-auto-energy-burn-section" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <label for="setting-auto-energy-burn" class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-auto-energy-burn"
+            v-model="energyBurnSettings.enabled"
+            type="checkbox"
+            class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 size-3.5 cursor-pointer"
+            @change="saveEnergyAutoBurn"
+          />
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>⚡</span> Anti-Cap Energy Auto-Burner
+          </h3>
+        </label>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="energyBurnSettings.enabled"
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+          >
+            Active
+          </span>
+          <button
+            v-if="energyBurnSettings.enabled"
+            id="setting-auto-energy-burn-check-btn"
+            type="button"
+            :disabled="energyBurnChecking"
+            class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
+            @click="checkEnergyAutoBurnNow"
+          >
+            {{ energyBurnChecking ? 'Checking...' : 'Check Now' }}
+          </button>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-slate-500 dark:text-slate-400">
+        Zero-polling anti-cap guard. Only burns within natural regen window (trigger% to 100% cap) — preserves user over-cap energy (&gt; cap) and never spends Emeralds or Energy Bottles.
+      </p>
+
+      <div
+        v-if="energyBurnSettings.enabled && (energyBurnStatus || energyBurnLastError)"
+        class="text-xs rounded-lg px-3 py-2 border"
+        :class="
+          energyBurnLastError
+            ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300'
+            : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-300'
+        "
+      >
+        {{ energyBurnLastError ? `Error: ${energyBurnLastError}` : energyBurnStatus }}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+        <div class="space-y-1">
+          <label for="setting-energy-burn-campaign-pct" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Campaign Trigger (%)
+          </label>
+          <input
+            id="setting-energy-burn-campaign-pct"
+            v-model.number="energyBurnSettings.campaignTriggerPct"
+            type="number"
+            min="50"
+            max="100"
+            step="5"
+            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveEnergyAutoBurn"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <label for="setting-energy-burn-campaign-reserve" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Campaign Reserve (⚡)
+          </label>
+          <input
+            id="setting-energy-burn-campaign-reserve"
+            v-model.number="energyBurnSettings.campaignReserveEnergy"
+            type="number"
+            min="0"
+            max="180"
+            step="10"
+            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveEnergyAutoBurn"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <label for="setting-energy-burn-fallback-missions" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Fallback 3★ Mission IDs (max 3)
+          </label>
+          <input
+            id="setting-energy-burn-fallback-missions"
+            v-model="energyBurnFallbackText"
+            type="text"
+            placeholder="e.g. 101, 102"
+            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveEnergyAutoBurn"
+          />
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+        <label for="setting-energy-burn-fav-souls" class="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            id="setting-energy-burn-fav-souls"
+            v-model="energyBurnSettings.useFavoriteSoulMissionsFirst"
+            type="checkbox"
+            class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 size-3.5 cursor-pointer"
+            @change="saveEnergyAutoBurn"
+          />
+          <span>Sweep Favorite Hero Soul Stones first</span>
+        </label>
+        <label for="setting-energy-burn-world-fallback" class="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            id="setting-energy-burn-world-fallback"
+            v-model="energyBurnSettings.worldFallbackEnabled"
+            type="checkbox"
+            class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 size-3.5 cursor-pointer"
+            @change="saveEnergyAutoBurn"
+          />
+          <span>World Energy Solo-Monster fallback (when Raid Auto-Energy is off)</span>
         </label>
       </div>
     </section>
