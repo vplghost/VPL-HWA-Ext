@@ -37,6 +37,7 @@
 - **[Quy chuẩn WXT / Vue / Tailwind](WXT-VUE-TAILWIND-CONVENTIONS.md)**: Bắt buộc đọc trước khi bổ sung UI hoặc sửa build/runtime migration. `npm run check` chạy typecheck, test và WXT build; `npm run build` tạo `dist` và không tự tăng version.
 
 - **[Hướng dẫn cài đặt và sử dụng chi tiết](HUONG-DAN.md)**: Hướng dẫn cài đặt Node.js, lệnh build WXT (`npm run wxt:build`), dev server HMR (`npm run wxt:dev`), nạp vào Chrome và chi tiết từng tab tính năng.
+- **[Hướng dẫn vận hành HWA Control Panel](HWA-CONTROL-PANEL.md)**: Cài đặt, test Local/LAN bằng Node, bảo mật GUID+OTP (cookie 1 năm), Jenkins Docker build/push pipeline, triển khai Kubernetes (PV/PVC SQLite) và xử lý sự cố.
 - **[Phân tích log API mẫu](PHAN-TICH-API-LOG.md)**: Các nhóm dữ liệu RPC game đã quan sát được và cấu trúc payload.
 - **[Báo cáo RPC làm thay đổi số liệu](RPC-NUMERIC-CHANGE-REPORT.md)**: Danh mục các sự kiện RPC làm thay đổi kho đồ, tài nguyên, tướng, titan.
 - **[Chi tiết cơ chế tự động đánh hầm ngục](dungeon-automation.md)**: Thuật toán chọn cửa và cơ chế bảo vệ máu Titan.
