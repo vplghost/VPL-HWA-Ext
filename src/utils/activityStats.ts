@@ -2,6 +2,8 @@ import { formatUtcDay, getUtcDayOffset } from './resourceIncome.ts';
 
 export interface DailyActivityStats {
   date: string;
+  accountId?: string;
+  titaniteAuthoritative?: boolean;
   // Raid Auto-Join
   extAutoJoinCount: number;
   gameAutoJoinCount: number;
@@ -60,6 +62,62 @@ function maxTitaniteQuestProgress(quests: any): number {
     }
   }
   return maxVal;
+}
+
+function hasTitaniteQuestEntry(quests: any): boolean {
+  if (!quests) return false;
+  if (Array.isArray(quests)) {
+    return quests.some((q) => q && TITANITE_QUEST_IDS.includes(Number(q.id)) && Number.isFinite(Number(q.progress)));
+  }
+  if (typeof quests === 'object') {
+    return TITANITE_QUEST_IDS.some((qId) => {
+      const q = quests[qId] ?? quests[String(qId)];
+      return Boolean(q && Number.isFinite(Number(q.progress)));
+    });
+  }
+  return false;
+}
+
+/**
+ * Returns true when cache contains at least one server-authoritative Titanite source for today (UTC).
+ * When true, Dashboard Personal Titanite must trust live resolved value 1:1 with DungeonModal
+ * instead of locking onto a stale/inflated dailyActivityHistory entry via Math.max.
+ */
+export function hasAuthoritativePersonalTitanite(cache: Record<string, any> = {}, now = Date.now()): boolean {
+  const today = formatUtcDay(now);
+  const accountId = String(cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? '');
+
+  const guildData = cache?.guildStatus?.data;
+  if (
+    guildData &&
+    accountId &&
+    (!guildData.accountId || String(guildData.accountId) === accountId) &&
+    isSameUtcDayOrUnstamped(cache?.guildStatus?.updatedAt, today)
+  ) {
+    const guildTitanite = Number(guildData.members?.[accountId]?.stats?.todayDungeonActivity);
+    if (Number.isFinite(guildTitanite) && guildTitanite >= 0) return true;
+  }
+
+  if (isSameUtcDayOrUnstamped(cache?.questGetAll?.updatedAt, today) && hasTitaniteQuestEntry(cache?.questGetAll?.data)) {
+    return true;
+  }
+  if (
+    isSameUtcDayOrUnstamped(cache?.['getDailyQuests:quest']?.updatedAt, today) &&
+    hasTitaniteQuestEntry(cache?.['getDailyQuests:quest']?.data?.events)
+  ) {
+    return true;
+  }
+
+  const dungeonStatus = cache?.dungeonStatus?.data || cache?.dungeonGetInfo?.data;
+  const dungeonUpdated = cache?.dungeonStatus?.updatedAt || cache?.dungeonGetInfo?.updatedAt;
+  if (dungeonStatus && isSameUtcDayOrUnstamped(dungeonUpdated, today)) {
+    const statusTitanite = Number(dungeonStatus.todayTitanite);
+    if (Number.isFinite(statusTitanite) && statusTitanite >= 0) return true;
+    const logTitanite = Number(dungeonStatus.dailyCombatLog?.todayTitanite);
+    if (Number.isFinite(logTitanite) && logTitanite >= 0) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -528,6 +586,8 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   }
 
   const personalTitaniteToday = resolvePersonalTitaniteToday(cache, now);
+  const titaniteAuthoritative = hasAuthoritativePersonalTitanite(cache, now);
+  const resolvedAccountId = String(cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? '') || undefined;
 
   // 9. Frontier Progression
   const frontierProgress = cache?.eternalStoryDailyProgress?.data;
@@ -552,6 +612,8 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
 
   return {
     date: today,
+    ...(resolvedAccountId ? { accountId: resolvedAccountId } : {}),
+    titaniteAuthoritative,
     extAutoJoinCount,
     gameAutoJoinCount,
     totalAutoJoinCount: extAutoJoinCount + gameAutoJoinCount,
@@ -610,7 +672,13 @@ export function getActivityStatsForDay(
     const campBattleLoss = Math.max(liveToday.campLosses, existing.campLosses || 0);
 
     const dungeonBattles = Math.max(liveToday.dungeonBattlesToday, existing.dungeonBattlesToday || 0);
-    const titanite = Math.max(liveToday.personalTitaniteToday, existing.personalTitaniteToday || 0);
+    const sameAccount =
+      !liveToday.accountId || !existing.accountId || String(existing.accountId) === String(liveToday.accountId);
+    const titanite = liveToday.titaniteAuthoritative
+      ? liveToday.personalTitaniteToday
+      : sameAccount
+        ? Math.max(liveToday.personalTitaniteToday, existing.personalTitaniteToday || 0)
+        : liveToday.personalTitaniteToday;
     const frontierStages = Math.max(liveToday.frontierStagesToday, existing.frontierStagesToday || 0);
     const frontierCoins = Math.max(liveToday.frontierCoinsToday, existing.frontierCoinsToday || 0);
 
@@ -780,8 +848,16 @@ export async function persistDailyActivityStats(
     const nextGameAuto = isV2Existing
       ? Math.max(existing?.gameAutoJoinCount || 0, stats.gameAutoJoinCount)
       : stats.gameAutoJoinCount;
+    const sameAccount =
+      !stats.accountId || !existing?.accountId || String(existing.accountId) === String(stats.accountId);
+    const nextTitanite = stats.titaniteAuthoritative
+      ? (stats.personalTitaniteToday || 0)
+      : sameAccount
+        ? Math.max(existing?.personalTitaniteToday || 0, stats.personalTitaniteToday || 0)
+        : (stats.personalTitaniteToday || 0);
     const merged: DailyActivityStats = {
       date: stats.date,
+      ...(stats.accountId || existing?.accountId ? { accountId: stats.accountId || existing?.accountId } : {}),
       extAutoJoinCount: nextExtAuto,
       gameAutoJoinCount: nextGameAuto,
       totalAutoJoinCount: nextExtAuto + nextGameAuto,
@@ -796,7 +872,7 @@ export async function persistDailyActivityStats(
       brigandCampsCount: Math.max(existing?.brigandCampsCount || 0, stats.brigandCampsCount),
       campLosses: Math.max(existing?.campLosses || 0, stats.campLosses),
       dungeonBattlesToday: Math.max(existing?.dungeonBattlesToday || 0, stats.dungeonBattlesToday || 0),
-      personalTitaniteToday: Math.max(existing?.personalTitaniteToday || 0, stats.personalTitaniteToday || 0),
+      personalTitaniteToday: nextTitanite,
       frontierStagesToday: Math.max(existing?.frontierStagesToday || 0, stats.frontierStagesToday || 0),
       frontierCoinsToday: Math.max(existing?.frontierCoinsToday || 0, stats.frontierCoinsToday || 0),
       campaignEnergySpent: Math.max(existing?.campaignEnergySpent || 0, stats.campaignEnergySpent),

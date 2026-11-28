@@ -481,3 +481,73 @@ test('P1-20: recordPriorityAutoJoinDaily deduplicates IDs, caps data at 200, pru
   assert.equal(persisted['2026-11-18'].gameAutoJoinCount, 7);
   assert.equal(persisted['2026-11-18'].autoJoinV2, true);
 });
+
+test('P1-23: Dashboard personalTitaniteToday trusts authoritative live server data 1:1 with DungeonModal and self-heals poisoned history', async () => {
+  const poisonedHistory = {
+    '2026-11-18': {
+      date: '2026-11-18',
+      accountId: '1001',
+      extAutoJoinCount: 0,
+      gameAutoJoinCount: 0,
+      totalAutoJoinCount: 0,
+      autoJoinV2: true,
+      autoJoinLosses: 0,
+      campaignCount: 0,
+      campaignLosses: 0,
+      organizedRalliesCount: 0,
+      rallyLosses: 0,
+      monstersCount: 0,
+      monsterLosses: 0,
+      brigandCampsCount: 0,
+      campLosses: 0,
+      dungeonBattlesToday: 0,
+      personalTitaniteToday: 450, // Poisoned from 00:00-02:00 UTC yesterday carry-over
+      frontierStagesToday: 0,
+      frontierCoinsToday: 0,
+      campaignEnergySpent: 0,
+      worldEnergySpent: 0,
+      totalEnergySpent: 0,
+    },
+  };
+
+  // Authoritative server says todayDungeonActivity is 75 (after 02:00 UTC reset + fresh run)
+  const liveCache = {
+    accountStatus: { data: { id: 1001 }, updatedAt: '2026-11-18T09:00:00Z' },
+    guildStatus: {
+      updatedAt: '2026-11-18T09:00:00Z',
+      data: {
+        accountId: 1001,
+        members: { 1001: { stats: { todayDungeonActivity: 75 } } },
+      },
+    },
+  };
+
+  const liveDungeonVal = resolvePersonalTitaniteToday(liveCache, testNow);
+  assert.equal(liveDungeonVal, 75);
+
+  const dashboardView = getActivityStatsForDay(liveCache, '2026-11-18', poisonedHistory, testNow);
+  assert.equal(dashboardView.personalTitaniteToday, 75, 'Dashboard must match DungeonModal 1:1 instead of locking onto 450');
+
+  // Persisting self-heals stored history from 450 -> 75
+  const memStore = { dailyActivityHistory: structuredClone(poisonedHistory) };
+  const mockChrome = {
+    storage: {
+      local: {
+        get: async () => ({ ...memStore }),
+        set: async (patch) => Object.assign(memStore, patch),
+      },
+    },
+  };
+  const liveToday = getTodayActivityStats(liveCache, testNow);
+  const persisted = await persistDailyActivityStats(liveToday, mockChrome, testNow);
+  assert.equal(persisted['2026-11-18'].personalTitaniteToday, 75);
+
+  // Offline cache (no authoritative sources yet) still falls back to stored history for same account
+  const offlineView = getActivityStatsForDay(
+    { accountStatus: { data: { id: 1001 } } },
+    '2026-11-18',
+    persisted,
+    testNow
+  );
+  assert.equal(offlineView.personalTitaniteToday, 75);
+});

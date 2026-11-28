@@ -158,6 +158,8 @@ const selectedDayOffset = ref(0);
 const storedHistory = ref<Record<string, DailyActivityStats>>({});
 const raidQueueState = ref<any>(null);
 const monsterQueueState = ref<any>(null);
+const nowTick = ref(Date.now());
+let dayTickTimer: ReturnType<typeof setInterval> | null = null;
 
 // Combined effective cache incorporating storage queues (raidQueue, monsterQueue)
 const effectiveCache = computed(() => {
@@ -171,17 +173,17 @@ const effectiveCache = computed(() => {
 
 // Compute today's live activity stats
 const liveTodayStats = computed<DailyActivityStats>(() => {
-  return getTodayActivityStats(effectiveCache.value);
+  return getTodayActivityStats(effectiveCache.value, nowTick.value);
 });
 
 // Selected date string (YYYY-MM-DD, UTC)
 const selectedDate = computed(() => {
-  return getUtcDayOffset(Date.now(), selectedDayOffset.value);
+  return getUtcDayOffset(nowTick.value, selectedDayOffset.value);
 });
 
 // Stats for the currently selected date
 const activityStats = computed<DailyActivityStats>(() => {
-  return getActivityStatsForDay(effectiveCache.value, selectedDate.value, storedHistory.value);
+  return getActivityStatsForDay(effectiveCache.value, selectedDate.value, storedHistory.value, nowTick.value);
 });
 
 const maxDaysBack = 30;
@@ -212,6 +214,9 @@ function handleStorageChange(changes: Record<string, chrome.storage.StorageChang
 }
 
 onMounted(async () => {
+  dayTickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 60_000);
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'dailyActivityHistory']);
@@ -230,6 +235,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (dayTickTimer) clearInterval(dayTickTimer);
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.removeListener(handleStorageChange);
   }

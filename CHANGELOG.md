@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.412 — 2026-11-28
+
+### Fixed
+
+- **Dashboard Personal Titanite Accuracy (`activityStats.ts`, `IncomeOverview.vue`, `tests/activity-stats.test.mjs`)**:
+  - Added `hasAuthoritativePersonalTitanite()` so Dashboard Daily Progress & Automation trusts authoritative server Titanite 1:1 with `DungeonModal.vue` and self-heals poisoned `dailyActivityHistory` entries (e.g., from the 00:00–02:00 UTC reset gap or account switches) instead of locking onto stale inflated values via `Math.max`.
+  - Added reactive `nowTick` in `IncomeOverview.vue` so `selectedDate` stays accurate when the extension tab remains open across UTC midnight.
+
 ## 0.11.411 — 2026-11-28
 
 ### Changed
