@@ -4,6 +4,8 @@
  * - Structured QueueSessionSummary builder for Raid and Monster queues
  */
 import { calculateHealingDurationMs, normalizeArray } from '../../utils/troops.ts';
+import { buildSmartHealBatch, computeMarchDefenseDemand } from '../troopHealService.ts';
+import type { TroopHealSettings } from '../../types/index.ts';
 
 export type QueueSessionEventType =
   | 'created'
@@ -72,7 +74,12 @@ export function appendSessionEvent(
  */
 export function planPostQueueHeal(
   healingData: any,
-  now: number = Date.now()
+  now: number = Date.now(),
+  options?: {
+    cache?: Record<string, any> | null;
+    stored?: Record<string, any> | null;
+    healSettings?: Partial<TroopHealSettings> | null;
+  }
 ): PostQueueHealPlan {
   if (!healingData || typeof healingData !== 'object') {
     return {
@@ -115,7 +122,7 @@ export function planPostQueueHeal(
     };
   }
 
-  const unitsToHeal = normalizeArray(healingData.injuredUnits)
+  let unitsToHeal = normalizeArray(healingData.injuredUnits)
     .filter((u: any) => Number.isInteger(Number(u?.unitId)) && Number(u?.count) > 0)
     .map((u: any) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
 
@@ -125,6 +132,22 @@ export function planPostQueueHeal(
       calls: [],
       summary: { status: 'no_wounded', troopsCount: 0 },
     };
+  }
+
+  // Use smart batching when troopHealSettings or strongest-team demand is provided
+  if (options?.healSettings || options?.cache) {
+    const demand = computeMarchDefenseDemand(options.cache, options.stored);
+    const totalInjured = unitsToHeal.reduce((sum, u) => sum + u.count, 0);
+    const shouldBatch =
+      options.healSettings?.autoHealEnabled === true ||
+      (Number(options.healSettings?.batchPerType) || 0) > 0 ||
+      totalInjured > demand.topTeamCapacity;
+    if (shouldBatch) {
+      const batch = buildSmartHealBatch(healingData, options.healSettings, demand);
+      if (batch.units.length > 0) {
+        unitsToHeal = batch.units;
+      }
+    }
   }
 
   const troopsCount = unitsToHeal.reduce((sum: number, u) => sum + u.count, 0);

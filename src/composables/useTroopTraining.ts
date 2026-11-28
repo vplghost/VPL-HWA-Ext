@@ -14,7 +14,13 @@ import {
   calculateHealingDurationMs,
   calculateTrainingDurationMs,
 } from '../utils/troops.ts';
-import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
+import type { TroopHealSettings, TroopTrainSettings, TroopUnitState } from '@/src/types';
+import {
+  DEFAULT_TROOP_HEAL_SETTINGS,
+  buildSmartHealBatch,
+  computeMarchDefenseDemand,
+  normalizeTroopHealSettings,
+} from '../services/troopHealService.ts';
 
 export {
   getTroopType,
@@ -32,6 +38,19 @@ export {
 export function useTroopTraining() {
   const { cache, dispatchRpc } = useRpcCache();
   const trainSettings = ref<TroopTrainSettings>({ autoTrainEnabled: false, maxTargets: {}, trainLevels: {} });
+  const defaultHealSettings: TroopHealSettings =
+    typeof DEFAULT_TROOP_HEAL_SETTINGS !== 'undefined'
+      ? { ...DEFAULT_TROOP_HEAL_SETTINGS }
+      : {
+          autoHealEnabled: false,
+          batchPerType: 0,
+          prioritizeTeamDemand: true,
+          minInjuredToStart: 100,
+          onlyHealTeamShortfall: false,
+          maxBatchDurationMin: 0,
+        };
+  const healSettings = ref<TroopHealSettings>(defaultHealSettings);
+  const storedCapacitySnapshot = ref<Record<string, any>>({});
   const isRefreshing = ref(false);
   const isSyncLoading = ref(false);
   const isHealLoading = ref(false);
@@ -43,7 +62,12 @@ export function useTroopTraining() {
   async function loadSettings() {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
       try {
-        const stored = await chrome.storage.local.get('troopTrainSettings');
+        const stored = await chrome.storage.local.get([
+          'troopTrainSettings',
+          'troopHealSettings',
+          'troopCapacitySettings',
+          'capacityObservations',
+        ]);
         if (stored.troopTrainSettings) {
           trainSettings.value = {
             autoTrainEnabled: stored.troopTrainSettings.autoTrainEnabled === true,
@@ -51,6 +75,16 @@ export function useTroopTraining() {
             trainLevels: stored.troopTrainSettings.trainLevels || {},
           };
         }
+        if (stored.troopHealSettings) {
+          healSettings.value =
+            typeof normalizeTroopHealSettings === 'function'
+              ? normalizeTroopHealSettings(stored.troopHealSettings)
+              : { ...defaultHealSettings, ...stored.troopHealSettings };
+        }
+        storedCapacitySnapshot.value = {
+          troopCapacitySettings: stored.troopCapacitySettings,
+          capacityObservations: stored.capacityObservations,
+        };
       } catch (_) {}
     }
   }
@@ -113,12 +147,26 @@ export function useTroopTraining() {
   }
 
   function handleStorageChanged(changes: any, area: string) {
-    if (area === 'local' && changes?.troopTrainSettings?.newValue) {
+    if (area !== 'local') return;
+    if (changes?.troopTrainSettings?.newValue) {
       const next = changes.troopTrainSettings.newValue;
       trainSettings.value = {
         autoTrainEnabled: next.autoTrainEnabled === true,
         maxTargets: next.maxTargets || {},
         trainLevels: next.trainLevels || {},
+      };
+    }
+    if (changes?.troopHealSettings?.newValue) {
+      healSettings.value =
+        typeof normalizeTroopHealSettings === 'function'
+          ? normalizeTroopHealSettings(changes.troopHealSettings.newValue)
+          : { ...defaultHealSettings, ...changes.troopHealSettings.newValue };
+    }
+    if (changes?.troopCapacitySettings || changes?.capacityObservations) {
+      storedCapacitySnapshot.value = {
+        ...storedCapacitySnapshot.value,
+        ...(changes?.troopCapacitySettings ? { troopCapacitySettings: changes.troopCapacitySettings.newValue } : {}),
+        ...(changes?.capacityObservations ? { capacityObservations: changes.capacityObservations.newValue } : {}),
       };
     }
   }
@@ -347,16 +395,42 @@ export function useTroopTraining() {
     ]);
   }
 
-  async function healAll() {
+  const smartHealPreview = computed(() => {
+    if (typeof computeMarchDefenseDemand !== 'function' || typeof buildSmartHealBatch !== 'function') {
+      return {
+        demand: {
+          topTeamCapacity: 3000,
+          topTeamHeroIds: [],
+          autoBatchPerType: 1000,
+          maxMarches: 3,
+          requiredTeams: 4,
+          targetPerType: 4000,
+          readyByType: [0, 0, 0] as [number, number, number],
+          shortfallByType: [0, 0, 0] as [number, number, number],
+          totalShortfall: 0,
+        },
+        batch: {
+          units: [],
+          totalCount: 0,
+          perTypeCounts: [0, 0, 0] as [number, number, number],
+          effectiveBatchPerType: 1000,
+          estimatedDurationMs: 0,
+          reason: 'no_injured' as const,
+        },
+      };
+    }
+    const demand = computeMarchDefenseDemand(cache.value, storedCapacitySnapshot.value);
+    const batch = buildSmartHealBatch(healing.value, healSettings.value, demand);
+    return { demand, batch };
+  });
+
+  async function dispatchHealingUnits(unitsToHeal: Array<{ unitId: number; count: number }>) {
     if (isHealLoading.value || isSyncLoading.value) return;
     if (isHealingActive.value || isHealingReady.value) {
       healStatus.value = isHealingReady.value ? 'Sync healed troops before starting another heal.' : 'Healing is already in progress.';
       return;
     }
-    const unitsToHeal = normalizeArray(healing.value?.injuredUnits)
-      .filter((u: any) => Number.isInteger(Number(u?.unitId)) && Number(u?.count) > 0)
-      .map((u: any) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
-    if (unitsToHeal.length === 0) return;
+    if (!unitsToHeal.length) return;
 
     isHealLoading.value = true;
     healStatus.value = '';
@@ -383,6 +457,24 @@ export function useTroopTraining() {
     }
   }
 
+  async function healAll() {
+    const unitsToHeal = normalizeArray(healing.value?.injuredUnits)
+      .filter((u: any) => Number.isInteger(Number(u?.unitId)) && Number(u?.count) > 0)
+      .map((u: any) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
+    await dispatchHealingUnits(unitsToHeal);
+  }
+
+  async function healBatch() {
+    const batch = smartHealPreview.value.batch;
+    if (!batch.units.length) {
+      healStatus.value = batch.reason === 'demand_met'
+        ? 'All march + defense teams already have enough ready troops.'
+        : 'No wounded troops available for batch healing.';
+      return;
+    }
+    await dispatchHealingUnits(batch.units);
+  }
+
   async function syncHealed() {
     if (isSyncLoading.value || isHealLoading.value || !isHealingReady.value) return;
     isSyncLoading.value = true;
@@ -406,6 +498,8 @@ export function useTroopTraining() {
   return {
     troopStats,
     trainSettings,
+    healSettings,
+    smartHealPreview,
     totalInjured,
     isHealingActive,
     isHealingReady,
@@ -423,6 +517,7 @@ export function useTroopTraining() {
     collectTraining,
     startTrain,
     healAll,
+    healBatch,
     syncHealed,
     checkAndExecuteAutoTrain,
   };

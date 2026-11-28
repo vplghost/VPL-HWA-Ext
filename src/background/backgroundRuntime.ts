@@ -36,6 +36,12 @@ import { runtimeTelemetry, collectStorageTelemetry } from './telemetry.ts';
 import { createRuntimeEventBus } from './eventBus.ts';
 import { resourceLockManager } from './resourceLock.ts';
 import { planPostQueueHeal, buildQueueSessionSummary } from '../services/queues/queueCoordination.ts';
+import {
+  AUTO_HEAL_ERROR_BACKOFF_MS,
+  buildAutoHealCalls,
+  needsTroopHealRefresh,
+  normalizeTroopHealSettings,
+} from '../services/troopHealService.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
 import { recordPriorityAutoJoinDaily } from '../utils/activityStats.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
@@ -655,10 +661,199 @@ let troopTrainInFlight = false;
 let lastTroopTrainDispatch: { sig: string; at: number } | null = null;
 let lastTroopTrainRefreshAt = 0;
 
+let troopHealInFlight = false;
+let lastTroopHealDispatch: { sig: string; at: number } | null = null;
+let lastTroopHealRefreshAt = 0;
+
 export function resetTroopTrainRuntimeState() {
   troopTrainInFlight = false;
   lastTroopTrainDispatch = null;
   lastTroopTrainRefreshAt = 0;
+  troopHealInFlight = false;
+  lastTroopHealDispatch = null;
+  lastTroopHealRefreshAt = 0;
+}
+
+export async function advanceTroopHealing(tabId?: number, customChrome?: any, options?: { force?: boolean }) {
+  const cr = getActiveChrome(customChrome);
+  const now = Date.now();
+  const force = Boolean(options?.force);
+
+  const stored =
+    (await cr?.storage?.local?.get([
+      'troopHealSettings',
+      'autoHealState',
+      'troopCapacitySettings',
+      'capacityObservations',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+    ])) || {};
+
+  const settings = normalizeTroopHealSettings(stored.troopHealSettings);
+  if (!settings.autoHealEnabled) {
+    cr?.alarms?.clear?.('hwa-auto-heal-wake')?.catch?.(() => {});
+    return { ok: false, error: 'Auto heal is disabled.' };
+  }
+
+  const saveState = async (patch: Record<string, any>) => {
+    try {
+      await cr?.storage?.local?.set({
+        autoHealState: {
+          updatedAt: now,
+          ...patch,
+        },
+      });
+    } catch (_) {}
+  };
+
+  if (stored.popupRpcEnabled !== true) {
+    await saveState({ status: 'Paused: Popup RPC is disabled.', lastError: 'Popup RPC is disabled.' });
+    return { ok: false, error: 'Popup RPC is disabled.' };
+  }
+
+  if (!tabId) tabId = (await findActiveGameTab(cr))?.id;
+  if (!tabId) {
+    await saveState({ status: 'No active game tab found. Waiting for game tab...', lastError: null });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  if (troopHealInFlight) {
+    return { ok: true, skipped: true, reason: 'in-flight' };
+  }
+
+  troopHealInFlight = true;
+  try {
+    const plan = buildAutoHealCalls(
+      stored.rpcCache,
+      force ? { ...stored, autoHealState: { ...(stored.autoHealState || {}), nextRetryAt: null } } : stored,
+      settings,
+      now
+    );
+
+    if (!plan.calls.length) {
+      if (needsTroopHealRefresh(stored.rpcCache, now) && (force || now - lastTroopHealRefreshAt >= 60_000)) {
+        const refreshCalls = [
+          { name: 'getUnitSummary', feature: 'unit', args: {} },
+          { name: 'getHealing', feature: 'unit', args: {} },
+        ];
+        const refreshDispatch = rpcMessageForSettings(stored, refreshCalls, false, { group: 'auto-heal-refresh' });
+        if (refreshDispatch) {
+          lastTroopHealRefreshAt = now;
+          try {
+            await cr?.tabs?.sendMessage?.(tabId, refreshDispatch);
+            await saveState({
+              status: `Syncing infirmary data (${new Date(now).toLocaleTimeString()})...`,
+              lastError: null,
+              lastRunAt: now,
+            });
+            return { ok: true, refreshing: true, queued: refreshDispatch.kind === 'queue-rpc' };
+          } catch (err: any) {
+            const errMsg = err?.message || String(err);
+            await saveState({ status: 'Failed to sync infirmary data.', lastError: errMsg, lastRunAt: now });
+            return { ok: false, error: errMsg };
+          }
+        }
+      }
+
+      if (plan.nextWakeAt) {
+        const wakeAt = Math.max(now + 1500, plan.nextWakeAt);
+        cr?.alarms?.create?.('hwa-auto-heal-wake', { when: wakeAt });
+        const statusMsg =
+          plan.action === 'backoff'
+            ? `Backoff until ${new Date(wakeAt).toLocaleTimeString()} after previous error`
+            : `Healing in progress · next check at ${new Date(wakeAt).toLocaleTimeString()}`;
+        await saveState({
+          status: statusMsg,
+          nextWakeAt: wakeAt,
+          ...(plan.action === 'backoff'
+            ? { lastError: stored.autoHealState?.lastError || null, nextRetryAt: stored.autoHealState?.nextRetryAt || wakeAt }
+            : { lastError: null, nextRetryAt: null }),
+          lastRunAt: now,
+        });
+      } else {
+        const idleReason =
+          plan.action === 'demand_met'
+            ? `Target met (${plan.demand.requiredTeams} teams ready)`
+            : plan.action === 'below_threshold'
+              ? `${plan.totalInjured} wounded (< min ${settings.minInjuredToStart})`
+              : 'Infirmary empty';
+        await saveState({
+          status: `Idle at ${new Date(now).toLocaleTimeString()} (${idleReason})`,
+          nextWakeAt: null,
+          lastError: null,
+          nextRetryAt: null,
+          lastRunAt: now,
+        });
+      }
+      return { ok: true, calls: [], action: plan.action, nextWakeAt: plan.nextWakeAt };
+    }
+
+    const sig = JSON.stringify({ action: plan.action, units: plan.batch?.units || [] });
+    if (!force && lastTroopHealDispatch && lastTroopHealDispatch.sig === sig && now - lastTroopHealDispatch.at < 15_000) {
+      return { ok: true, skipped: true, reason: 'cooldown' };
+    }
+
+    const dispatch = rpcMessageForSettings(stored, plan.calls, false, { group: 'auto-heal' });
+    if (!dispatch) {
+      const errMsg = 'Could not prepare RPC message for current settings (enable Direct mode or Monitor API for Piggyback).';
+      await saveState({ status: errMsg, lastError: errMsg, lastRunAt: now });
+      return { ok: false, error: errMsg };
+    }
+
+    const resp = await cr?.tabs?.sendMessage?.(tabId, dispatch);
+    if (resp && resp.ok === false) {
+      const errMsg = resp.error || 'RPC dispatch failed.';
+      const nextRetryAt = now + AUTO_HEAL_ERROR_BACKOFF_MS;
+      cr?.alarms?.create?.('hwa-auto-heal-wake', { when: nextRetryAt });
+      await saveState({ status: 'RPC dispatch failed.', lastError: errMsg, lastRunAt: now, nextRetryAt, nextWakeAt: nextRetryAt });
+      return { ok: false, error: errMsg };
+    }
+    const rpcErr = Array.isArray(resp?.results)
+      ? resp.results
+          .map((r: any) => r?.error || r?.result?.response?.errorCode || r?.result?.response?.error)
+          .find(Boolean)
+      : null;
+    if (rpcErr) {
+      const errMsg = typeof rpcErr === 'string' ? rpcErr : (rpcErr?.description || rpcErr?.name || JSON.stringify(rpcErr));
+      const nextRetryAt = now + AUTO_HEAL_ERROR_BACKOFF_MS;
+      cr?.alarms?.create?.('hwa-auto-heal-wake', { when: nextRetryAt });
+      await saveState({
+        status: 'Game server rejected healing RPC (backing off 15m).',
+        lastError: errMsg,
+        lastRunAt: now,
+        nextRetryAt,
+        nextWakeAt: nextRetryAt,
+      });
+      return { ok: false, error: errMsg };
+    }
+
+    lastTroopHealDispatch = { sig, at: now };
+    if (plan.nextWakeAt) {
+      cr?.alarms?.create?.('hwa-auto-heal-wake', { when: Math.max(now + 1500, plan.nextWakeAt) });
+    }
+    const summary =
+      plan.action === 'complete'
+        ? 'Collect healed troops'
+        : `Heal batch ${plan.batch?.totalCount || 0} troops (${(plan.batch?.perTypeCounts || [0, 0, 0]).join('/')})`;
+    await saveState({
+      status: `${dispatch.kind === 'queue-rpc' ? 'Queued' : 'Dispatched'}: ${summary} (${new Date(now).toLocaleTimeString()})`,
+      lastAction: summary,
+      lastError: null,
+      nextRetryAt: null,
+      nextWakeAt: plan.nextWakeAt,
+      lastRunAt: now,
+      queued: dispatch.kind === 'queue-rpc',
+    });
+    return { ok: true, action: plan.action, batch: plan.batch, queued: dispatch.kind === 'queue-rpc' };
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    await saveState({ status: 'Auto heal dispatch error.', lastError: errMsg, lastRunAt: now });
+    return { ok: false, error: errMsg };
+  } finally {
+    troopHealInFlight = false;
+  }
 }
 
 export async function advanceTroopTraining(tabId?: number, customChrome?: any, options?: { force?: boolean }) {
@@ -1334,7 +1529,14 @@ async function finalizeQueueCoordination(
     ((Number(state?.completed) || 0) > 0 || (Number(state?.started) || 0) > 0);
   if (shouldHeal) {
     const healingData = stored?.rpcCache?.['getHealing:unit']?.data || stored?.rpcCache?.getHealing?.data;
-    const plan = planPostQueueHeal(healingData, now);
+    const extraHealStored = stored?.troopHealSettings
+      ? stored
+      : { ...stored, ...((await cr?.storage?.local?.get?.(['troopHealSettings', 'troopCapacitySettings', 'capacityObservations'])) || {}) };
+    const plan = planPostQueueHeal(healingData, now, {
+      cache: stored?.rpcCache,
+      stored: extraHealStored,
+      healSettings: extraHealStored?.troopHealSettings,
+    });
     postQueueHeal = plan.summary;
     if (plan.calls.length > 0 && state?.tabId) {
       const dispatch = rpcMessageForSettings(stored, plan.calls);
@@ -3391,12 +3593,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         await advanceTroopTraining(tab.id, cr);
       }
     }
+    if (alarm.name === 'hwa-auto-heal-wake') {
+      const tab = await findActiveGameTab(cr);
+      if (tab?.id) {
+        await advanceTroopHealing(tab.id, cr);
+      }
+    }
     if (alarm.name === 'hwa-queue-watch') {
       const tab = await findActiveGameTab(cr);
       if (tab?.id) {
         await advanceBuildingQueue(tab.id, undefined, cr);
         await advanceResearchQueue(tab.id, undefined, cr);
         await advanceTroopTraining(tab.id, cr);
+        await advanceTroopHealing(tab.id, cr);
       }
     }
   });
@@ -3409,6 +3618,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       await advanceBuildingQueue(tab.id, undefined, cr);
       await advanceResearchQueue(tab.id, undefined, cr);
       await advanceTroopTraining(tab.id, cr);
+      await advanceTroopHealing(tab.id, cr);
     }
   });
 
@@ -3451,6 +3661,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopTrainDispatch = null;
       pending = pending.then(() => advanceTroopTraining(undefined, cr)).catch(() => {});
+    }
+    if (area === 'local' && ['troopHealSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
+      lastTroopHealDispatch = null;
+      pending = pending.then(() => advanceTroopHealing(undefined, cr)).catch(() => {});
     }
     if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
     pending = pending
@@ -3570,6 +3784,17 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     ) {
       const targetTabId = isGameUrl(sender.url) ? sender.tab?.id : undefined;
       pending = pending.then(() => advanceTroopTraining(targetTabId, cr, { force: Boolean(message?.force) }));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'auto-heal-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      const targetTabId = isGameUrl(sender.url) ? sender.tab?.id : undefined;
+      pending = pending.then(() => advanceTroopHealing(targetTabId, cr, { force: Boolean(message?.force) }));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -4671,7 +4896,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           ) {
             lastTroopTrainDispatch = null;
           }
+          if (
+            cacheResult.cache?.['getHealing:unit']?.updatedAt === record.timestamp ||
+            cacheResult.cache?.getHealing?.updatedAt === record.timestamp
+          ) {
+            lastTroopHealDispatch = null;
+          }
           await advanceTroopTraining(sender.tab.id, cr);
+          await advanceTroopHealing(sender.tab.id, cr);
         }
       }
       Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'raidEnergyAuto', 'customTeams', 'troopCapacitySettings']));
@@ -4986,6 +5218,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     advanceBuildingQueue: (tabId?: number, record?: any) => advanceBuildingQueue(tabId, record, cr),
     advanceResearchQueue: (tabId?: number, record?: any) => advanceResearchQueue(tabId, record, cr),
     advanceTroopTraining: (tabId?: number) => advanceTroopTraining(tabId, cr),
+    advanceTroopHealing: (tabId?: number, options?: { force?: boolean }) => advanceTroopHealing(tabId, cr, options),
     advanceCityQueue: (type: string, tabId?: number, record?: any) => advanceCityQueue(type, tabId, record, cr),
     runCityQueue: (type: string, tabId?: number, record?: any) => runCityQueue(type, tabId, record, cr),
     mutateCityQueue: (type: string, message: any) => mutateCityQueue(type, message, cr),

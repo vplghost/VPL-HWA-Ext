@@ -30,6 +30,7 @@ export const CONFIG_KEYS = [
   'customTeams',
   'troopCapacitySettings',
   'troopTrainSettings',
+  'troopHealSettings',
   'towerAutomationSettings',
   'autoGatherSettings',
   'campaignRaidSequential',

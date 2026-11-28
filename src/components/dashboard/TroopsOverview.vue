@@ -11,6 +11,8 @@ const { cache } = typeof useRpcCache === 'function' ? useRpcCache() : { cache: {
 const {
   troopStats,
   trainSettings,
+  healSettings,
+  smartHealPreview,
   totalInjured,
   isHealingActive,
   isHealingReady,
@@ -25,8 +27,21 @@ const {
   collectTraining,
   startTrain,
   healAll,
+  healBatch,
   syncHealed,
 } = useTroopTraining();
+
+const smartBatchTooltip = computed(() => {
+  const preview = smartHealPreview?.value;
+  if (!preview?.batch?.totalCount) return 'Heal a smart batch prioritized by highest troop tier';
+  const [inf, spr, mrk] = preview.batch.perTypeCounts;
+  const durSec = Math.ceil(preview.batch.estimatedDurationMs / 1000);
+  const modeLabel =
+    preview.batch.reason === 'shortfall_priority'
+      ? `Shortfall priority (${preview.demand.maxMarches} + 1 defense teams)`
+      : `Strongest team baseline (${formatNumber(preview.batch.effectiveBatchPerType)} / type)`;
+  return `${modeLabel} · Inf ${formatNumber(inf)} · Spr ${formatNumber(spr)} · Mrk ${formatNumber(mrk)} · ~${formatDuration(durSec)}`;
+});
 
 function handleLevelChange(type: number, event: Event) {
   const target = event.target as HTMLSelectElement;
@@ -123,6 +138,13 @@ const troopCards = computed(() => {
         >
           ⚡ Auto Train
         </span>
+        <span
+          v-if="healSettings?.autoHealEnabled"
+          class="inline-flex items-center gap-1 rounded bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-800/60"
+          title="Auto Batch Healing is enabled in Settings"
+        >
+          🏥 Auto Heal
+        </span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -152,9 +174,23 @@ const troopCards = computed(() => {
             <span>{{ isSyncLoading ? 'Syncing...' : 'Sync Healed' }}</span>
           </button>
 
+          <!-- Heal Batch Button (shown when wounded exceeds 1 smart batch) -->
+          <button
+            v-if="!isHealingReady && totalInjured > 0 && !isHealingActive && smartHealPreview?.batch?.totalCount > 0 && smartHealPreview.batch.totalCount < totalInjured"
+            id="dashboard-troops-heal-batch-btn"
+            type="button"
+            :disabled="isHealLoading"
+            :title="smartBatchTooltip"
+            class="cursor-pointer inline-flex items-center gap-1 rounded bg-amber-600 hover:bg-amber-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
+            @click="healBatch"
+          >
+            <span :class="{ 'animate-spin': isHealLoading }">{{ isHealLoading ? '↻' : '🩹' }}</span>
+            <span>{{ isHealLoading ? 'Healing...' : `Heal Batch (${formatNumber(smartHealPreview.batch.totalCount)})` }}</span>
+          </button>
+
           <!-- Heal All Button -->
           <button
-            v-else-if="totalInjured > 0 && !isHealingActive"
+            v-if="!isHealingReady && totalInjured > 0 && !isHealingActive"
             id="dashboard-troops-heal-all-btn"
             type="button"
             :disabled="isHealLoading"

@@ -4,6 +4,31 @@ export interface TroopTrainSettings {
   trainLevels?: Record<string | number, number>;
 }
 
+export interface TroopHealSettings {
+  autoHealEnabled: boolean;
+  /** 0 = Auto (1 strongest 5-hero team / 3 per troop type); >0 = manual cap per troop type (100..50000) */
+  batchPerType: number;
+  /** Prioritize healing troop types that are below (maxMarches + 1 defense) team target */
+  prioritizeTeamDemand: boolean;
+  /** Minimum wounded troops in infirmary before starting an auto-heal batch (ignored when shortfall > 0) */
+  minInjuredToStart: number;
+  /** When true, stop auto-healing once (maxMarches + 1) ready target is met */
+  onlyHealTeamShortfall: boolean;
+  /** Optional max duration per batch in minutes (0 = no duration cap) */
+  maxBatchDurationMin?: number;
+}
+
+export interface AutoHealState {
+  status?: string;
+  lastAction?: string;
+  lastError?: string | null;
+  lastRunAt?: number;
+  nextWakeAt?: number | null;
+  nextRetryAt?: number | null;
+  updatedAt?: number;
+  queued?: boolean;
+}
+
 export interface TroopUnitState {
   type: 0 | 1 | 2; // 0: Infantry, 1: Spearmen, 2: Marksmen
   label: string;

@@ -6,6 +6,7 @@ export type ActiveAutomationId =
   | 'monster'
   | 'gather'
   | 'train'
+  | 'heal'
   | 'building'
   | 'research'
   | 'tower'
@@ -28,6 +29,8 @@ export const AUTOMATION_STORAGE_KEYS = [
   'smartGatherState',
   'troopTrainSettings',
   'autoTrainState',
+  'troopHealSettings',
+  'autoHealState',
   'buildingQueue',
   'researchQueue',
   'towerRun',
@@ -103,6 +106,23 @@ export function computeActiveAutomations(stored: Record<string, any> | null | un
       storageDisableKey: {
         key: 'troopTrainSettings',
         patch: { ...(stored.troopTrainSettings || {}), autoTrainEnabled: false },
+      },
+    });
+  }
+
+  if (stored.troopHealSettings?.autoHealEnabled === true) {
+    const statusText = stored.autoHealState?.lastError
+      ? 'Auto Heal: Attention'
+      : 'Auto Heal: Active';
+    items.push({
+      id: 'heal',
+      icon: '🏥',
+      label: statusText,
+      statusTone: stored.autoHealState?.lastError ? 'warning' : 'running',
+      modalName: 'building',
+      storageDisableKey: {
+        key: 'troopHealSettings',
+        patch: { ...(stored.troopHealSettings || {}), autoHealEnabled: false },
       },
     });
   }

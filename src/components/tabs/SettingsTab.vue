@@ -33,7 +33,12 @@ import {
   type CityTreeManifest,
   type CityTreeOverlay,
 } from '@/src/services/cityTreeSync';
-import type { ThemeMode, TroopTrainSettings } from '@/src/types';
+import type { AutoHealState, ThemeMode, TroopHealSettings, TroopTrainSettings } from '@/src/types';
+import {
+  DEFAULT_TROOP_HEAL_SETTINGS,
+  computeMarchDefenseDemand,
+  normalizeTroopHealSettings,
+} from '@/src/services/troopHealService';
 
 const { theme, applyTheme } = useTheme();
 const openInPopup = ref(false);
@@ -392,6 +397,64 @@ async function triggerAutoTrainNow() {
   }
 }
 
+// Auto Batch Healing
+const autoHealSettings = ref<TroopHealSettings>({ ...DEFAULT_TROOP_HEAL_SETTINGS });
+const autoHealState = ref<AutoHealState | null>(null);
+const autoHealTickPending = ref(false);
+const autoHealCapacitySnapshot = ref<Record<string, any>>({});
+
+async function loadTroopHealSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const stored = await chrome.storage.local.get([
+        'troopHealSettings',
+        'autoHealState',
+        'troopCapacitySettings',
+        'capacityObservations',
+      ]);
+      if (stored.troopHealSettings) {
+        autoHealSettings.value = normalizeTroopHealSettings(stored.troopHealSettings);
+      }
+      if (stored.autoHealState) {
+        autoHealState.value = stored.autoHealState;
+      }
+      autoHealCapacitySnapshot.value = {
+        troopCapacitySettings: stored.troopCapacitySettings,
+        capacityObservations: stored.capacityObservations,
+      };
+    } catch (_) {}
+  }
+}
+
+async function saveAutoHeal() {
+  const payload = normalizeTroopHealSettings(autoHealSettings.value);
+  autoHealSettings.value = payload;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({ troopHealSettings: payload });
+      if (payload.autoHealEnabled && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ kind: 'auto-heal-tick' }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+}
+
+async function triggerAutoHealNow() {
+  if (autoHealTickPending.value || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  autoHealTickPending.value = true;
+  try {
+    await chrome.runtime.sendMessage({ kind: 'auto-heal-tick', force: true });
+    await loadTroopHealSettings();
+  } catch (_) {
+  } finally {
+    autoHealTickPending.value = false;
+  }
+}
+
+const autoHealDemandPreview = computed(() => {
+  return computeMarchDefenseDemand(cache?.value, autoHealCapacitySnapshot.value);
+});
+
 const troopSettingsList = computed(() => {
   return TROOP_DEFS.map((def) => {
     const cap = getBuildingTrainingCapacity(def.type, cache?.value);
@@ -556,6 +619,7 @@ onMounted(async () => {
         tabSettings.value = result;
       }
       await loadTroopTrainSettings();
+      await loadTroopHealSettings();
       void refreshStorageTelemetry();
     } catch (_) {}
   }
@@ -574,6 +638,12 @@ function handleAutoTrainStorageChange(changes: any, area: string) {
     if (changes.troopTrainSettings.newValue.trainLevels) {
       autoTrainLevels.value = { ...changes.troopTrainSettings.newValue.trainLevels };
     }
+  }
+  if (changes?.autoHealState) {
+    autoHealState.value = changes.autoHealState.newValue || null;
+  }
+  if (changes?.troopHealSettings?.newValue) {
+    autoHealSettings.value = normalizeTroopHealSettings(changes.troopHealSettings.newValue);
   }
   if (changes?.cachedGameVersion) {
     cachedGameVersion.value = changes.cachedGameVersion.newValue ? String(changes.cachedGameVersion.newValue) : null;
@@ -1240,6 +1310,117 @@ async function toggleRecording() {
             Allowed levels: Lv.{{ troop.unlockedLevels[0] }} – Lv.{{ troop.unlockedLevels[troop.unlockedLevels.length - 1] }}
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Auto Batch Healing (Enable checkbox inline in title) -->
+    <section id="settings-auto-heal-section" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <label for="setting-auto-heal" class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-auto-heal"
+            v-model="autoHealSettings.autoHealEnabled"
+            type="checkbox"
+            class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 size-3.5 cursor-pointer"
+            @change="saveAutoHeal"
+          />
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>🏥</span> Auto Batch Healing
+          </h3>
+        </label>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="autoHealSettings.autoHealEnabled"
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+          >
+            Active
+          </span>
+          <button
+            v-if="autoHealSettings.autoHealEnabled"
+            id="setting-auto-heal-check-btn"
+            type="button"
+            :disabled="autoHealTickPending"
+            class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
+            @click="triggerAutoHealNow"
+          >
+            {{ autoHealTickPending ? 'Checking...' : 'Check Now' }}
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="autoHealSettings.autoHealEnabled && (autoHealState?.status || autoHealState?.lastError)"
+        class="text-xs rounded-lg px-3 py-2 border"
+        :class="
+          autoHealState?.lastError
+            ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300'
+            : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-300'
+        "
+      >
+        {{ autoHealState.lastError ? `Error: ${autoHealState.lastError}` : autoHealState.status }}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+        <div class="space-y-1">
+          <label for="setting-auto-heal-batch" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Batch / troop type (0 = Auto)
+          </label>
+          <input
+            id="setting-auto-heal-batch"
+            v-model.number="autoHealSettings.batchPerType"
+            type="number"
+            min="0"
+            max="50000"
+            step="100"
+            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveAutoHeal"
+          />
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">
+            Auto: {{ autoHealDemandPreview.autoBatchPerType.toLocaleString() }} / type · Top team: {{ autoHealDemandPreview.topTeamCapacity.toLocaleString() }}
+          </p>
+        </div>
+
+        <div class="space-y-1">
+          <label for="setting-auto-heal-min-injured" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            Min wounded to start
+          </label>
+          <input
+            id="setting-auto-heal-min-injured"
+            v-model.number="autoHealSettings.minInjuredToStart"
+            type="number"
+            min="0"
+            max="50000"
+            step="50"
+            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveAutoHeal"
+          />
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">
+            Target: {{ autoHealDemandPreview.maxMarches }} marches + 1 defense ({{ autoHealDemandPreview.targetPerType.toLocaleString() }} / type)
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+        <label for="setting-auto-heal-team-priority" class="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            id="setting-auto-heal-team-priority"
+            v-model="autoHealSettings.prioritizeTeamDemand"
+            type="checkbox"
+            class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 size-3.5 cursor-pointer"
+            @change="saveAutoHeal"
+          />
+          <span>Prioritize ({{ autoHealDemandPreview.maxMarches }} + 1 defense) shortfall, highest tier first</span>
+        </label>
+        <label for="setting-auto-heal-only-shortfall" class="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            id="setting-auto-heal-only-shortfall"
+            v-model="autoHealSettings.onlyHealTeamShortfall"
+            type="checkbox"
+            class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 size-3.5 cursor-pointer"
+            @change="saveAutoHeal"
+          />
+          <span>Stop once march + defense target is met</span>
+        </label>
       </div>
     </section>
     </div>

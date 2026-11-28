@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.397 — 2026-11-28
+
+### Added
+
+- **Smart Batch Auto-Heal Infirmary (`troopHealService.ts`, `backgroundRuntime.ts`, `useTroopTraining.ts`, `useActiveAutomations.ts`, `SettingsTab.vue`, `TroopsOverview.vue`, `queueCoordination.ts`, `tests/troop-heal.test.mjs`)**:
+  - Added `computeMarchDefenseDemand()` & `buildSmartHealBatch()` to compute the batch baseline directly from the account's strongest 5-hero team (`highestPowerHeroes` + `capacityModel`/`squadCapacity`, ignoring `customTeams`) and evaluate ready-troop shortfall against `(maxMarches + 1 defense)` teams, always healing highest troop levels first (`Lv.10 → Lv.1`) with optional manual `batchPerType` override (e.g. `1000` per troop type).
+  - Added alarm-driven background Auto Batch Healing (`hwa-auto-heal-wake` + `auto-heal-tick`) with automatic `completeHealing` → next-batch chaining, 0-Emerald safety, 15-minute error backoff, `ActiveAutomationStrip` 1-click stop, and `troopHealSettings` backup support.
+  - Added `#settings-auto-heal-section` in `SettingsTab.vue` and `#dashboard-troops-heal-batch-btn` (`Heal Batch`) + `🏥 Auto Heal` badge in `TroopsOverview.vue`.
+
 ## 0.11.396 — 2026-11-28
 
 ### Fixed
