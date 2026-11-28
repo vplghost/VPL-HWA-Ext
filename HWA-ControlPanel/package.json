@@ -1,0 +1,18 @@
+{
+  "name": "hwa-control-panel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal mobile proxy & automation control panel for VPL-HWA-Ext (Express.js + ws + node:sqlite)",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node src/server.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

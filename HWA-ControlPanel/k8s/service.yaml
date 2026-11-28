@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hwa-control-panel
+  labels:
+    app: hwa-control-panel
+spec:
+  type: ClusterIP
+  selector:
+    app: hwa-control-panel
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

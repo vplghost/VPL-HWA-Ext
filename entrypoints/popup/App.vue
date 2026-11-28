@@ -13,6 +13,7 @@ import GuildTab from '@/src/components/tabs/GuildTab.vue';
 import EventsTab from '@/src/components/tabs/EventsTab.vue';
 import GoalsTab from '@/src/components/tabs/GoalsTab.vue';
 import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
+import ControlPanelTab from '@/src/components/tabs/ControlPanelTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
 import ExpeditionsModal from '@/src/components/dialogs/ExpeditionsModal.vue';
 import MailModal from '@/src/components/dialogs/MailModal.vue';
@@ -72,6 +73,7 @@ const { modalState, modalContext } = useModals();
               activeTab === 'guild' ? GuildTab :
               activeTab === 'events' ? EventsTab :
               activeTab === 'goals' ? GoalsTab :
+              activeTab === 'controlPanel' ? ControlPanelTab :
               activeTab === 'settings' ? SettingsTab :
               DashboardTab
             "

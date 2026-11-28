@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.409 — 2026-11-28
+
+### Added
+
+- **HWA Control Panel (`HWA-ControlPanel/`, `ControlPanelTab.vue`, `remoteBridgeService.ts`, `qrSvg.ts`)**:
+  - **CP-01 (Proxy Server, SQLite PV/PVC & CI/CD)**: Added lightweight Express.js + `ws` + `node:sqlite` proxy server in `HWA-ControlPanel/` with GUID+TOTP authentication issuing 1-year `HttpOnly` cookie sessions (`hwa_cp_session`), IP rate-limiting (`429`), OTP replay protection, session revocation, local/LAN Node dev mode (`npm run cp:dev`), `Dockerfile`, `Jenkinsfile` (Jenkins Credentials + Environment), `docker-compose.yml`, K8s PV/PVC manifests, and Knowns documentation (`architecture/hwa-control-panel-architecture`, `guides/hwa-control-panel-deployment-local-testing-guide`).
+  - **CP-02 (Extension Bridge & Dedicated Tab)**: Added dedicated `ControlPanelTab.vue` (`📱 Control Panel`) with endpoint health check (`GET /healthz`), offline pure-SVG QR code generator, live 30s TOTP passcode, sanitized telemetry snapshots, MV3 keepalive WS client, and strict emergency command allowlist.
+  - **CP-03 (Mobile WebView)**: Added mobile-first Tailwind WebView (`HWA-ControlPanel/public/`) with QR `?guid=` pre-fill, 1-year cookie persistence, on-demand Refresh with task-only WebSocket wait, monitoring cards, and 2-step Emergency Recall All Gatherers.
+
 ## 0.11.408 — 2026-11-28
 
 ### Changed

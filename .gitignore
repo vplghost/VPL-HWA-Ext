@@ -36,4 +36,8 @@ node_modules/
 debug-bridge/symbols.json
 debug-bridge/com.local.wxt_unity_bridge.json
 
+# HWA Control Panel local runtime DB & dependencies
+/HWA-ControlPanel/data/
+/HWA-ControlPanel/node_modules/
+
 

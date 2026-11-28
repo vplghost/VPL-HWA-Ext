@@ -1,0 +1,18 @@
+services:
+  hwa-control-panel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hwa-control-panel:local
+    container_name: hwa-control-panel
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      DATA_DIR: "/data"
+      # Optional: uncomment to require pairing key on POST /api/ext/pair
+      # BOOTSTRAP_KEY: "change-me"
+    volumes:
+      - ./data:/data

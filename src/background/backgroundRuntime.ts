@@ -13,6 +13,13 @@ import { computeConstrainedCityQueueMove } from '../utils/cityQueueReorder.ts';
 import { raidQueueService } from '../services/queues/raidQueue.ts';
 import { monsterQueueService } from '../services/queues/monsterQueue.ts';
 import { raidEnergyAutoService } from '../services/queues/raidEnergyAuto.ts';
+import {
+  REMOTE_BRIDGE_ALARM,
+  checkRemoteBridgeConnection,
+  revokeRemoteSessions,
+  ensureRemoteBridgeConnected,
+  scheduleSnapshotPush,
+} from './remoteBridgeRuntime.ts';
 import { autoGatherService } from '../services/queues/autoGather.ts';
 import { smartGatherService } from '../services/queues/smartGather.ts';
 import { towerAutomationService } from '../services/queues/towerAutomation.ts';
@@ -3714,6 +3721,164 @@ export async function tickMineDefense(customChrome?: any) {
   await cr?.storage?.local?.set({ smartGatherState: nextState });
 }
 
+export async function executeRemoteControlCommand(
+  action: string,
+  payload: Record<string, any>,
+  customChrome?: any
+): Promise<{ ok: boolean; message: string; data?: any }> {
+  const cr = getActiveChrome(customChrome);
+  const tab = await findActiveGameTab(cr);
+
+  if (action === 'refresh-snapshot') {
+    if (tab?.id) {
+      const stored = (await cr?.storage?.local?.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'])) || {};
+      const dispatch = rpcMessageForSettings(stored, [
+        { name: 'getMarches', feature: 'march' },
+        { name: 'getUnitSummary', feature: 'unit' },
+      ]);
+      if (dispatch) {
+        await cr?.tabs?.sendMessage?.(tab.id, { ...dispatch, group: 'remote-refresh' })?.catch?.(() => {});
+      }
+    }
+    return { ok: true, message: tab?.id ? 'Snapshot refreshed' : 'Snapshot read (game tab offline)' };
+  }
+
+  if (action === 'emergency-recall-gatherers') {
+    if (!tab?.id) return { ok: false, message: 'No active game tab available' };
+    const stored = (await cr?.storage?.local?.get(['rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'])) || {};
+    const marches = smartGatherService.list(stored.rpcCache?.marchStatus?.data?.marches).filter((m: any) =>
+      smartGatherService.gathering(m)
+    );
+    if (marches.length === 0) return { ok: true, message: 'No active gathering marches to recall', data: { recalled: 0 } };
+    const calls = marches
+      .map((m: any) => m?.squadId || m?.id)
+      .filter(Boolean)
+      .map((squadId: any) => ({ name: 'stopMineGathering', feature: 'mine', args: { squadId } }));
+    const dispatch = rpcMessageForSettings(stored, calls);
+    if (!dispatch) return { ok: false, message: 'Popup RPC disabled in Settings' };
+    await cr?.tabs?.sendMessage?.(tab.id, { ...dispatch, group: 'remote-emergency-recall' })?.catch?.(() => {});
+    return { ok: true, message: `Recalled ${calls.length} gathering squad(s)`, data: { recalled: calls.length } };
+  }
+
+  if (action === 'toggle-automation') {
+    const target = String(payload.target || '');
+    const stored =
+      (await cr?.storage?.local?.get([
+        'autoGatherSettings',
+        'troopHealSettings',
+        'troopTrainSettings',
+        'energyAutoBurnSettings',
+        'expiringClaimSettings',
+        'autoShopFavoritesEnabled',
+      ])) || {};
+
+    if (target === 'autoGather') {
+      const cur = stored.autoGatherSettings || {};
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !cur.enabled;
+      const next = { ...cur, enabled: nextEnabled, smartEnabled: nextEnabled ? true : cur.smartEnabled };
+      await cr?.storage?.local?.set({ autoGatherSettings: next });
+      if (nextEnabled) await tickAutoGather(true, cr);
+      else if (tab?.id) await cr?.tabs?.sendMessage?.(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' })?.catch?.(() => {});
+      return { ok: true, message: `Auto-Gather ${nextEnabled ? 'enabled' : 'paused'}` };
+    }
+    if (target === 'mineDefense') {
+      const cur = stored.autoGatherSettings || {};
+      const curEnabled = cur.defenseRecallEnabled !== false;
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !curEnabled;
+      await cr?.storage?.local?.set({ autoGatherSettings: { ...cur, defenseRecallEnabled: nextEnabled } });
+      await tickMineDefense(cr);
+      return { ok: true, message: `Mine Defense ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    if (target === 'autoHeal') {
+      const cur = stored.troopHealSettings || {};
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !cur.autoHealEnabled;
+      await cr?.storage?.local?.set({ troopHealSettings: { ...cur, autoHealEnabled: nextEnabled } });
+      return { ok: true, message: `Auto-Heal ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    if (target === 'autoTrain') {
+      const cur = stored.troopTrainSettings || {};
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !cur.autoTrainEnabled;
+      await cr?.storage?.local?.set({ troopTrainSettings: { ...cur, autoTrainEnabled: nextEnabled } });
+      return { ok: true, message: `Auto-Train ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    if (target === 'energyBurn') {
+      const cur = stored.energyAutoBurnSettings || {};
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !cur.enabled;
+      await cr?.storage?.local?.set({ energyAutoBurnSettings: { ...cur, enabled: nextEnabled } });
+      return { ok: true, message: `Energy Burner ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    if (target === 'expiringClaims') {
+      const cur = stored.expiringClaimSettings || {};
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !cur.enabled;
+      await cr?.storage?.local?.set({ expiringClaimSettings: { ...cur, enabled: nextEnabled } });
+      return { ok: true, message: `Expiring Claims ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    if (target === 'shopFavorites') {
+      const nextEnabled = typeof payload.enabled === 'boolean' ? payload.enabled : !stored.autoShopFavoritesEnabled;
+      await cr?.storage?.local?.set({ autoShopFavoritesEnabled: nextEnabled });
+      return { ok: true, message: `Auto Shop ${nextEnabled ? 'enabled' : 'disabled'}` };
+    }
+    return { ok: false, message: `Unknown toggle target: ${target}` };
+  }
+
+  if (action === 'stop-queue') {
+    const q = String(payload.queue || '');
+    const stored = (await cr?.storage?.local?.get(['raidQueue', 'monsterQueue', 'towerRun', 'dungeonRun', 'buildingQueue', 'researchQueue'])) || {};
+    if (q === 'raid' && stored.raidQueue) {
+      await saveRaidTransition({ state: raidQueueService.stop(stored.raidQueue, 'Stopped via HWA Control Panel') }, stored, cr);
+      return { ok: true, message: 'Raid queue stopped' };
+    }
+    if (q === 'monster' && stored.monsterQueue) {
+      await saveMonsterTransition({ state: monsterQueueService.stop(stored.monsterQueue, 'Stopped via HWA Control Panel') }, stored, cr);
+      return { ok: true, message: 'Monster queue stopped' };
+    }
+    if (q === 'tower' && stored.towerRun) {
+      await saveTowerTransition({ state: towerRunnerService.stop(stored.towerRun, 'Stopped via HWA Control Panel') }, stored, cr);
+      return { ok: true, message: 'Tower run stopped' };
+    }
+    if (q === 'dungeon' && stored.dungeonRun && dungeonRunnerService) {
+      await saveDungeonTransition({ state: dungeonRunnerService.stop(stored.dungeonRun, 'Stopped via HWA Control Panel') }, stored, cr);
+      return { ok: true, message: 'Dungeon run stopped' };
+    }
+    if (q === 'building') {
+      await cr?.storage?.local?.set({ buildingQueue: { active: false, status: 'stopped', items: [] } });
+      return { ok: true, message: 'Building queue cleared' };
+    }
+    if (q === 'research') {
+      await cr?.storage?.local?.set({ researchQueue: { active: false, status: 'stopped', items: [] } });
+      return { ok: true, message: 'Research queue cleared' };
+    }
+    return { ok: true, message: `No active ${q} queue to stop` };
+  }
+
+  if (action === 'trigger-special') {
+    const trigger = String(payload.trigger || '');
+    if (trigger === 'run-batch-heal') {
+      await advanceTroopHealing(tab?.id, cr, { force: true });
+      return { ok: true, message: 'Batch auto-heal triggered' };
+    }
+    if (trigger === 'claim-freebies') {
+      await runRealmResourcesClaim(true, cr);
+      await runFrontierRewardsClaim(true, cr);
+      await runFreeSpin(true, null, tab?.id, cr);
+      await runHeroicChestVideoOpen(true, cr);
+      return { ok: true, message: 'Freebies claim triggered' };
+    }
+    if (trigger === 'run-daily-autopilot') {
+      await runRealmResourcesClaim(true, cr);
+      await runFrontierRewardsClaim(true, cr);
+      await runFreeSpin(true, null, tab?.id, cr);
+      await runHeroicChestVideoOpen(true, cr);
+      await runAutoShopFavorites(true, cr);
+      await runAutoExpiringClaims(true, cr);
+      return { ok: true, message: 'Daily autopilot routine triggered' };
+    }
+    return { ok: false, message: `Unknown trigger: ${trigger}` };
+  }
+
+  return { ok: false, message: `Unsupported command: ${action}` };
+}
+
 export function socketRefreshCalls(record: any, cache: any): any[] {
   if (record.transport !== 'websocket' || record.direction !== 'received' || record.encoding !== 'utf8' || record.payloadTruncated)
     return [];
@@ -4143,6 +4308,12 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       await pending;
     }
     if (alarm.name === 'hwa-mine-defense') await tickMineDefense(cr);
+    if (alarm.name === REMOTE_BRIDGE_ALARM) {
+      await ensureRemoteBridgeConnected(cr, {
+        hasGameTab: async () => Boolean((await findActiveGameTab(cr))?.id),
+        executeCommand: (action, payload) => executeRemoteControlCommand(action, payload, cr),
+      });
+    }
     if (alarm.name === 'hwa-troop-train-wake') {
       const tab = await findActiveGameTab(cr);
       if (tab?.id) {
@@ -4230,6 +4401,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     if (area === 'local' && ['troopHealSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       lastTroopHealDispatch = null;
       pending = pending.then(() => advanceTroopHealing(undefined, cr)).catch(() => {});
+    }
+    if (
+      area === 'local' &&
+      ['autoGatherSettings', 'smartGatherState', 'raidQueue', 'monsterQueue', 'troopHealSettings', 'troopTrainSettings', 'energyAutoBurnSettings', 'expiringClaimSettings'].some(
+        (key) => key in changes
+      )
+    ) {
+      scheduleSnapshotPush(cr, async () => Boolean((await findActiveGameTab(cr))?.id));
     }
     if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
     pending = pending
@@ -4416,6 +4595,30 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     ) {
       pending = pending.then(async () => {
         await tickMineDefense(cr);
+        return { ok: true };
+      });
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      ['remote-bridge-check', 'remote-bridge-sync', 'remote-bridge-pair', 'remote-bridge-revoke-sessions'].includes(
+        message?.kind
+      ) &&
+      sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/')
+    ) {
+      pending = pending.then(async () => {
+        if (message.kind === 'remote-bridge-check') {
+          return checkRemoteBridgeConnection(String(message.endpointUrl || ''));
+        }
+        if (message.kind === 'remote-bridge-revoke-sessions') {
+          return revokeRemoteSessions(cr);
+        }
+        await ensureRemoteBridgeConnected(cr, {
+          forcePair: message.kind === 'remote-bridge-pair',
+          hasGameTab: async () => Boolean((await findActiveGameTab(cr))?.id),
+          executeCommand: (action, payload) => executeRemoteControlCommand(action, payload, cr),
+        });
         return { ok: true };
       });
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));

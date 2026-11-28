@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hwa-control-panel
+  labels:
+    app: hwa-control-panel
+spec:
+  replicas: 1
+  strategy:
+    # Single-writer SQLite on ReadWriteOnce PVC requires Recreate strategy
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hwa-control-panel
+  template:
+    metadata:
+      labels:
+        app: hwa-control-panel
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: hwa-control-panel
+          image: registry.example.com/hwa/hwa-control-panel:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "8080"
+            - name: DATA_DIR
+              value: "/data"
+            - name: COOKIE_SECURE
+              value: "auto"
+            # Optional pairing key from K8s Secret:
+            # - name: BOOTSTRAP_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: hwa-control-panel-secret
+            #       key: bootstrap-key
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hwa-control-panel-data

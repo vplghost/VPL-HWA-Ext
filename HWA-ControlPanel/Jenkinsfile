@@ -1,0 +1,82 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Optional custom image tag (defaults to short Git commit SHA)')
+    booleanParam(name: 'PUSH_LATEST', defaultValue: true, description: 'Also tag and push :latest')
+  }
+
+  environment {
+    // Configure these via Jenkins Global/Folder Environment or override per job
+    REGISTRY_URL            = "${env.HWA_REGISTRY_URL ?: 'registry.example.com'}"
+    IMAGE_NAME              = "${env.HWA_CP_IMAGE_NAME ?: 'hwa/hwa-control-panel'}"
+    REGISTRY_CREDENTIALS_ID = "${env.HWA_REGISTRY_CREDENTIALS_ID ?: 'hwa-registry-creds'}"
+    DOCKER_CONTEXT          = 'HWA-ControlPanel'
+    DOCKERFILE_PATH         = 'HWA-ControlPanel/Dockerfile'
+  }
+
+  options {
+    disableConcurrentBuilds()
+    timeout(time: 15, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.GIT_SHORT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+          env.RESOLVED_TAG  = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : env.GIT_SHORT_SHA
+          env.FULL_IMAGE    = "${env.REGISTRY_URL}/${env.IMAGE_NAME}"
+        }
+        echo "Building ${env.FULL_IMAGE}:${env.RESOLVED_TAG}"
+      }
+    }
+
+    stage('Docker Build') {
+      steps {
+        sh """
+          docker build \
+            --file ${DOCKERFILE_PATH} \
+            --label org.opencontainers.image.revision=${GIT_SHORT_SHA} \
+            --label org.opencontainers.image.source=VPL-HWA-Ext \
+            --tag ${FULL_IMAGE}:${RESOLVED_TAG} \
+            ${DOCKER_CONTEXT}
+        """
+        script {
+          if (params.PUSH_LATEST) {
+            sh "docker tag ${env.FULL_IMAGE}:${env.RESOLVED_TAG} ${env.FULL_IMAGE}:latest"
+          }
+        }
+      }
+    }
+
+    stage('Docker Push') {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: env.REGISTRY_CREDENTIALS_ID,
+          usernameVariable: 'REG_USER',
+          passwordVariable: 'REG_PASS'
+        )]) {
+          sh '''
+            echo "$REG_PASS" | docker login "$REGISTRY_URL" --username "$REG_USER" --password-stdin
+            docker push "${FULL_IMAGE}:${RESOLVED_TAG}"
+          '''
+          script {
+            if (params.PUSH_LATEST) {
+              sh 'docker push "${FULL_IMAGE}:latest"'
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout "$REGISTRY_URL" || true'
+      sh 'docker image rm "${FULL_IMAGE}:${RESOLVED_TAG}" || true'
+    }
+  }
+}

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>HWA Control Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f172a; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; margin: 0; }
+    .cp-shell { max-width: 28rem; margin: 0 auto; min-height: 100vh; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .cp-card { background: #1e293b; border: 1px solid #334155; border-radius: 0.875rem; padding: 0.875rem; }
+    .cp-btn { cursor: pointer; border-radius: 0.75rem; font-weight: 600; transition: opacity 0.15s, transform 0.1s; }
+    .cp-btn:active { transform: scale(0.98); }
+    .cp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+  <div class="cp-shell max-w-md mx-auto min-h-screen p-3.5 flex flex-col gap-3">
+    <!-- Login View (QR ?guid= pre-filled + 6-digit OTP -> 1-year cookie) -->
+    <section id="cp-login-view" class="hidden my-auto cp-card bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+      <div class="text-center space-y-1">
+        <div class="text-3xl">📱</div>
+        <h1 class="text-lg font-bold text-slate-100">HWA Control Panel</h1>
+        <p class="text-xs text-slate-400">Scan QR once &amp; enter 6-digit OTP from Extension (1-year session)</p>
+      </div>
+
+      <form id="cp-login-form" class="space-y-3">
+        <label class="block text-xs font-medium text-slate-300">
+          Client GUID
+          <input
+            id="cp-guid-input"
+            type="text"
+            required
+            autocomplete="off"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            class="mt-1 block w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs font-mono text-slate-100 focus:border-indigo-500 focus:outline-none"
+          />
+        </label>
+
+        <label class="block text-xs font-medium text-slate-300">
+          6-Digit OTP
+          <input
+            id="cp-otp-input"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            required
+            autocomplete="one-time-code"
+            placeholder="000000"
+            class="mt-1 block w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-3 text-center text-2xl font-mono font-bold tracking-[0.35em] text-indigo-300 focus:border-indigo-500 focus:outline-none"
+          />
+        </label>
+
+        <p id="cp-login-error" class="hidden rounded-lg bg-rose-950/60 border border-rose-800 px-3 py-2 text-xs text-rose-300"></p>
+
+        <button
+          id="cp-login-submit"
+          type="submit"
+          class="cp-btn w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-3 text-sm font-bold text-white shadow-sm"
+        >
+          Connect &amp; Remember (1 Year)
+        </button>
+      </form>
+    </section>
+
+    <!-- Mobile Dashboard View -->
+    <main id="cp-dashboard-view" class="hidden flex-1 flex flex-col gap-3">
+      <!-- Top Bar -->
+      <header id="cp-header" class="cp-card bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-base">📱</span>
+            <h1 class="text-sm font-bold text-slate-100 truncate">HWA Control Panel</h1>
+          </div>
+          <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span id="cp-ext-status" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold bg-slate-800 text-slate-400">Offline</span>
+            <span id="cp-sync-time" class="text-slate-400">Never synced</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            id="cp-refresh-btn"
+            type="button"
+            class="cp-btn rounded-xl bg-teal-600 hover:bg-teal-500 px-3 py-2 text-xs font-bold text-white inline-flex items-center gap-1"
+          >
+            <span id="cp-refresh-icon">↻</span>
+            <span>Refresh</span>
+          </button>
+          <button
+            id="cp-logout-btn"
+            type="button"
+            title="Logout"
+            class="cp-btn rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-2 text-xs text-slate-300"
+          >
+            ⏻
+          </button>
+        </div>
+      </header>
+
+      <!-- Task Status Banner (shown only while awaiting command / showing result) -->
+      <div id="cp-task-status" class="hidden rounded-xl border px-3 py-2 text-xs font-medium"></div>
+
+      <!-- Incoming Mine Attack Alert -->
+      <div id="cp-mine-alert" class="hidden rounded-xl border border-rose-700 bg-rose-950/70 px-3.5 py-2.5 text-xs text-rose-200 font-semibold flex items-center justify-between gap-2">
+        <span id="cp-mine-alert-text">⚠️ Incoming Mine Attack Detected</span>
+      </div>
+
+      <!-- Monitor Cards (2x2 Grid) -->
+      <section id="cp-monitor-cards" class="grid grid-cols-2 gap-2.5">
+        <div class="cp-card bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-[11px] text-slate-400">⚡ World Energy</div>
+          <div id="cp-world-energy" class="mt-1 text-lg font-mono font-bold text-amber-300">--</div>
+        </div>
+        <div class="cp-card bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-[11px] text-slate-400">🔥 Campaign Energy</div>
+          <div id="cp-campaign-energy" class="mt-1 text-lg font-mono font-bold text-orange-300">--</div>
+        </div>
+        <div class="cp-card bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-[11px] text-slate-400">⛏️ Gathering</div>
+          <div id="cp-gathering-stat" class="mt-1 text-lg font-mono font-bold text-emerald-300">--</div>
+          <div id="cp-gathering-sub" class="text-[10px] text-slate-400 truncate"></div>
+        </div>
+        <div class="cp-card bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-[11px] text-slate-400">🏥 Infirmary</div>
+          <div id="cp-infirmary-stat" class="mt-1 text-lg font-mono font-bold text-cyan-300">--</div>
+          <div id="cp-defense-sub" class="text-[10px] text-slate-400 truncate"></div>
+        </div>
+      </section>
+
+      <!-- Active Automations Summary -->
+      <section class="cp-card bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Automations</h2>
+          <span id="cp-account-label" class="text-[11px] text-slate-400 truncate max-w-[160px]"></span>
+        </div>
+        <div id="cp-automations-list" class="flex flex-wrap gap-1.5 text-xs">
+          <span class="text-slate-500">Tap Refresh to load status.</span>
+        </div>
+      </section>
+
+      <!-- Basic Emergency Actions -->
+      <section id="cp-emergency-actions" class="cp-card bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2.5">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">🚨 Emergency &amp; Quick Controls</h2>
+
+        <button
+          id="cp-btn-recall-all"
+          type="button"
+          class="cp-btn w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-3 px-4 text-sm font-bold text-white shadow-sm"
+        >
+          🚨 Emergency Recall All Gatherers
+        </button>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            id="cp-btn-toggle-gather"
+            type="button"
+            class="cp-btn rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2.5 px-3 text-xs font-bold text-slate-100"
+          >
+            ⛏️ Toggle Auto-Gather
+          </button>
+          <button
+            id="cp-btn-toggle-defense"
+            type="button"
+            class="cp-btn rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2.5 px-3 text-xs font-bold text-slate-100"
+          >
+            🛡️ Toggle Mine Defense
+          </button>
+          <button
+            id="cp-btn-autopilot"
+            type="button"
+            class="cp-btn rounded-xl bg-indigo-600/90 hover:bg-indigo-500 py-2.5 px-3 text-xs font-bold text-white"
+          >
+            ⚡ Daily Autopilot
+          </button>
+          <button
+            id="cp-btn-batch-heal"
+            type="button"
+            class="cp-btn rounded-xl bg-cyan-700 hover:bg-cyan-600 py-2.5 px-3 text-xs font-bold text-white"
+          >
+            🏥 Batch Auto-Heal
+          </button>
+        </div>
+
+        <div id="cp-active-queues-stop" class="hidden pt-1 flex flex-wrap gap-2"></div>
+      </section>
+
+      <!-- Collapsible Recent Logs & Command History -->
+      <details id="cp-recent-logs" class="cp-card bg-slate-900 border border-slate-800 rounded-2xl p-3">
+        <summary class="cursor-pointer text-xs font-bold uppercase tracking-wider text-slate-400 select-none">
+          📋 Recent Commands &amp; Logs
+        </summary>
+        <div id="cp-commands-history" class="mt-2.5 space-y-1.5 text-[11px]"></div>
+      </details>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

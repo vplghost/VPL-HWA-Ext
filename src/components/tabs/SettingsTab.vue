@@ -726,6 +726,7 @@ const DEFAULT_TAB_ITEMS = [
   { id: 'events', label: 'Events' },
   { id: 'goals', label: 'Goals' },
   { id: 'guild', label: 'Guild' },
+  { id: 'controlPanel', label: 'Control Panel' },
 ];
 
 interface TabSettingItem {
