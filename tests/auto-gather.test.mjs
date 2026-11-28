@@ -138,7 +138,7 @@ test('auto-gather handles object-shaped marches and mine search without TypeErro
     },
     'getUnitSummary:unit': {
       data: {
-        units: { '0': { unitId: 1, count: 5000 } }
+        units: { '0': { unitId: 1, count: 20000 } }
       }
     },
     experimentalMapContext: { data: { mapId: 42, center: { x: 100, y: 200 } } },

@@ -102,6 +102,81 @@ export function countAvailableTroops(unitSummary: any): number {
   return total;
 }
 
+export function countDeployedTroops(unitSummary: any): number {
+  const squads = safeList(unitSummary?.squads);
+  let total = 0;
+  for (const squad of squads) {
+    for (const unit of safeList(squad?.units)) {
+      const count = Number(unit?.state?.survived ?? unit?.count);
+      if (Number.isFinite(count) && count > 0) total += Math.floor(count);
+    }
+  }
+  return total;
+}
+
+export function countTotalTroops(unitSummary: any): number {
+  return countAvailableTroops(unitSummary) + countDeployedTroops(unitSummary);
+}
+
+export interface BalancedGatherPlan {
+  constrained: boolean;
+  totalTroops: number;
+  reserveTotal: number;
+  netTroops: number;
+  targetSlots: number;
+  perMarchCap: number;
+  dispatchCap: number;
+}
+
+export function computeBalancedGatherAllocation(params: {
+  rawSummary: any;
+  effectiveSummary: any;
+  reserveTroops?: GatherTroopReserve | null;
+  squadCapacity: number;
+  effectiveMaxMarches: number;
+  activeCount: number;
+}): BalancedGatherPlan {
+  const normReserve = normalizeTroopReserve(params.reserveTroops);
+  const reserveTotal = normReserve.infantry + normReserve.spearmen + normReserve.marksmen;
+  const totalTroops = countTotalTroops(params.rawSummary);
+  const netTroops = Math.max(0, totalTroops - reserveTotal);
+  const squadCap = Math.max(0, Math.floor(Number(params.squadCapacity) || 0));
+  const maxMarches = Math.max(0, Math.floor(Number(params.effectiveMaxMarches) || 0));
+  const active = Math.max(0, Math.floor(Number(params.activeCount) || 0));
+
+  const fullNeed = squadCap * maxMarches;
+  const constrained = maxMarches > 1 && squadCap > 0 && netTroops < fullNeed;
+
+  if (!constrained) {
+    return {
+      constrained: false,
+      totalTroops,
+      reserveTotal,
+      netTroops,
+      targetSlots: maxMarches,
+      perMarchCap: squadCap,
+      dispatchCap: squadCap,
+    };
+  }
+
+  const targetSlots = Math.max(1, maxMarches - 1);
+  const perMarchCap = Math.max(1, Math.min(squadCap, Math.floor(netTroops / targetSlots)));
+  const remainingSlots = Math.max(1, targetSlots - active);
+  const surplusInCity = countAvailableTroops(params.effectiveSummary);
+  const fairShareNow = Math.max(1, Math.floor(surplusInCity / remainingSlots));
+  const dispatchCap = Math.max(1, Math.min(squadCap, perMarchCap, fairShareNow));
+
+  return {
+    constrained: true,
+    totalTroops,
+    reserveTotal,
+    netTroops,
+    targetSlots,
+    perMarchCap,
+    dispatchCap,
+  };
+}
+
 /**
  * Deducts reserved troop counts per type (infantry=0, spearmen=1, marksmen=2),
  * preserving the HIGHEST tiers first for combat (Auto-Join / Rallies).
@@ -515,6 +590,35 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
     }
   }
 
+  const myAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id ?? cache?.accountStatus?.data?.id;
+  const refHeroIds = data.lowestPowerHeroes(heroes, availableHeroIds);
+  const refSquadCapacity =
+    refHeroIds.length > 0
+      ? data.capacityModel(
+          refHeroIds,
+          heroes,
+          cache?.troopCapacityEvidence?.data,
+          data.normalizeCapacitySettings(stored?.troopCapacitySettings),
+          myAccountId
+        ).total || 0
+      : 0;
+  const balanced = computeBalancedGatherAllocation({
+    rawSummary: summary,
+    effectiveSummary,
+    reserveTroops: settings.reserveTroops,
+    squadCapacity: refSquadCapacity,
+    effectiveMaxMarches,
+    activeCount,
+  });
+  if (balanced.constrained && activeCount >= balanced.targetSlots) {
+    return {
+      action: 'wait',
+      reason: `Balanced gathering active (${activeCount}/${balanced.targetSlots} squads; reserving 1 march slot while army is below full capacity)`,
+      activeCount,
+      maxMarches: balanced.targetSlots,
+    };
+  }
+
   const targetMineType =
     resume?.type || daily?.type || resolveNextMineType(settings.mineType, settings.lastAutoMineType);
   const nearest =
@@ -565,6 +669,7 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
         targetMine: selectedMine,
         capacitySettings: data.normalizeCapacitySettings(stored?.troopCapacitySettings),
         accountId: myId,
+        ...(balanced.constrained ? { maxTroopBudget: balanced.dispatchCap } : {}),
       });
       if (!opt.heroIds.length || !opt.allocatedTroops.length) {
         return {
@@ -588,10 +693,13 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
         data.normalizeCapacitySettings(stored?.troopCapacitySettings),
         myId
       ).total;
+      const effectiveCap = balanced.constrained && Number.isFinite(capacity)
+        ? Math.min(capacity, balanced.dispatchCap)
+        : capacity;
       const availSummary = Array.isArray(effectiveSummary?.available)
         ? effectiveSummary
         : { available: safeList(effectiveSummary?.units) };
-      const troops = data.allocateTroops(availSummary, capacity);
+      const troops = data.allocateTroops(availSummary, effectiveCap);
       squad = data.buildSquad(heroIds, troops);
     }
 
@@ -628,6 +736,9 @@ export const autoGatherService = {
   normalizeTroopReserve,
   hasTroopReserve,
   countAvailableTroops,
+  countDeployedTroops,
+  countTotalTroops,
+  computeBalancedGatherAllocation,
   applyTroopReserve,
   normalizeAutoGatherSettings,
   resolveNextMineType,

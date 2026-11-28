@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.408 — 2026-11-28
+
+### Changed
+
+- **Auto-Gather Balanced Troop Split Allocation (`autoGather.ts`, `mineData.ts`, `tests/gathering-modal-and-troop-wait.test.mjs`)**:
+  - Added `countDeployedTroops()`, `countTotalTroops()`, and `computeBalancedGatherAllocation()` to evenly distribute `(totalTroops - reserveTroops) / (maxMarches - 1)` across `(maxMarches - 1)` gathering marches whenever army size cannot fill all marches, keeping 1 march slot open and optimizing travel/gathering balance across both standard and optimized team modes.
+
 ## 0.11.407 — 2026-11-28
 
 ### Changed

@@ -176,6 +176,7 @@ export interface OptimizedGatheringTeamParams {
   mine?: any;
   capacitySettings?: any;
   accountId?: any;
+  maxTroopBudget?: number;
 }
 
 export interface OptimizedGatheringTeamResult {
@@ -214,6 +215,11 @@ export function buildOptimizedGatheringTeam(
 
   const requiredCargo = calculateMineCargo(mineType, mineLevel, resourcesAmount);
   const requiredTroops = calculateRequiredTroopsForCargo(requiredCargo, unitSummary);
+  const budgetCap =
+    Number.isFinite(params.maxTroopBudget) && (params.maxTroopBudget as number) > 0
+      ? Math.max(1, Math.floor(params.maxTroopBudget as number))
+      : null;
+  const effectiveRequiredTroops = budgetCap != null ? Math.min(requiredTroops, budgetCap) : requiredTroops;
 
   const sortedHeroIds = [...availableHeroIds]
     .filter((id) => heroes[String(id)])
@@ -235,12 +241,12 @@ export function buildOptimizedGatheringTeam(
     const heroCap = heroCapacity(heroId, heroes[String(heroId)], null, normSettings.defaultHero);
     currentSquadCapacity += heroCap;
 
-    if (currentSquadCapacity >= requiredTroops || selectedHeroIds.length >= 5) {
+    if (currentSquadCapacity >= effectiveRequiredTroops || selectedHeroIds.length >= 5) {
       break;
     }
   }
 
-  const targetTroops = Math.min(currentSquadCapacity, requiredTroops);
+  const targetTroops = Math.min(currentSquadCapacity, effectiveRequiredTroops);
   const allocatedTroops = allocateTroops(unitSummary, targetTroops);
 
   return {

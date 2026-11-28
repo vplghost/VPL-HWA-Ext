@@ -7,11 +7,14 @@ import {
   normalizeTroopReserve,
   applyTroopReserve,
   countAvailableTroops,
+  countTotalTroops,
+  computeBalancedGatherAllocation,
   isTroopAvailabilityEvent,
   planAutoGather,
 } from '../src/services/queues/autoGather.ts';
 import { computeActiveAutomations } from '../src/composables/useActiveAutomations.ts';
 import { evaluateAutoGather, tickMineDefense } from '../src/background/backgroundRuntime.ts';
+import { getMineConfigId } from '../src/utils/mineData.ts';
 
 function makeBaseCache(availableUnits, now = 1_700_000_000_000) {
   const iso = new Date(now).toISOString();
@@ -373,4 +376,151 @@ test('GatheringModal uses header status/actions, unified Auto toggle, mutual Aut
   assert.match(vue, /id="gather-reserve-spearmen"/);
   assert.match(vue, /id="gather-reserve-marksmen"/);
   assert.match(vue, /const showReserveConfig = ref\(false\)/);
+});
+
+test('P2-54: computeBalancedGatherAllocation splits (total - reserve) / (maxMarches - 1) evenly when constrained', () => {
+  const reserve = { infantry: 100, spearmen: 100, marksmen: 100 }; // 300 total
+  const rawSummary = {
+    available: [
+      { unitId: 9, count: 3500 },
+      { unitId: 19, count: 3400 },
+      { unitId: 29, count: 3400 },
+    ], // 10,300 total -> 10,000 net < 4,000 * 5 = 20,000
+    squads: [],
+  };
+  const effectiveSummary = applyTroopReserve(rawSummary, reserve);
+
+  const p0 = computeBalancedGatherAllocation({
+    rawSummary,
+    effectiveSummary,
+    reserveTroops: reserve,
+    squadCapacity: 4000,
+    effectiveMaxMarches: 5,
+    activeCount: 0,
+  });
+  assert.equal(p0.constrained, true);
+  assert.equal(p0.targetSlots, 4);
+  assert.equal(p0.perMarchCap, 2500);
+  assert.equal(p0.dispatchCap, 2500);
+
+  // Full army (25,000 net >= 20,000) -> unconstrained, uses all 5 marches at full 4,000 cap
+  const bigSummary = { available: [{ unitId: 9, count: 25300 }], squads: [] };
+  const pFull = computeBalancedGatherAllocation({
+    rawSummary: bigSummary,
+    effectiveSummary: applyTroopReserve(bigSummary, reserve),
+    reserveTroops: reserve,
+    squadCapacity: 4000,
+    effectiveMaxMarches: 5,
+    activeCount: 0,
+  });
+  assert.equal(pFull.constrained, false);
+  assert.equal(pFull.targetSlots, 5);
+  assert.equal(pFull.dispatchCap, 4000);
+
+  // maxMarches === 1 -> no division by zero, unconstrained
+  const pOne = computeBalancedGatherAllocation({
+    rawSummary,
+    effectiveSummary,
+    reserveTroops: reserve,
+    squadCapacity: 4000,
+    effectiveMaxMarches: 1,
+    activeCount: 0,
+  });
+  assert.equal(pOne.constrained, false);
+  assert.equal(pOne.targetSlots, 1);
+  assert.equal(countTotalTroops({ available: [{ unitId: 9, count: 500 }], squads: [{ units: [{ unitId: 9, state: { survived: 250 } }] }] }), 750);
+});
+
+test('P2-54: planAutoGather caps dispatch troops to balanced share and stops at (maxMarches - 1) when army is constrained', () => {
+  const now = 1_700_000_000_000;
+  const cache = makeBaseCache(
+    [
+      { unitId: 9, count: 3100 },
+      { unitId: 19, count: 3100 },
+      { unitId: 29, count: 3100 },
+    ], // 9,300 total - 300 reserve = 9,000 net; 4 marches * ~4,055 = ~16,220 -> constrained -> 3 slots * 3,000 each
+    now
+  );
+  cache.researchStatus = {
+    data: { completedResearches: [{ id: 7, level: 1 }, { id: 94, level: 1 }] },
+    updatedAt: new Date(now).toISOString(),
+  };
+  cache.subscriptionGetInfo = {
+    data: { subscription: { isActive: true } },
+    updatedAt: new Date(now).toISOString(),
+  };
+  cache.experimentalMineSearch = {
+    data: {
+      mapId: 'map-1',
+      mineConfigId: getMineConfigId('food', 10),
+      mines: [{ mineId: 'mine-10-a', coordinates: { x: 11, y: 11 }, resourceAmount: 30000000 }],
+    },
+    updatedAt: new Date(now).toISOString(),
+  };
+
+  // Standard mode dispatch #1: capped at 3,000 instead of draining full 4,055
+  const stdPlan = planAutoGather(
+    cache,
+    {
+      popupRpcEnabled: true,
+      autoGatherSettings: {
+        enabled: true,
+        smartEnabled: false,
+        maxMarches: 4,
+        mineLevel: 10,
+        mineType: 'food',
+        reserveTroops: { infantry: 100, spearmen: 100, marksmen: 100 },
+      },
+    },
+    now
+  );
+  assert.equal(stdPlan.action, 'gather');
+  const stdSent = stdPlan.call.args.squad.units.reduce((s, u) => s + u.count, 0);
+  assert.equal(stdSent, 3000);
+
+  // Optimized mode dispatch #1: also capped at 3,000
+  const optPlan = planAutoGather(
+    cache,
+    {
+      popupRpcEnabled: true,
+      autoGatherSettings: {
+        enabled: true,
+        smartEnabled: false,
+        maxMarches: 4,
+        mineLevel: 10,
+        mineType: 'food',
+        selectedTeam: 'optimized',
+        optimizeTeam: true,
+        reserveTroops: { infantry: 100, spearmen: 100, marksmen: 100 },
+      },
+    },
+    now
+  );
+  assert.equal(optPlan.action, 'gather');
+  const optSent = optPlan.call.args.squad.units.reduce((s, u) => s + u.count, 0);
+  assert.equal(optSent, 3000);
+
+  // When 3 marches are already active (maxMarches - 1), waits instead of filling the 4th slot
+  cache.marchStatus.data.marches = [
+    { squadId: 1, mineId: 'm1', stage: 'gathering' },
+    { squadId: 2, mineId: 'm2', stage: 'gathering' },
+    { squadId: 3, mineId: 'm3', stage: 'gathering' },
+  ];
+  const waitPlan = planAutoGather(
+    cache,
+    {
+      popupRpcEnabled: true,
+      autoGatherSettings: {
+        enabled: true,
+        smartEnabled: false,
+        maxMarches: 4,
+        mineLevel: 10,
+        mineType: 'food',
+        reserveTroops: { infantry: 100, spearmen: 100, marksmen: 100 },
+      },
+    },
+    now
+  );
+  assert.equal(waitPlan.action, 'wait');
+  assert.match(waitPlan.reason || '', /Balanced gathering active/i);
 });
