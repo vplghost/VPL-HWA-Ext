@@ -14,7 +14,7 @@ import { useShopFavoritesAutomation } from '@/src/composables/useShopFavoritesAu
 import { useEnergyAutoBurn } from '@/src/composables/useEnergyAutoBurn';
 import { useExpiringClaimsAutomation } from '@/src/composables/useExpiringClaimsAutomation';
 import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
-import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
+import { DAILY_STEP_LABELS, DEFAULT_DAILY_STEP_ORDER, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { applyTabPreset } from '@/src/utils/commandPalette';
 import { moveItemToIndex } from '@/src/utils/listReorder';
 import { useDraft } from '@/src/composables/useDraft';
@@ -77,6 +77,41 @@ function toggleDailyAutopilotStepSkip(stepId: string) {
     [stepId]: !dailyAutopilotSettings.value.skippedSteps?.[stepId],
   };
   saveDailyAutopilotSettings({ skippedSteps: nextSkipped });
+}
+
+const draggedAutopilotIdx = ref<number | null>(null);
+const dragOverAutopilotIdx = ref<number | null>(null);
+
+function onAutopilotStepDragStart(index: number, event: DragEvent) {
+  draggedAutopilotIdx.value = index;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  }
+}
+
+function onAutopilotStepDragOver(index: number) {
+  if (draggedAutopilotIdx.value !== null && draggedAutopilotIdx.value !== index) {
+    dragOverAutopilotIdx.value = index;
+  }
+}
+
+function onAutopilotStepDrop(targetIndex: number) {
+  const fromIdx = draggedAutopilotIdx.value;
+  draggedAutopilotIdx.value = null;
+  dragOverAutopilotIdx.value = null;
+  if (fromIdx === null || fromIdx === targetIndex) return;
+  const nextOrder = moveItemToIndex(dailyAutopilotSettings.value.stepOrder, fromIdx, targetIndex);
+  saveDailyAutopilotSettings({ stepOrder: nextOrder });
+}
+
+function onAutopilotStepDragEnd() {
+  draggedAutopilotIdx.value = null;
+  dragOverAutopilotIdx.value = null;
+}
+
+function resetDailyAutopilotOrder() {
+  saveDailyAutopilotSettings({ stepOrder: [...DEFAULT_DAILY_STEP_ORDER] });
 }
 const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEngineStatus, checkStatus } = useGameConnection();
 const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
@@ -359,6 +394,117 @@ const energyBurnFallbackText = computed({
     energyBurnSettings.value = { ...energyBurnSettings.value, fallbackMissionIds: ids };
   },
 });
+
+// Consolidated World Energy Auto Raid Rally (moved from RaidModal into Anti-Cap Energy Auto-Burner)
+const raidEnergyAutoEnabled = ref(false);
+const raidEnergyThreshold = ref(200);
+const raidEnergyMessage = ref('');
+const savedRaidPrefs = ref<Record<string, any> | null>(null);
+
+const worldEnergyMode = computed<'off' | 'raid' | 'monster'>({
+  get: () => {
+    if (raidEnergyAutoEnabled.value) return 'raid';
+    if (energyBurnSettings.value.worldFallbackEnabled) return 'monster';
+    return 'off';
+  },
+  set: (mode) => {
+    void applyWorldEnergyMode(mode);
+  },
+});
+
+const raidConfigSummary = computed(() => {
+  const p = savedRaidPrefs.value;
+  if (!p) return 'Open Guild Raid dialog once to save boss level, team & map coordinates.';
+  const lvl = p.bossLevel || 1;
+  const cnt = p.raidCount || 2;
+  const waitMin = Math.round((p.waitSeconds || 300) / 60);
+  return `Uses saved Raid preset: Boss Lv.${lvl} · ${cnt} rounds · Wait ${waitMin}m`;
+});
+
+async function loadRaidEnergyAutoSettings() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.get) return;
+  try {
+    const stored: any = await chrome.storage.local.get(['raidEnergyAuto', 'raidEnergyAutoStatus', 'raidPreferences']);
+    const accId = cache.value?.accountStatus?.data?.id;
+    if (stored.raidEnergyAuto && (accId == null || String(stored.raidEnergyAuto.accountId) === String(accId))) {
+      raidEnergyAutoEnabled.value = stored.raidEnergyAuto.enabled === true;
+      raidEnergyThreshold.value = Number(stored.raidEnergyAuto.threshold) || 200;
+    } else {
+      raidEnergyAutoEnabled.value = false;
+    }
+    raidEnergyMessage.value = stored.raidEnergyAutoStatus?.message || '';
+    savedRaidPrefs.value = stored.raidPreferences || stored.raidEnergyAuto?.options || null;
+  } catch (_) {}
+}
+
+async function saveRaidEnergyConfig(enabled: boolean) {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  if (!enabled) {
+    raidEnergyAutoEnabled.value = false;
+    await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config: { enabled: false } }).catch(() => {});
+    raidEnergyMessage.value = 'Auto Raid Rally is off.';
+    return;
+  }
+  const stored: any = await chrome.storage.local.get(['raidPreferences', 'raidEnergyAuto']);
+  const prefs = stored.raidPreferences || {};
+  const prevOpts = stored.raidEnergyAuto?.options || {};
+  const mapInfo = cache.value?.mapGetInfo?.data || cache.value?.clan_getSummary?.data;
+  const options = {
+    mapId: prefs.mapId ?? prevOpts.mapId ?? mapInfo?.mapId ?? mapInfo?.id,
+    center: prefs.center ?? prevOpts.center ?? mapInfo?.castlePosition ?? mapInfo?.center,
+    firstMobId: prefs.targetMobId ?? prevOpts.firstMobId,
+    level: Number(prefs.bossLevel ?? prevOpts.level ?? 1),
+    waitSeconds: Number(prefs.waitSeconds ?? prevOpts.waitSeconds ?? 300),
+    minMembers: Number(prefs.minMembers ?? prevOpts.minMembers ?? 4),
+    count: Number(prefs.raidCount ?? prevOpts.count ?? 2),
+    autoCancel: prefs.autoCancel ?? prevOpts.autoCancel ?? true,
+    autoHealAfterQueue: prefs.autoHealAfterQueue ?? prevOpts.autoHealAfterQueue ?? true,
+    heroIds: Array.isArray(prefs.heroIds) && prefs.heroIds.length === 5 ? prefs.heroIds : (prevOpts.heroIds || []),
+    teamId: prefs.teamId ?? prefs.rallyTeam ?? prevOpts.teamId ?? '',
+    maxTroops: prefs.maxTroops ?? prevOpts.maxTroops,
+  };
+  const threshold = Math.max(25, Math.min(200, Math.floor(Number(raidEnergyThreshold.value) || 200)));
+  raidEnergyThreshold.value = threshold;
+  const config = {
+    enabled: true,
+    threshold,
+    accountId: cache.value?.accountStatus?.data?.id ?? prefs.accountId ?? stored.raidEnergyAuto?.accountId,
+    options,
+  };
+  const response = await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config }).catch((err: any) => ({ error: String(err) }));
+  if (!response?.ok) {
+    raidEnergyAutoEnabled.value = false;
+    raidEnergyMessage.value = response?.error || 'Open Guild Raid dialog once to configure map & team before enabling Auto Raid Rally.';
+    await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config: { enabled: false } }).catch(() => {});
+  } else {
+    raidEnergyAutoEnabled.value = true;
+    raidEnergyMessage.value = `Watching natural World Energy regeneration up to ${threshold}.`;
+  }
+}
+
+async function applyWorldEnergyMode(mode: 'off' | 'raid' | 'monster') {
+  if (mode === 'raid') {
+    if (energyBurnSettings.value.worldFallbackEnabled) {
+      energyBurnSettings.value = { ...energyBurnSettings.value, worldFallbackEnabled: false };
+      await saveEnergyAutoBurn();
+    }
+    await saveRaidEnergyConfig(true);
+  } else if (mode === 'monster') {
+    if (raidEnergyAutoEnabled.value) {
+      await saveRaidEnergyConfig(false);
+    }
+    energyBurnSettings.value = { ...energyBurnSettings.value, worldFallbackEnabled: true };
+    await saveEnergyAutoBurn();
+  } else {
+    if (raidEnergyAutoEnabled.value) {
+      await saveRaidEnergyConfig(false);
+    }
+    if (energyBurnSettings.value.worldFallbackEnabled) {
+      energyBurnSettings.value = { ...energyBurnSettings.value, worldFallbackEnabled: false };
+      await saveEnergyAutoBurn();
+    }
+  }
+}
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
@@ -657,6 +803,7 @@ onMounted(async () => {
       }
       await loadTroopTrainSettings();
       await loadTroopHealSettings();
+      await loadRaidEnergyAutoSettings();
       void refreshStorageTelemetry();
     } catch (_) {}
   }
@@ -681,6 +828,9 @@ function handleAutoTrainStorageChange(changes: any, area: string) {
   }
   if (changes?.troopHealSettings?.newValue) {
     autoHealSettings.value = normalizeTroopHealSettings(changes.troopHealSettings.newValue);
+  }
+  if (changes?.raidEnergyAuto || changes?.raidEnergyAutoStatus || changes?.raidPreferences) {
+    void loadRaidEnergyAutoSettings();
   }
   if (changes?.cachedGameVersion) {
     cachedGameVersion.value = changes.cachedGameVersion.newValue ? String(changes.cachedGameVersion.newValue) : null;
@@ -1132,9 +1282,9 @@ async function toggleRecording() {
     </div>
     </div>
 
-    <!-- Row 2: Daily Routine Autopilot | (Auto Collectors + Auto Troop Training) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
-    <section id="settings-daily-autopilot" class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+    <!-- Row 2: Daily Routine Autopilot (Compact Draggable Pills) | Auto Freebies & Resource Collectors -->
+    <div id="settings-row-autopilot-collectors" class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+    <section id="settings-daily-autopilot" class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5 flex flex-col">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <label for="setting-daily-autopilot-enabled" class="flex items-center gap-2 cursor-pointer">
           <input
@@ -1153,68 +1303,90 @@ async function toggleRecording() {
         </span>
       </div>
 
-      <div class="space-y-2 text-xs">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            id="setting-daily-autopilot-skip-high-risk"
-            type="checkbox"
-            :checked="dailyAutopilotSettings.skipHighRiskByDefault"
-            @change="saveDailyAutopilotSettings({ skipHighRiskByDefault: ($event.target as HTMLInputElement).checked })"
-          />
-          <span>Skip high-risk activities by default (Hydra, Arena, Grand Arena, Guild Dungeon)</span>
-        </label>
-
-        <div class="flex items-center justify-between gap-2 pt-1">
-          <span class="text-slate-600 dark:text-slate-300 font-medium">On step error:</span>
+      <div class="space-y-2 text-xs flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              id="setting-daily-autopilot-skip-high-risk"
+              type="checkbox"
+              :checked="dailyAutopilotSettings.skipHighRiskByDefault"
+              @change="saveDailyAutopilotSettings({ skipHighRiskByDefault: ($event.target as HTMLInputElement).checked })"
+            />
+            <span>Skip high-risk by default (Hydra, Arena, GA, Dungeon)</span>
+          </label>
           <select
             id="setting-daily-autopilot-error-policy"
             :value="dailyAutopilotSettings.errorPolicy"
-            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            aria-label="On step error policy"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] text-slate-800 dark:text-slate-200"
             @change="saveDailyAutopilotSettings({ errorPolicy: ($event.target as HTMLSelectElement).value as any })"
           >
-            <option value="skip-and-continue">Skip failed step &amp; continue</option>
-            <option value="stop-all">Stop autopilot immediately</option>
+            <option value="skip-and-continue">On error: Skip &amp; continue</option>
+            <option value="stop-all">On error: Stop immediately</option>
           </select>
         </div>
 
-        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-          <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-            Execution Order &amp; Per-Activity Skip (Safe first, high-risk at bottom)
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              Execution Sequence (drag pills to reorder · uncheck to skip)
+            </span>
+            <button
+              id="setting-daily-autopilot-reset-order"
+              type="button"
+              class="cursor-pointer text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+              @click="resetDailyAutopilotOrder"
+            >
+              Reset order
+            </button>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            <label
+          <div
+            id="settings-autopilot-step-pills"
+            class="flex flex-wrap gap-1.5"
+          >
+            <div
               v-for="(stepId, idx) in dailyAutopilotSettings.stepOrder"
               :key="stepId"
-              class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 cursor-pointer"
+              draggable="true"
+              class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] select-none transition-all cursor-grab active:cursor-grabbing"
+              :class="[
+                Boolean(dailyAutopilotSettings.skippedSteps?.[stepId])
+                  ? 'border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-950/40 text-slate-400 dark:text-slate-500 opacity-60 line-through'
+                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 hover:border-blue-400 dark:hover:border-blue-500',
+                dragOverAutopilotIdx === idx ? 'ring-2 ring-blue-500 scale-[1.02]' : '',
+              ]"
+              title="Drag to reorder · toggle checkbox to include or skip"
+              @dragstart="onAutopilotStepDragStart(idx, $event)"
+              @dragover.prevent="onAutopilotStepDragOver(idx)"
+              @drop.prevent="onAutopilotStepDrop(idx)"
+              @dragend="onAutopilotStepDragEnd"
             >
-              <span class="flex items-center gap-1.5 min-w-0 truncate">
-                <span class="text-[10px] font-mono text-slate-400">{{ idx + 1 }}.</span>
-                <span class="font-medium text-slate-700 dark:text-slate-200 truncate">{{ DAILY_STEP_LABELS[stepId] }}</span>
-                <span
-                  v-if="HIGH_RISK_ACTIVITIES.has(stepId)"
-                  class="px-1 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                >
-                  Risk
-                </span>
+              <span class="text-slate-400 dark:text-slate-500 text-[10px] leading-none" aria-hidden="true">⋮⋮</span>
+              <input
+                type="checkbox"
+                :checked="!Boolean(dailyAutopilotSettings.skippedSteps?.[stepId])"
+                :aria-label="`Include ${DAILY_STEP_LABELS[stepId]}`"
+                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-3 cursor-pointer"
+                @change="toggleDailyAutopilotStepSkip(stepId)"
+                @click.stop
+              />
+              <span class="text-[10px] font-mono text-slate-400">{{ idx + 1 }}.</span>
+              <span class="font-medium">{{ DAILY_STEP_LABELS[stepId] }}</span>
+              <span
+                v-if="HIGH_RISK_ACTIVITIES.has(stepId)"
+                class="px-1 rounded text-[9px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 no-underline"
+              >
+                Risk
               </span>
-              <span class="flex items-center gap-1 shrink-0 text-[10px] text-slate-500">
-                <input
-                  type="checkbox"
-                  :checked="Boolean(dailyAutopilotSettings.skippedSteps?.[stepId])"
-                  @change="toggleDailyAutopilotStepSkip(stepId)"
-                />
-                <span>Skip</span>
-              </span>
-            </label>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="flex flex-col gap-3.5">
     <section
       id="settings-auto-collectors-section"
-      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5"
+      class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5"
     >
       <div>
         <h3 class="text-sm font-bold">Auto Freebies & Resource Collectors</h3>
@@ -1332,7 +1504,11 @@ async function toggleRecording() {
         </div>
       </div>
     </section>
+    </div>
 
+    <!-- Row 3: Troops (Auto Training + Auto Batch Healing) | Anti-Cap Energy Auto-Burner (Campaign + World Energy) -->
+    <div id="settings-row-troops-energy" class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+    <div class="flex flex-col gap-3.5">
     <!-- Auto Troop Training (Enable checkbox inline in title) -->
     <section class="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1528,9 +1704,10 @@ async function toggleRecording() {
         </label>
       </div>
     </section>
+    </div>
 
-    <!-- Anti-Cap Energy Auto-Burner -->
-    <section id="settings-auto-energy-burn-section" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
+    <!-- Anti-Cap Energy Auto-Burner (Campaign + Consolidated World Energy Auto Raid Rally / Solo Monster) -->
+    <section id="settings-auto-energy-burn-section" class="h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 flex flex-col">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <label for="setting-auto-energy-burn" class="flex items-center gap-2 cursor-pointer">
           <input
@@ -1546,7 +1723,7 @@ async function toggleRecording() {
         </label>
         <div class="flex items-center gap-2">
           <span
-            v-if="energyBurnSettings.enabled"
+            v-if="energyBurnSettings.enabled || raidEnergyAutoEnabled"
             class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
           >
             Active
@@ -1580,56 +1757,60 @@ async function toggleRecording() {
         {{ energyBurnLastError ? `Error: ${energyBurnLastError}` : energyBurnStatus }}
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
-        <div class="space-y-1">
-          <label for="setting-energy-burn-campaign-pct" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Campaign Trigger (%)
-          </label>
-          <input
-            id="setting-energy-burn-campaign-pct"
-            v-model.number="energyBurnSettings.campaignTriggerPct"
-            type="number"
-            min="50"
-            max="100"
-            step="5"
-            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
-            @change="saveEnergyAutoBurn"
-          />
+      <!-- Campaign Energy Sub-panel -->
+      <div class="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 p-2.5 space-y-2">
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Campaign Energy
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="space-y-1">
+            <label for="setting-energy-burn-campaign-pct" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Trigger (%)
+            </label>
+            <input
+              id="setting-energy-burn-campaign-pct"
+              v-model.number="energyBurnSettings.campaignTriggerPct"
+              type="number"
+              min="50"
+              max="100"
+              step="5"
+              class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+              @change="saveEnergyAutoBurn"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label for="setting-energy-burn-campaign-reserve" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Reserve (⚡)
+            </label>
+            <input
+              id="setting-energy-burn-campaign-reserve"
+              v-model.number="energyBurnSettings.campaignReserveEnergy"
+              type="number"
+              min="0"
+              max="180"
+              step="10"
+              class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+              @change="saveEnergyAutoBurn"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label for="setting-energy-burn-fallback-missions" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Fallback 3★ IDs (max 3)
+            </label>
+            <input
+              id="setting-energy-burn-fallback-missions"
+              v-model="energyBurnFallbackText"
+              type="text"
+              placeholder="e.g. 101, 102"
+              class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+              @change="saveEnergyAutoBurn"
+            />
+          </div>
         </div>
 
-        <div class="space-y-1">
-          <label for="setting-energy-burn-campaign-reserve" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Campaign Reserve (⚡)
-          </label>
-          <input
-            id="setting-energy-burn-campaign-reserve"
-            v-model.number="energyBurnSettings.campaignReserveEnergy"
-            type="number"
-            min="0"
-            max="180"
-            step="10"
-            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
-            @change="saveEnergyAutoBurn"
-          />
-        </div>
-
-        <div class="space-y-1">
-          <label for="setting-energy-burn-fallback-missions" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Fallback 3★ Mission IDs (max 3)
-          </label>
-          <input
-            id="setting-energy-burn-fallback-missions"
-            v-model="energyBurnFallbackText"
-            type="text"
-            placeholder="e.g. 101, 102"
-            class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
-            @change="saveEnergyAutoBurn"
-          />
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-        <label for="setting-energy-burn-fav-souls" class="inline-flex items-center gap-1.5 cursor-pointer">
+        <label for="setting-energy-burn-fav-souls" class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
           <input
             id="setting-energy-burn-fav-souls"
             v-model="energyBurnSettings.useFavoriteSoulMissionsFirst"
@@ -1639,19 +1820,100 @@ async function toggleRecording() {
           />
           <span>Sweep Favorite Hero Soul Stones first</span>
         </label>
-        <label for="setting-energy-burn-world-fallback" class="inline-flex items-center gap-1.5 cursor-pointer">
-          <input
-            id="setting-energy-burn-world-fallback"
-            v-model="energyBurnSettings.worldFallbackEnabled"
-            type="checkbox"
-            class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 size-3.5 cursor-pointer"
-            @change="saveEnergyAutoBurn"
-          />
-          <span>World Energy Solo-Monster fallback (when Raid Auto-Energy is off)</span>
-        </label>
+      </div>
+
+      <!-- World Energy Sub-panel (Consolidated Auto Raid Rally + Solo Monster Fallback) -->
+      <div class="rounded-lg border border-indigo-200/70 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/20 p-2.5 space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+            World Energy Auto-Burn Mode
+          </span>
+          <div id="setting-energy-burn-world-mode" class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 text-[11px]">
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded-md font-medium transition-colors"
+              :class="worldEnergyMode === 'off' ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+              @click="worldEnergyMode = 'off'"
+            >
+              Off
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded-md font-medium transition-colors"
+              :class="worldEnergyMode === 'raid' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+              @click="worldEnergyMode = 'raid'"
+            >
+              ⚔️ Auto Raid Rally
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded-md font-medium transition-colors"
+              :class="worldEnergyMode === 'monster' ? 'bg-amber-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'"
+              @click="worldEnergyMode = 'monster'"
+            >
+              👹 Solo Monster
+            </button>
+          </div>
+        </div>
+
+        <div v-if="worldEnergyMode === 'raid'" class="space-y-1.5 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <label for="raid-energy-threshold" class="font-medium text-slate-700 dark:text-slate-200">
+              Trigger when World Energy naturally reaches
+            </label>
+            <input
+              id="raid-energy-threshold"
+              v-model.number="raidEnergyThreshold"
+              type="number"
+              min="25"
+              max="200"
+              aria-label="World Energy threshold"
+              class="w-16 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-mono"
+              @change="saveRaidEnergyConfig(true)"
+            />
+          </div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ raidConfigSummary }}</p>
+          <p v-if="raidEnergyMessage" role="status" class="text-[11px] text-indigo-600 dark:text-indigo-300">{{ raidEnergyMessage }}</p>
+        </div>
+
+        <div v-else-if="worldEnergyMode === 'monster'" class="grid grid-cols-2 gap-2 text-xs">
+          <div class="space-y-1">
+            <label for="setting-energy-burn-world-pct" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Monster Trigger (%)
+            </label>
+            <input
+              id="setting-energy-burn-world-pct"
+              v-model.number="energyBurnSettings.worldTriggerPct"
+              type="number"
+              min="50"
+              max="100"
+              step="5"
+              class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
+              @change="saveEnergyAutoBurn"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="setting-energy-burn-world-reserve" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Monster Reserve (⚡)
+            </label>
+            <input
+              id="setting-energy-burn-world-reserve"
+              v-model.number="energyBurnSettings.worldReserveEnergy"
+              type="number"
+              min="0"
+              max="180"
+              step="10"
+              class="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
+              @change="saveEnergyAutoBurn"
+            />
+          </div>
+        </div>
+
+        <p v-else class="text-[11px] text-slate-500 dark:text-slate-400">
+          World Energy auto-burn is off. Choose Auto Raid Rally (25⚡) or Solo Monster (10⚡).
+        </p>
       </div>
     </section>
-    </div>
     </div>
 
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">

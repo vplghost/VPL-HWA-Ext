@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.402 — 2026-11-28
+
+### Changed
+
+- **Consolidated World Energy Auto Raid Rally, Draggable Autopilot Pills & Balanced Settings Layout (`SettingsTab.vue`, `RaidModal.vue`, `tests/energy-auto-burn.test.mjs`, `tests/status-alert-banner.test.mjs`)**:
+  - Removed `#raid-auto-energy-section` from `RaidModal.vue` (while persisting full `raidPreferences` snapshots) and consolidated World Energy auto-burn modes (`Off` | `Auto Raid Rally` with `#raid-energy-threshold` | `Solo Monster`) inside `#settings-auto-energy-burn-section` in `SettingsTab.vue`.
+  - Converted `Daily Routine Autopilot` steps into compact draggable pills (`#settings-autopilot-step-pills`, drag-and-drop reorder via `moveItemToIndex` + `#setting-daily-autopilot-reset-order`).
+  - Split Settings into balanced 2-column rows (`#settings-row-autopilot-collectors` and `#settings-row-troops-energy`), eliminating empty whitespace under `Daily Routine Autopilot`.
+
 ## 0.11.401 — 2026-11-28
 
 ### Added

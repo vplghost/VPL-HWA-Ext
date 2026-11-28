@@ -70,10 +70,10 @@ test('auto raid configuration validates complete bound dialog options', () => {
   }
 });
 
-test('actual Raid dialog saves current options and does not silently enable global RPC', async t => {
+test('actual Raid dialog saves full raidPreferences snapshot and does not silently enable global RPC (P2-50: Auto Raid moved to SettingsTab)', async t => {
   const source = await readFile(new URL('../src/components/dialogs/RaidModal.vue', import.meta.url), 'utf8');
   const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
-  const sent = [], writes = [], stops = [];
+  const writes = [], stops = [];
   const selectedTeamId = ref('custom:test');
   const team = ref({ id: 'custom:test', heroIds: [1, 2, 3, 4, 5], maxTroops: 1200 });
   const cache = ref({ accountStatus: { data: { id: 10 } } });
@@ -85,38 +85,28 @@ test('actual Raid dialog saves current options and does not silently enable glob
     normalizeArray: raw => Array.isArray(raw) ? raw : Object.values(raw || {}),
     bossConfigId: level => 59 + level, rallyWaitOptions: [60, 300],
     chrome: { storage: { local: { get: async () => ({ popupRpcEnabled: false }), set: async value => writes.push(value) } },
-      runtime: { sendMessage: async message => { sent.push(message); return { ok: true }; } } } };
+      runtime: { sendMessage: async () => ({ ok: true }) } } };
   t.after(() => stops.forEach(stop => stop()));
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
-  vm.runInNewContext(js + '\nglobalThis.api = { saveAutoRaid, savePreferences, autoEnergyRaid, energyThreshold, bossLevel, raidCount, waitSeconds, autoCancel, autoConfigLoaded, statusMessage, ensureRpcEnabled };', context);
+  vm.runInNewContext(js + '\nglobalThis.api = { savePreferences, bossLevel, raidCount, waitSeconds, autoCancel, statusMessage, ensureRpcEnabled };', context);
   const ui = context.api;
-  ui.autoEnergyRaid.value = true;
-  ui.energyThreshold.value = 150;
   ui.bossLevel.value = 9;
   ui.raidCount.value = 3;
   ui.waitSeconds.value = 60;
   ui.autoCancel.value = false;
-  await ui.saveAutoRaid();
-  const config = sent.at(-1).config;
-  assert.equal(config.enabled, true);
-  assert.equal(config.threshold, 150);
-  assert.equal(config.accountId, 10);
-  assert.equal(config.options.teamId, 'custom:test');
-  assert.equal(config.options.maxTroops, 1200);
-  assert.equal(config.options.level, 9);
-  assert.equal(config.options.count, 3);
-  assert.equal(config.options.waitSeconds, 60);
-  assert.equal(config.options.autoCancel, false);
   await ui.savePreferences();
+  const saved = writes.at(-1)?.raidPreferences;
+  assert.equal(saved.accountId, 10);
+  assert.equal(saved.mapId, 'map');
+  assert.deepEqual(saved.center, { x: 5, y: 6 });
+  assert.equal(saved.teamId, 'custom:test');
+  assert.deepEqual(saved.heroIds, [1, 2, 3, 4, 5]);
+  assert.equal(saved.maxTroops, 1200);
+  assert.equal(saved.bossLevel, 9);
+  assert.equal(saved.raidCount, 3);
+  assert.equal(saved.waitSeconds, 60);
+  assert.equal(saved.autoCancel, false);
   assert.ok(writes.every(value => !('popupRpcEnabled' in value)), 'Saving options cannot override global policy');
   assert.equal(await ui.ensureRpcEnabled(), false);
   assert.match(ui.statusMessage.value, /Enable RPC/);
-  ui.autoConfigLoaded.value = true;
-  selectedTeamId.value = 'weakest';
-  team.value = { id: 'weakest', heroIds: [5, 4, 3, 2, 1] };
-  await nextTick();
-  assert.equal(sent.at(-1).config.options.teamId, 'weakest');
-  cache.value.accountStatus.data.id = 11;
-  await nextTick();
-  assert.equal(ui.autoEnergyRaid.value, false);
 });

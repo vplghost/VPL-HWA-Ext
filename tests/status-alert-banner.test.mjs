@@ -70,7 +70,7 @@ test('RaidModal integrates StatusAlertBanner with handleBannerRefresh dispatchin
   assert.match(raidModalSource, /Lv\. \{\{ lvl \}\}/, 'P2-40: Boss Level options omit redundant Boss word');
   assert.doesNotMatch(raidModalSource, /Boss level \{\{ lvl \}\}/, 'P2-40: No redundant Boss level option text');
   assert.match(raidModalSource, /#\{\{ Number\(idx\) \+ 1 \}\} ·/, 'P2-40: Target options omit redundant Boss word');
-  assert.match(raidModalSource, /<section[\s\S]*?id="raid-auto-energy-section"/, 'P2-40: Auto Raid Energy is a detached sibling section');
+  assert.doesNotMatch(raidModalSource, /id="raid-auto-energy-section"/, 'P2-50: Auto Raid Energy moved from RaidModal into SettingsTab Anti-Cap Energy Auto-Burner');
   const actionsIdx = raidModalSource.indexOf('id="raid-dialog-actions"');
   const bannerIdx = raidModalSource.indexOf('<StatusAlertBanner');
   assert.ok(actionsIdx > 0 && bannerIdx > actionsIdx, 'P2-40: StatusAlertBanner renders below #raid-dialog-actions to prevent button jump');

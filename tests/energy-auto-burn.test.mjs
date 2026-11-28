@@ -224,7 +224,15 @@ test('P3-09: runAutoEnergyBurn schedules single zero-polling alarm, preserves ov
   assert.match(settingsVue, /id="settings-auto-energy-burn-section"/);
   assert.match(settingsVue, /id="setting-auto-energy-burn"/);
   assert.match(settingsVue, /id="setting-energy-burn-campaign-pct"/);
-  assert.match(settingsVue, /id="setting-energy-burn-world-fallback"/);
+  assert.match(settingsVue, /id="setting-energy-burn-world-mode"/);
+  assert.match(settingsVue, /id="raid-energy-threshold"/);
+  assert.match(settingsVue, /id="settings-autopilot-step-pills"/);
+  assert.match(settingsVue, /id="setting-daily-autopilot-reset-order"/);
+  assert.match(settingsVue, /id="settings-row-autopilot-collectors"/);
+  assert.match(settingsVue, /id="settings-row-troops-energy"/);
+
+  const raidModalVue = await readFile(resolve('src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.doesNotMatch(raidModalVue, /id="raid-auto-energy-section"/);
 
   // Sanity check computeExactRefillWakeAt
   const wake = computeExactRefillWakeAt(

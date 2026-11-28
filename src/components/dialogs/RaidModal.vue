@@ -54,10 +54,6 @@ const minMembers = ref(4);
 const raidCount = ref(2);
 const autoCancel = ref(true);
 const autoHealAfterQueue = ref(true);
-const autoEnergyRaid = ref(false);
-const energyThreshold = ref(200);
-const autoEnergyMessage = ref('');
-const autoConfigLoaded = ref(false);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 const lastSessionSummary = ref<any>(null);
@@ -184,14 +180,7 @@ const queueStatusLabel = computed(() => {
 
 onMounted(async () => {
   await loadSquadData();
-  const autoStored: any = await chrome.storage.local.get(['raidEnergyAuto', 'raidEnergyAutoStatus', 'raidPreferences']);
   raidCount.value = maxRaidRounds.value;
-  if (String(autoStored.raidEnergyAuto?.accountId) === String(cache.value.accountStatus?.data?.id)) {
-    autoEnergyRaid.value = autoStored.raidEnergyAuto?.enabled === true;
-    energyThreshold.value = autoStored.raidEnergyAuto?.threshold || 200;
-  }
-  autoEnergyMessage.value = autoStored.raidEnergyAutoStatus?.message || '';
-  autoConfigLoaded.value = true;
 
   timer = window.setInterval(() => {
     now.value = Date.now();
@@ -230,7 +219,6 @@ onMounted(async () => {
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.raidEnergyAutoStatus) autoEnergyMessage.value = (changes.raidEnergyAutoStatus.newValue as any)?.message || '';
       if (area === 'local' && changes.raidQueue) {
         const q = changes.raidQueue.newValue as { phase?: string } | undefined;
         raidQueueState.value = q;
@@ -304,33 +292,14 @@ function raidOptions(count = raidCount.value) {
     heroIds: normalizeArray(selectedTeam.value?.heroIds),
     teamId: selectedTeam.value?.id || '', maxTroops: selectedTeam.value?.maxTroops };
 }
-async function saveAutoRaid() {
-  const config = { enabled: autoEnergyRaid.value, threshold: energyThreshold.value,
-    accountId: cache.value.accountStatus?.data?.id, options: raidOptions() };
-  const response = await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config }).catch(error => ({ error: String(error) }));
-  if (!response?.ok) {
-    autoEnergyMessage.value = response?.error || 'Auto raid settings could not be saved.';
-    if (autoEnergyRaid.value) {
-      autoEnergyRaid.value = false;
-      await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config: { enabled: false } }).catch(() => {});
-    }
-  } else autoEnergyMessage.value = autoEnergyRaid.value
-    ? 'Watching natural World Energy regeneration with these raid options.'
-    : 'Automatic energy raid is off.';
-}
-watch(selectedTeamId, () => {
-  if (autoConfigLoaded.value && autoEnergyRaid.value) void saveAutoRaid();
-});
-watch(() => cache.value.accountStatus?.data?.id, () => {
-  autoEnergyRaid.value = false;
-  autoEnergyMessage.value = 'Account changed. Enable auto raid again for this account.';
-});
 
 async function savePreferences() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({
       raidPreferences: {
         accountId: cache.value.accountStatus?.data?.id,
+        mapId: mapContext.value?.mapId,
+        center: mapCenter.value,
         raidCount: raidCount.value,
         bossLevel: bossLevel.value,
         waitSeconds: waitSeconds.value,
@@ -338,15 +307,14 @@ async function savePreferences() {
         autoCancel: autoCancel.value,
         autoHealAfterQueue: autoHealAfterQueue.value,
         rallyTeam: selectedTeamId.value,
+        teamId: selectedTeam.value?.id || selectedTeamId.value || '',
+        heroIds: normalizeArray(selectedTeam.value?.heroIds),
+        maxTroops: selectedTeam.value?.maxTroops,
         targetMobId: selectedMobId.value,
       },
     });
   }
 }
-
-watch([bossLevel, waitSeconds, minMembers, raidCount, autoCancel], () => {
-  if (autoConfigLoaded.value && autoEnergyRaid.value) void saveAutoRaid();
-});
 
 const isLocatingMap = ref(false);
 
@@ -861,22 +829,6 @@ async function stopRaidQueue() {
               🔒 {{ activeRaidLock.heroIds?.length || 0 }} heroes &amp; {{ activeRaidLock.marchSlots || 1 }} march slot reserved from Auto Gather
             </span>
           </div>
-        </section>
-
-        <!-- Section 3: Detached Auto Raid by World Energy -->
-        <section
-          id="raid-auto-energy-section"
-          class="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-white dark:bg-slate-800/80 p-3.5 shadow-xs space-y-1.5"
-        >
-          <label class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-100 cursor-pointer">
-            <input id="raid-auto-energy" v-model="autoEnergyRaid" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 shrink-0" @change="saveAutoRaid" />
-            <span>⚡ Auto raid when World Energy naturally reaches</span>
-            <input id="raid-energy-threshold" v-model.number="energyThreshold" type="number" min="25" max="200" aria-label="World Energy threshold" class="w-16 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-mono" @change="saveAutoRaid" />
-          </label>
-          <p class="text-[11px] text-slate-500 dark:text-slate-400">
-            Uses the team, boss level, rounds and rally settings above. Triggers only from below to the threshold through natural regeneration; skips startup, item gains and energy already above the threshold.
-          </p>
-          <p v-if="autoEnergyMessage" role="status" class="text-xs text-indigo-600 dark:text-indigo-300">{{ autoEnergyMessage }}</p>
         </section>
 
         <!-- Map Missing Warning & Locate Action -->
